@@ -50,9 +50,3 @@
 	- Slows enemy movement for a fixed amount of time.
 3. Camouflage:
 	- Player spider opacity increased temporarily.
-
-### Diagram
-##### Legend
-- Diamonds: Spiders
-- Circles: Creatures
-
