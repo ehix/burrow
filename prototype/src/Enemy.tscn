@@ -4,7 +4,6 @@
 [ext_resource path="res://src/Enemy.gd" type="Script" id=2]
 [ext_resource path="res://assets/EnemySpider.png" type="Texture" id=3]
 
-
 [sub_resource type="RectangleShape2D" id=1]
 extents = Vector2( 50.717, 53.7154 )
 
@@ -24,7 +23,7 @@ tracks/0/keys = {
 }
 
 [sub_resource type="RectangleShape2D" id=3]
-extents = Vector2( 274.371, 268.098 )
+extents = Vector2( 256.768, 257.314 )
 
 [node name="Enemy" type="KinematicBody2D"]
 position = Vector2( 113.705, 125.964 )

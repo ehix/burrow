@@ -4,7 +4,6 @@
 [ext_resource path="res://assets/Playerspider.png" type="Texture" id=2]
 [ext_resource path="res://assets/light.png" type="Texture" id=3]
 
-
 [sub_resource type="RectangleShape2D" id=1]
 extents = Vector2( 50.717, 53.7154 )
 
@@ -24,7 +23,7 @@ tracks/0/keys = {
 }
 
 [sub_resource type="RectangleShape2D" id=3]
-extents = Vector2( 274.371, 268.098 )
+extents = Vector2( 256.475, 257.32 )
 
 [node name="Player" type="KinematicBody2D"]
 position = Vector2( 112.705, 125.964 )
@@ -51,7 +50,6 @@ shape = SubResource( 3 )
 position = Vector2( 0.731506, 168.323 )
 
 [node name="Light2D" type="Light2D" parent="."]
-position = Vector2( 274.102, 171.922 )
 texture = ExtResource( 3 )
 texture_scale = 6.93
 color = Color( 0.992157, 0.882353, 0.45098, 1 )
