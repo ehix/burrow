@@ -21,7 +21,7 @@ tile_set = ExtResource( 3 )
 format = 1
 
 [node name="Player" parent="." instance=ExtResource( 1 )]
-position = Vector2( 66.0242, 66.3692 )
+position = Vector2( 91.4954, 82.8506 )
 scale = Vector2( 0.1, 0.1 )
 
 [node name="Enemy" parent="." instance=ExtResource( 4 )]

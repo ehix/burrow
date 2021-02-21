@@ -12,7 +12,7 @@ var tile_size = 64  # tile size (in pixels)
 var width = 17  # width of map (in tiles)
 var height = 10  # height of map (in tiles)
 
-var map_seed = null
+var map_seed = 1234
 
 # fraction of walls to remove
 var erase_fraction = 0.2
