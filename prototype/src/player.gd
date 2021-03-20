@@ -17,6 +17,13 @@ var current_dir = Vector2.DOWN
 onready var spider_mouth_pos = $SpiderMouth 
 var health: int = 3
 
+func _ready() -> void:
+	pass
+
+func set_position(position):
+	var player = get_parent().get_node("Player")
+	player.position = position
+
 func get_input():
 	velocity = Vector2.ZERO
 	if Input.is_action_pressed("move_right"):
@@ -35,9 +42,10 @@ func get_input():
 		velocity.y -= 1
 		rotation_degrees = 180
 		current_dir = Vector2.UP
+		
 	# Make sure diagonal movement isn't faster
-
 	velocity = velocity.normalized() * movespeed
+	return current_dir
 
 func fire(): 
 	var bullet_instance = bullet.instance()
@@ -52,11 +60,8 @@ func fire():
 #	bullet_instance.apply_impulse(Vector2(), Vector2(bullet_speed, 0).rotated(deg2rad(270)))
 # Called when the node enters the scene tree for the first time.
 
-func _ready() -> void:
-	pass # Replace with function body.
-
 func _physics_process(delta: float) -> void:
-	get_input()
+	var current_direction = get_input()
 	velocity = move_and_slide(velocity)
 	if Input.is_action_just_pressed("fire"):
 		fire()
@@ -81,4 +86,3 @@ func _on_Area2D_body_entered(body: Node) -> void:
 	if "Enemy" in body.name:
 		print("Player KILLED by Enemy")
 		take_damage()
-

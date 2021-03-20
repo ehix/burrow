@@ -15,7 +15,7 @@ var height = 10  # height of map (in tiles)
 var map_seed
 
 # fraction of walls to remove
-var erase_fraction = 0.2
+var erase_fraction = 0.9
 
 # get a reference to the map for convenience
 onready var Map = $TileMap
@@ -29,8 +29,12 @@ func _ready():
 	seed(map_seed)
 	print("Seed: ", map_seed)
 	tile_size = Map.cell_size
-	make_maze()
+	# Make maze, and get starting positions for players
+	var starting_positions = make_maze()
+	get_node("Player").set_position(starting_positions[0] + tile_size/2)
+	get_node("Enemy").set_position(starting_positions[1] + tile_size/2)
 	erase_walls()
+	
 	
 func check_neighbors(cell, unvisited):
 	# returns an array of cell's unvisited neighbors
@@ -51,8 +55,14 @@ func make_maze():
 	for x in range(0, width, 2):
 		for y in range(0, height, 2):
 			unvisited.append(Vector2(x, y))
+	
 	var current = Vector2(0, 0)
 	unvisited.erase(current)
+	
+	# Start positions for each spider
+	var player_start = current * tile_size
+	var enemy_start = unvisited[-1] * tile_size
+
 	# execute recursive backtracker algorithm
 	while unvisited:
 		var neighbors = check_neighbors(current, unvisited)
@@ -75,10 +85,11 @@ func make_maze():
 		elif stack:
 			current = stack.pop_back()
 		# yield(get_tree(), 'idle_frame')
+	return [player_start, enemy_start]
 
 func erase_walls():
 	# randomly remove a number of the map's walls
-	for i in range(int(width * height * erase_fraction)):
+	for i in range(int((width * height) * erase_fraction)):
 		var x = int(rand_range(2, width/2 - 2)) * 2
 		var y = int(rand_range(2, height/2 - 2)) * 2
 		var cell = Vector2(x, y)
