@@ -1,6 +1,4 @@
 extends KinematicBody2D
-
-
 # Declare member xvariables here. Examples:
 # var a: int = 2
 # var b: String = "text"
@@ -11,7 +9,11 @@ var current_dir = Vector2.DOWN
 var init_timout = 3.0
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	pass # Replace with function body.
+	pass
+
+func set_position(position):
+	var player = get_parent().get_node("Enemy")
+	player.position = position
 
 func get_input():
 	velocity = Vector2.ZERO
