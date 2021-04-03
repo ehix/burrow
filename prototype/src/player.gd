@@ -50,7 +50,7 @@ func get_input():
 func fire(): 
 	var bullet_instance = bullet.instance()
 #	add_child(bullet_instance)
-	print("fire!")
+	#print("fire!")
 	bullet_instance.global_position = spider_mouth_pos.global_position
 	bullet_instance.set_direction(current_dir)
 	
