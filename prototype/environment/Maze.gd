@@ -5,10 +5,10 @@ const E = 2
 const S = 4
 const W = 8
 const block_tile = N|E|S|W # 15 because tile index 15 is the 'block' tile (only collision)
+const TileTypes = preload("res://src/TileTypes.gd").Tile_Type
 
 var cell_walls = {Vector2(0, -2): N, Vector2(2, 0): E, 
 				  Vector2(0, 2): S, Vector2(-2, 0): W}
-
 var tile_size = 64  # tile size (in pixels)
 var width = 17  # width of map (in tiles)
 var height = 10  # height of map (in tiles)
@@ -105,4 +105,77 @@ func erase_walls():
 			else:
 				self.set_cellv(cell+neighbor/2, 10)
 		#yield(get_tree(), 'idle_frame')
-
+		
+func get_grid_id_from_worldpos(worldpos: Vector2):
+	var cell_num = self.world_to_map(worldpos)
+	print("Maze, get grid index from worldpos - ", cell_num)
+	return cell_num
+	
+func get_tiletype_from_worldpos(worldpos: Vector2):
+	var cell_num = self.world_to_map(worldpos)
+	print("Maze, get grid index from worldpos - ", cell_num)
+	return get_tiletype(cell_num)
+	
+func get_tiletype(grid_id: Vector2):
+	var up_tile = self.get_cellv(grid_id + Vector2.UP)
+	var up_blocked = up_tile == block_tile || up_tile == -1
+	print("Up Blocked? - ", up_blocked)
+	var right_tile = self.get_cellv(grid_id + Vector2.RIGHT)
+	var right_blocked = right_tile == block_tile || right_tile == -1
+	print("Right Blocked? - ", right_blocked)
+	var down_tile = self.get_cellv(grid_id + Vector2.DOWN)
+	var down_blocked = down_tile == block_tile || down_tile == -1
+	print("Down Blocked? - ", down_blocked)
+	var left_tile = self.get_cellv(grid_id + Vector2.LEFT)
+	var left_blocked = left_tile == block_tile || left_tile == -1
+	print("Left Blocked? - ", left_blocked)
+	
+	# Horizontal Tunnel Variants
+	if up_blocked && down_blocked && !left_blocked && !right_blocked:
+		print("FOUND HORIZONTAL TUNNEL")
+		return TileTypes.TUNNEL_HORIZONTAL
+	elif up_blocked && down_blocked && !left_blocked && right_blocked:
+		print("FOUND HORIZONTAL TUNNEL w Dead Right End")
+		return TileTypes.TUNNEL_HORIZONTAL
+	elif up_blocked && down_blocked && left_blocked && !right_blocked:
+		print("FOUND HORIZONTAL TUNNEL w Dead Left End")
+		return TileTypes.TUNNEL_HORIZONTAL
+	# Vertical Tunnel Variants
+	elif !up_blocked && !down_blocked && left_blocked && right_blocked:
+		print("FOUND VERTICAL TUNNEL")
+		return TileTypes.TUNNEL_VERTICAL
+	elif up_blocked && !down_blocked && left_blocked && right_blocked:
+		print("FOUND VERTICAL TUNNEL w Dead End above")
+		return TileTypes.TUNNEL_VERTICAL
+	elif !up_blocked && down_blocked && left_blocked && right_blocked:
+		print("FOUND VERTICAL TUNNEL w Dead End below")
+		return TileTypes.TUNNEL_VERTICAL
+	# Corner Variants
+	elif left_blocked && up_blocked && !right_blocked && !down_blocked:
+		print("FOUND TOP LEFT CORNER ")
+		return TileTypes.CORNER_TOP_LEFT
+	elif !left_blocked && up_blocked && right_blocked && !down_blocked:
+		print("FOUND TOP RIGHT CORNER ")
+		return TileTypes.CORNER_TOP_RIGHT
+	elif !left_blocked && !up_blocked && right_blocked && down_blocked:
+		print("FOUND BOTTOM RIGHT CORNER ")
+		return TileTypes.CORNER_BOTTOM_RIGHT
+	elif left_blocked && !up_blocked && !right_blocked && down_blocked:
+		print("FOUND BOTTOM LEFT CORNER ")
+		return TileTypes.CORNER_BOTTOM_LEFT
+	# Junction Variants
+	elif left_blocked && !up_blocked && !right_blocked && !down_blocked:
+		print("FOUND LEFT T JUNCTION ")
+		return TileTypes.T_LEFT
+	elif !left_blocked && up_blocked && !right_blocked && !down_blocked:
+		print("FOUND NORMAL T JUNCTION ")
+		return TileTypes.T_NORMAL
+	elif !left_blocked && !up_blocked && right_blocked && !down_blocked:
+		print("FOUND RIGHT T JUNCTION ")
+		return TileTypes.T_RIGHT
+	elif !left_blocked && !up_blocked && !right_blocked && down_blocked:
+		print("FOUND UPSIDE DOWN T JUNCTION ")
+		return TileTypes.T_UPSIDE_DOWN
+	elif !left_blocked && !up_blocked && !right_blocked && !down_blocked:
+		print("FOUND CROSSROAD JUNCTION ")
+		return TileTypes.CROSSROAD

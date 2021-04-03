@@ -1,16 +1,23 @@
 extends Node2D
 
+const TileTypes = preload("res://src/TileTypes.gd").Tile_Type
+
 var init_timout = 3.0 # DUMMY TIMEOUT
 var larvae = preload("res://src/Larvae.tscn")
 var num_larvae = 0
 onready var Maze = get_node("Maze")
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+	print("enum example - T Left = ",TileTypes.T_LEFT)
 	pass # Replace with function body.
+	
+func get_input():
+	if Input.is_action_pressed("click"):
+		Maze.get_tiletype_from_worldpos(get_global_mouse_position())
 	
 
 func _process(delta: float) -> void:
-
+	get_input()
 	if init_timout > 0:# DUMMY TIMEOUT
 		init_timout -= delta# DUMMY TIMEOUT
 	else:
@@ -33,5 +40,9 @@ func spawn_larvae():
 			found_valid_tile = true
 	larvae_instance.global_position = ((cell_location * Maze.tile_size) + (Maze.tile_size / 2))
 	get_tree().get_root().add_child(larvae_instance)
-	num_larvae += 1	
+	increment_larvae()
 
+func decrement_larvae():
+	num_larvae -=1
+func increment_larvae():
+	num_larvae += 1

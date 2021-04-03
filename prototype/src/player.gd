@@ -84,5 +84,5 @@ func take_damage():
 func _on_Area2D_body_entered(body: Node) -> void:
 	print("Player Area entered by - ", body.name)
 	if "Enemy" in body.name:
-		print("Player KILLED by Enemy")
+		print("Player damaged by Enemy")
 		take_damage()
