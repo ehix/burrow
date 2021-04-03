@@ -11,13 +11,13 @@ func _ready() -> void:
 	print("enum example - T Left = ",TileTypes.T_LEFT)
 	pass # Replace with function body.
 	
-func get_input():
-	if Input.is_action_pressed("click"):
-		Maze.get_tiletype_from_worldpos(get_global_mouse_position())
-	
+#func get_input():
+#	if Input.is_action_pressed("click"):
+#		Maze.get_tiletype_from_worldpos(get_global_mouse_position())
+#
 
 func _process(delta: float) -> void:
-	get_input()
+#	get_input()
 	if init_timout > 0:# DUMMY TIMEOUT
 		init_timout -= delta# DUMMY TIMEOUT
 	else:
@@ -39,6 +39,8 @@ func spawn_larvae():
 		if cell_type != Maze.block_tile:
 			found_valid_tile = true
 	larvae_instance.global_position = ((cell_location * Maze.tile_size) + (Maze.tile_size / 2))
+	var target_tiletype = Maze.get_tiletype_from_worldpos(larvae_instance.global_position)
+	larvae_instance.decide_orientation(target_tiletype)
 	get_tree().get_root().add_child(larvae_instance)
 	increment_larvae()
 

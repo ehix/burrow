@@ -1,4 +1,5 @@
 enum Tile_Type {	  
+BLOCKED_CELL,
 TUNNEL_HORIZONTAL, # --
 TUNNEL_VERTICAL, # |
 CORNER_TOP_LEFT, # |¯

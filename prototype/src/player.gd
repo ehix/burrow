@@ -1,12 +1,6 @@
 extends KinematicBody2D
 
 
-enum DIR {
-	NORTH,
-	EAST,
-	SOUTH,
-	WEST
-}
 # Declare member variables here. Examples:
 var movespeed: int = 500
 var bullet_speed = 2000
@@ -55,10 +49,8 @@ func fire():
 	bullet_instance.set_direction(current_dir)
 	
 	get_tree().get_root().call_deferred("add_child", bullet_instance)
-#	bullet_instance.rotation_degrees = rotation_degrees
-#	bullet_instance.apply_impulse(Vector2(), Vector2(bullet_speed, 0).rotated(rotation))
-#	bullet_instance.apply_impulse(Vector2(), Vector2(bullet_speed, 0).rotated(deg2rad(270)))
-# Called when the node enters the scene tree for the first time.
+	var Maze = get_parent().get_node("Maze")
+	Maze.get_next_cell_tiletype(self.global_position, current_dir)
 
 func _physics_process(delta: float) -> void:
 	var current_direction = get_input()
