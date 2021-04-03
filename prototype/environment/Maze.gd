@@ -1,4 +1,4 @@
-extends Node2D
+extends TileMap
 
 const N = 1
 const E = 2
@@ -14,23 +14,9 @@ var width = 17  # width of map (in tiles)
 var height = 10  # height of map (in tiles)
 
 var map_seed
-var init_timout = 3.0 # DUMMY TIMEOUT
 # fraction of walls to remove
 var erase_fraction = 0.1
 
-# get a reference to the map for convenience
-onready var Map = $TileMap
-var larvae = preload("res://src/Larvae.tscn")
-var num_larvae = 0
-func _process(delta: float) -> void:
-
-	if init_timout > 0:# DUMMY TIMEOUT
-		init_timout -= delta# DUMMY TIMEOUT
-	else:
-		init_timout = 3.0
-		if num_larvae < 2:
-			spawn_larvae()
-		
 func _ready():
 #	$Camera2D.zoom = Vector2(3, 3)
 #	$Camera2D.position = Map.map_to_world(Vector2(width/2, height/2))
@@ -39,12 +25,12 @@ func _ready():
 		map_seed = randi()
 	seed(map_seed)
 	print("Seed: ", map_seed)
-	tile_size = Map.cell_size
+	tile_size = self.cell_size
 	# Make maze, and get starting positions for players
 	var starting_positions = make_maze()
-	make_maze()
-	get_node("Player").set_position(starting_positions[0] + tile_size/2)
-	get_node("Enemy").set_position(starting_positions[1] + tile_size/2)
+#	make_maze()
+	get_parent().get_node("Player").set_position(starting_positions[0] + tile_size/2)
+	get_parent().get_node("Enemy").set_position(starting_positions[1] + tile_size/2)
 	erase_walls()
 	
 	
@@ -60,10 +46,10 @@ func make_maze():
 	var unvisited = []  # array of unvisited tiles
 	var stack = []
 	# fill the map with solid tiles
-	Map.clear()
+	self.clear()
 	for x in range(width):
 		for y in range(height):
-			Map.set_cellv(Vector2(x, y), N|E|S|W)
+			self.set_cellv(Vector2(x, y), N|E|S|W)
 	for x in range(0, width, 2):
 		for y in range(0, height, 2):
 			unvisited.append(Vector2(x, y))
@@ -83,15 +69,15 @@ func make_maze():
 			stack.append(current)
 			# remove walls from *both* cells
 			var dir = next - current
-			var current_walls = Map.get_cellv(current) - cell_walls[dir]
-			var next_walls = Map.get_cellv(next) - cell_walls[-dir]
-			Map.set_cellv(current, current_walls)
-			Map.set_cellv(next, next_walls)
+			var current_walls = self.get_cellv(current) - cell_walls[dir]
+			var next_walls = self.get_cellv(next) - cell_walls[-dir]
+			self.set_cellv(current, current_walls)
+			self.set_cellv(next, next_walls)
 			# insert intermediate cell
 			if dir.x != 0:
-				Map.set_cellv(current + dir/2, 5)
+				self.set_cellv(current + dir/2, 5)
 			else:
-				Map.set_cellv(current + dir/2, 10)
+				self.set_cellv(current + dir/2, 10)
 			current = next
 			unvisited.erase(current)
 		elif stack:
@@ -108,30 +94,15 @@ func erase_walls():
 		# pick random neighbor
 		var neighbor = cell_walls.keys()[randi() % cell_walls.size()]
 		# if there's a wall between them, remove it
-		if Map.get_cellv(cell) & cell_walls[neighbor]:
-			var walls = Map.get_cellv(cell) - cell_walls[neighbor]
-			var n_walls = Map.get_cellv(cell+neighbor) - cell_walls[-neighbor]
-			Map.set_cellv(cell, walls)
-			Map.set_cellv(cell+neighbor, n_walls)
+		if self.get_cellv(cell) & cell_walls[neighbor]:
+			var walls = self.get_cellv(cell) - cell_walls[neighbor]
+			var n_walls = self.get_cellv(cell+neighbor) - cell_walls[-neighbor]
+			self.set_cellv(cell, walls)
+			self.set_cellv(cell+neighbor, n_walls)
 			# insert intermediate cell
 			if neighbor.x != 0:
-				Map.set_cellv(cell+neighbor/2, 5)
+				self.set_cellv(cell+neighbor/2, 5)
 			else:
-				Map.set_cellv(cell+neighbor/2, 10)
+				self.set_cellv(cell+neighbor/2, 10)
 		#yield(get_tree(), 'idle_frame')
-func spawn_larvae():
-	# DUMMY Larvae spawn
-	var larvae_instance = larvae.instance()
-	print("Spawn Larvae!")
-	var found_valid_tile = false
-	var cell_location = Vector2(0, 0)
-	while found_valid_tile == false:
-#				yield(get_tree(), "idle_frame")
-		cell_location = Vector2(randi() % width, randi() % height)
-		var cell_type = Map.get_cellv(cell_location)
-		print("Cell location, Cell type = ", cell_location," ", cell_type)
-		if cell_type != block_tile:
-			found_valid_tile = true
-	larvae_instance.global_position = ((cell_location * tile_size) + (tile_size / 2))
-	get_tree().get_root().add_child(larvae_instance)
-	num_larvae += 1	
+
