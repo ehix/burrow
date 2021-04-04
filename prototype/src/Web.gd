@@ -32,14 +32,14 @@ func set_direction(new_direction: Vector2):
 	
 
 
-func _on_Area2D_area_entered(area: Area2D) -> void:
-	print("Bullet hit something! - ", area.get_parent().name)
-	
+#func _on_Area2D_area_entered(area: Area2D) -> void:
+#	print("Bullet hit something! - ", area.get_parent().name)
+#
 
 
 func _on_Area2D_body_entered(body: Node) -> void:
-	print("Bullet body entered something! - ", body.name)
-	if "TileMap" in body.name:
+#	print("Bullet body entered something! - ", body.name)
+	if "Maze" in body.name:
 		queue_free()
 		
 	if "Enemy" in body.name:

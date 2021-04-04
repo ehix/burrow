@@ -66,9 +66,9 @@ func take_damage():
 	else:
 		$AnimationPlayer.play("Damage")
 		
-func _on_Area2D_body_entered(body: Node) -> void:
-	print("Enemy body entered ", body.name)
-#	pass # Replace with function body.
+#func _on_Area2D_body_entered(body: Node) -> void:
+##	print("Enemy body entered ", body.name)
+##	pass # Replace with function body.
 
 
 

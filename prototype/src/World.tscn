@@ -1,13 +1,14 @@
-[gd_scene load_steps=6 format=2]
+[gd_scene load_steps=7 format=2]
 
 [ext_resource path="res://src/Player.tscn" type="PackedScene" id=1]
 [ext_resource path="res://assets/whiteTile.png" type="Texture" id=2]
 [ext_resource path="res://environment/road_tiles.tres" type="TileSet" id=3]
 [ext_resource path="res://src/Enemy.tscn" type="PackedScene" id=4]
 [ext_resource path="res://environment/Maze.gd" type="Script" id=5]
+[ext_resource path="res://src/World.gd" type="Script" id=6]
 
 [node name="World" type="Node2D"]
-script = ExtResource( 5 )
+script = ExtResource( 6 )
 
 [node name="BG" type="Sprite" parent="."]
 modulate = Color( 0.164706, 0.243137, 0.45098, 1 )
@@ -15,10 +16,11 @@ scale = Vector2( 5.38582, 3.16949 )
 texture = ExtResource( 2 )
 centered = false
 
-[node name="TileMap" type="TileMap" parent="."]
+[node name="Maze" type="TileMap" parent="."]
 position = Vector2( 7.62939e-06, 7.62939e-06 )
 tile_set = ExtResource( 3 )
 format = 1
+script = ExtResource( 5 )
 
 [node name="MapBoundary" type="TileMap" parent="."]
 position = Vector2( 7.62939e-06, 7.62939e-06 )

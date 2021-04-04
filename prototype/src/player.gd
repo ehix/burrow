@@ -1,12 +1,6 @@
 extends KinematicBody2D
 
 
-enum DIR {
-	NORTH,
-	EAST,
-	SOUTH,
-	WEST
-}
 # Declare member variables here. Examples:
 var movespeed: int = 500
 var bullet_speed = 2000
@@ -50,15 +44,13 @@ func get_input():
 func fire(): 
 	var bullet_instance = bullet.instance()
 #	add_child(bullet_instance)
-	print("fire!")
+	#print("fire!")
 	bullet_instance.global_position = spider_mouth_pos.global_position
 	bullet_instance.set_direction(current_dir)
 	
 	get_tree().get_root().call_deferred("add_child", bullet_instance)
-#	bullet_instance.rotation_degrees = rotation_degrees
-#	bullet_instance.apply_impulse(Vector2(), Vector2(bullet_speed, 0).rotated(rotation))
-#	bullet_instance.apply_impulse(Vector2(), Vector2(bullet_speed, 0).rotated(deg2rad(270)))
-# Called when the node enters the scene tree for the first time.
+	var Maze = get_parent().get_node("Maze")
+	Maze.get_next_cell_tiletype(self.global_position, current_dir)
 
 func _physics_process(delta: float) -> void:
 	var current_direction = get_input()
@@ -84,5 +76,5 @@ func take_damage():
 func _on_Area2D_body_entered(body: Node) -> void:
 	print("Player Area entered by - ", body.name)
 	if "Enemy" in body.name:
-		print("Player KILLED by Enemy")
+		print("Player damaged by Enemy")
 		take_damage()
