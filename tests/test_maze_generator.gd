@@ -50,3 +50,27 @@ func test_open_cell_count_matches_reachable() -> void:
 	var cells := maze.open_cells()
 	assert_gt(cells.size(), 0)
 	assert_eq(maze.reachable_count(cells[0]), cells.size())
+
+
+func test_braiding_reduces_dead_ends() -> void:
+	# Same seed: braided maze has strictly fewer dead-ends than the perfect one.
+	var perfect := MazeGenerator.generate(8, 8, 123, 0.0)
+	var braided := MazeGenerator.generate(8, 8, 123, 1.0)
+	assert_gt(perfect.dead_end_count(), 0, "a perfect maze has dead-ends")
+	assert_lt(braided.dead_end_count(), perfect.dead_end_count(),
+		"braiding should remove dead-ends and add loops")
+
+
+func test_braiding_stays_connected_and_deterministic() -> void:
+	var a := MazeGenerator.generate(8, 8, 77, 0.7)
+	var b := MazeGenerator.generate(8, 8, 77, 0.7)
+	assert_true(a.is_fully_connected(), "braided maze stays fully connected")
+	assert_true(a.equals(b), "braiding is deterministic for a fixed seed")
+
+
+func test_full_braid_opens_more_passages() -> void:
+	# Braiding only opens walls, so the braided maze has >= the open tiles of
+	# the perfect one (and strictly more when any dead-end is braided).
+	var perfect := MazeGenerator.generate(8, 8, 5, 0.0)
+	var braided := MazeGenerator.generate(8, 8, 5, 1.0)
+	assert_gt(braided.open_cells().size(), perfect.open_cells().size())

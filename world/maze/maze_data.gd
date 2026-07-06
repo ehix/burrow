@@ -62,6 +62,21 @@ func reachable_count(start: Vector2i) -> int:
 
 
 ## True when every open tile is reachable from the first one (no islands).
+## Number of open cells with exactly one open orthogonal neighbour (dead-ends).
+## A perfect maze has many; braiding drives this down.
+func dead_end_count() -> int:
+	var count := 0
+	for y in height:
+		for x in width:
+			if not is_open(x, y):
+				continue
+			var neighbours := int(is_open(x, y - 1)) + int(is_open(x + 1, y)) \
+				+ int(is_open(x, y + 1)) + int(is_open(x - 1, y))
+			if neighbours == 1:
+				count += 1
+	return count
+
+
 func is_fully_connected() -> bool:
 	var cells := open_cells()
 	if cells.is_empty():

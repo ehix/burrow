@@ -8,6 +8,8 @@ const TILE_SIZE := 48
 const MAZE_COLS := 9   # fixed size — map-size progression is out of slice 1
 const MAZE_ROWS := 9
 const LARVA_COUNT := 4
+## Fraction of dead-ends to braid into loops (0 = perfect maze). Tunable feel.
+const LOOP_CHANCE := 0.7
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
@@ -30,7 +32,7 @@ var enemy: Node2D
 
 ## Build the whole level. Called by World right after instancing.
 func build() -> void:
-	maze = MazeGenerator.generate(MAZE_COLS, MAZE_ROWS, GameState.maze_seed())
+	maze = MazeGenerator.generate(MAZE_COLS, MAZE_ROWS, GameState.maze_seed(), LOOP_CHANCE)
 	_renderer.setup(maze, TILE_SIZE)
 	_build_collision_and_occluders()
 	_build_navigation()
