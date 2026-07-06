@@ -27,6 +27,26 @@
       "model": "gemini-3.1-flash-lite-image",
       "local": "assets/sprites/larva.png",
       "notes": "Wandering larva/grub. Faces east."
+    },
+    {
+      "asset_id": "8befbc5f-d9fe-46a3-9189-f1988c352a7e",
+      "label": "web-shot",
+      "role": "web_shot",
+      "sha12": "bad2819f6977",
+      "model": "gpt-image-2",
+      "quality": "low",
+      "local": "assets/sprites/web_shot.png",
+      "notes": "Silk projectile blob."
+    },
+    {
+      "asset_id": "133f3d2a-3d55-4248-b2f1-f1d82d801272",
+      "label": "web-trap",
+      "role": "web_trap",
+      "sha12": "7cba344e867a",
+      "model": "gpt-image-2",
+      "quality": "low",
+      "local": "assets/sprites/web_trap.png",
+      "notes": "Circular web snare."
     }
   ]
 }

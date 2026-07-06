@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://entities/web/web_trap.gd" id="1_trap"]
+[ext_resource type="Texture2D" uid="uid://cgme8yu4ka4xb" path="res://assets/sprites/web_trap.png" id="2_trap_tex"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_block"]
 radius = 11.0
@@ -16,13 +17,10 @@ script = ExtResource("1_trap")
 [node name="BlockShape" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_block")
 
-[node name="Visual" type="Polygon2D" parent="."]
-color = Color(0.85, 0.87, 0.9, 0.45)
-polygon = PackedVector2Array(16, 0, 11, 11, 0, 16, -11, 11, -16, 0, -11, -11, 0, -16, 11, -11)
-
-[node name="CrossVisual" type="Polygon2D" parent="."]
-color = Color(0.95, 0.96, 1, 0.7)
-polygon = PackedVector2Array(2, -15, 2, 15, -2, 15, -2, -15)
+[node name="Visual" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_trap_tex")
 
 [node name="CatchArea" type="Area2D" parent="."]
 collision_layer = 0
