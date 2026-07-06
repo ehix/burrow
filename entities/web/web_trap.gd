@@ -7,6 +7,8 @@ extends StaticBody2D
 ## catch_larva() / try_consume() are public and guard against missing child
 ## nodes so the resolution logic can be unit-tested without the full scene.
 
+const SpentScene := preload("res://entities/web/web_trap_spent.tscn")
+
 @export var satiation: float = 40.0
 ## Seconds before the blocking body becomes solid (lets the placer leave).
 @export var arm_delay: float = 0.4
@@ -79,7 +81,17 @@ func try_consume(spider: Node) -> void:
 		caught_larva.queue_free()
 	caught_larva = null
 	spent = true
+	_leave_torn_web()
 	queue_free()
+
+
+func _leave_torn_web() -> void:
+	var holder := get_parent()
+	if holder == null:
+		return
+	var torn := SpentScene.instantiate()
+	holder.add_child(torn)
+	torn.global_position = global_position
 
 
 func _find_hunger(spider: Node) -> HungerComponent:

@@ -47,6 +47,28 @@
       "quality": "low",
       "local": "assets/sprites/web_trap.png",
       "notes": "Circular web snare."
+    },
+    {
+      "asset_id": "a902c627-efb0-48b9-a0ad-587e447154af",
+      "label": "web-shot-spent",
+      "role": "web_shot_spent",
+      "sha12": "5d9f2d58d88d",
+      "model": "gpt-image-2",
+      "quality": "low",
+      "local": "assets/sprites/web_shot_spent.png",
+      "edited_from": "8befbc5f-d9fe-46a3-9189-f1988c352a7e",
+      "notes": "Splattered web on wall impact."
+    },
+    {
+      "asset_id": "b81da37b-dc2e-461c-a97a-c3e7c1a8cc2e",
+      "label": "web-trap-spent",
+      "role": "web_trap_spent",
+      "sha12": "6a465e1fc297",
+      "model": "gpt-image-2",
+      "quality": "low",
+      "local": "assets/sprites/web_trap_spent.png",
+      "edited_from": "133f3d2a-3d55-4248-b2f1-f1d82d801272",
+      "notes": "Torn spent web left after consumption."
     }
   ]
 }

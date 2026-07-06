@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://entities/web/web_decal.gd" id="1_decal"]
+[ext_resource type="Texture2D" uid="uid://mg1kjp3n0sak" path="res://assets/sprites/web_shot_spent.png" id="2_tex"]
+
+[node name="WebShotSpent" type="Sprite2D"]
+texture_filter = 1
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_tex")
+script = ExtResource("1_decal")
+lifetime = 0.9
+fade_time = 0.6
