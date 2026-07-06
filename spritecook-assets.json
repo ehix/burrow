@@ -1,0 +1,14 @@
+{
+  "assets": [
+    {
+      "asset_id": "72571f60-77d4-409a-af9a-cef7301682fa",
+      "label": "player-wolf-spider-anchor",
+      "role": "player",
+      "style_anchor": true,
+      "sha12": "751a0b3d34b1",
+      "model": "gemini-3.1-flash-image",
+      "notes": "Slice-1 hero + style anchor. 64px top-down pixel wolf spider, faces EAST (rotation=velocity.angle()).",
+      "local": "assets/sprites/player_wolf_spider.png"
+    }
+  ]
+}

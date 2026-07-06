@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://entities/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://components/health_component.gd" id="2_health"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://components/hurtbox.gd" id="6_hurtbox"]
 [ext_resource type="PackedScene" path="res://entities/web/web_shot.tscn" id="7_shot"]
 [ext_resource type="PackedScene" path="res://entities/web/web_trap.tscn" id="8_trap"]
+[ext_resource type="Texture2D" uid="uid://dftihn8h8qdhc" path="res://assets/sprites/player_wolf_spider.png" id="9_wolf"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 10.0
@@ -35,13 +36,10 @@ script = ExtResource("1_player")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_body")
 
-[node name="Visual" type="Polygon2D" parent="."]
-color = Color(0.79, 0.66, 0.42, 1)
-polygon = PackedVector2Array(12, 0, 8.485, 8.485, 0, 12, -8.485, 8.485, -12, 0, -8.485, -8.485, 0, -12, 8.485, -8.485)
-
-[node name="Facing" type="Polygon2D" parent="."]
-color = Color(0.95, 0.85, 0.55, 1)
-polygon = PackedVector2Array(10, -4, 19, 0, 10, 4)
+[node name="Sprite" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(0.45, 0.45)
+texture = ExtResource("9_wolf")
 
 [node name="HealthComponent" type="Node" parent="."]
 script = ExtResource("2_health")

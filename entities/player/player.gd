@@ -10,6 +10,7 @@ extends CharacterBody2D
 @onready var hunger: HungerComponent = $HungerComponent
 @onready var web_emitter: WebEmitter = $WebEmitter
 @onready var trap_placer: TrapPlacer = $TrapPlacer
+@onready var sprite: Sprite2D = $Sprite
 
 var facing := Vector2.RIGHT
 var _dead := false
@@ -36,6 +37,8 @@ func _physics_process(_delta: float) -> void:
 	velocity = input * move_speed
 	if input != Vector2.ZERO:
 		facing = input.normalized()
+		# Sprite is drawn facing east (rotation 0), so aim it along movement.
+		sprite.rotation = facing.angle()
 	move_and_slide()
 
 	if Input.is_action_pressed("fire"):
