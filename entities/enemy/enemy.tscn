@@ -1,0 +1,71 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://entities/enemy/enemy.gd" id="1_enemy"]
+[ext_resource type="Script" path="res://components/health_component.gd" id="2_health"]
+[ext_resource type="Script" path="res://components/hunger_component.gd" id="3_hunger"]
+[ext_resource type="Script" path="res://components/web_emitter.gd" id="4_emitter"]
+[ext_resource type="Script" path="res://components/trap_placer.gd" id="5_placer"]
+[ext_resource type="Script" path="res://components/hurtbox.gd" id="6_hurtbox"]
+[ext_resource type="PackedScene" path="res://entities/web/web_shot.tscn" id="7_shot"]
+[ext_resource type="PackedScene" path="res://entities/web/web_trap.tscn" id="8_trap"]
+[ext_resource type="Resource" path="res://resources/enemies/rival_spider.tres" id="9_type"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 10.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
+radius = 11.0
+
+[node name="Enemy" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 33
+script = ExtResource("1_enemy")
+enemy_type = ExtResource("9_type")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(0.66, 0.24, 0.28, 1)
+polygon = PackedVector2Array(12, 0, 8.485, 8.485, 0, 12, -8.485, 8.485, -12, 0, -8.485, -8.485, 0, -12, 8.485, -8.485)
+
+[node name="Facing" type="Polygon2D" parent="."]
+color = Color(0.95, 0.5, 0.45, 1)
+polygon = PackedVector2Array(10, -4, 19, 0, 10, 4)
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+max_health = 80.0
+
+[node name="HungerComponent" type="Node" parent="."]
+script = ExtResource("3_hunger")
+max_hunger = 100.0
+hunger_rate = 3.0
+starvation_damage_rate = 6.0
+health_path = NodePath("../HealthComponent")
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
+path_desired_distance = 8.0
+target_desired_distance = 12.0
+avoidance_enabled = false
+
+[node name="WebEmitter" type="Node" parent="."]
+script = ExtResource("4_emitter")
+web_shot_scene = ExtResource("7_shot")
+cooldown = 0.7
+muzzle_offset = 18.0
+
+[node name="TrapPlacer" type="Node" parent="."]
+script = ExtResource("5_placer")
+trap_scene = ExtResource("8_trap")
+max_active = 2
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+script = ExtResource("6_hurtbox")
+health = NodePath("../HealthComponent")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_hurt")

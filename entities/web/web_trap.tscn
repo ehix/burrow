@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://entities/web/web_trap.gd" id="1_trap"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_block"]
+radius = 11.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_catch"]
+radius = 17.0
+
+[node name="WebTrap" type="StaticBody2D"]
+collision_layer = 32
+collision_mask = 0
+script = ExtResource("1_trap")
+
+[node name="BlockShape" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_block")
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(0.85, 0.87, 0.9, 0.45)
+polygon = PackedVector2Array(16, 0, 11, 11, 0, 16, -11, 11, -16, 0, -11, -11, 0, -16, 11, -11)
+
+[node name="CrossVisual" type="Polygon2D" parent="."]
+color = Color(0.95, 0.96, 1, 0.7)
+polygon = PackedVector2Array(2, -15, 2, 15, -2, 15, -2, -15)
+
+[node name="CatchArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 14
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CatchArea"]
+shape = SubResource("CircleShape2D_catch")

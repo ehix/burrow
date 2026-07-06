@@ -1,0 +1,50 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/hud.gd" id="1_hud"]
+
+[node name="HUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="HealthLabel" type="Label" parent="Root"]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 216.0
+offset_bottom = 32.0
+text = "Health"
+
+[node name="HealthBar" type="ProgressBar" parent="Root"]
+offset_left = 16.0
+offset_top = 34.0
+offset_right = 236.0
+offset_bottom = 54.0
+max_value = 100.0
+value = 100.0
+modulate = Color(0.6, 0.9, 0.55, 1)
+
+[node name="HungerLabel" type="Label" parent="Root"]
+offset_left = 16.0
+offset_top = 60.0
+offset_right = 216.0
+offset_bottom = 80.0
+text = "Hunger"
+
+[node name="HungerBar" type="ProgressBar" parent="Root"]
+offset_left = 16.0
+offset_top = 82.0
+offset_right = 236.0
+offset_bottom = 102.0
+max_value = 100.0
+value = 0.0
+modulate = Color(0.92, 0.7, 0.4, 1)
+
+[node name="DepthLabel" type="Label" parent="Root"]
+offset_left = 16.0
+offset_top = 112.0
+offset_right = 316.0
+offset_bottom = 136.0
+text = "Depth 1"
