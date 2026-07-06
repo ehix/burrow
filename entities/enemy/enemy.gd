@@ -25,7 +25,7 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 @onready var agent: NavigationAgent2D = $NavigationAgent2D
 @onready var web_emitter: WebEmitter = $WebEmitter
 @onready var trap_placer: TrapPlacer = $TrapPlacer
-@onready var facing_visual: Node2D = get_node_or_null("Facing")
+@onready var facing_visual: Node2D = get_node_or_null("Sprite")
 
 var state: State = State.PATROL
 var move_speed: float = 85.0

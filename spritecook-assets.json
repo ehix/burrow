@@ -9,6 +9,24 @@
       "model": "gemini-3.1-flash-image",
       "notes": "Slice-1 hero + style anchor. 64px top-down pixel wolf spider, faces EAST (rotation=velocity.angle()).",
       "local": "assets/sprites/player_wolf_spider.png"
+    },
+    {
+      "asset_id": "1dd13a93-c2ff-426c-8d56-575141557b07",
+      "label": "enemy-trapdoor-spider",
+      "role": "enemy",
+      "sha12": "32cd6ea704f6",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/enemy_trapdoor_spider.png",
+      "notes": "Trapdoor spider enemy, styled off the wolf anchor. Faces east."
+    },
+    {
+      "asset_id": "5ee2f502-9f7c-42ed-81d4-ad2cfb3a78c5",
+      "label": "larva",
+      "role": "larva",
+      "sha12": "3994bc924527",
+      "model": "gemini-3.1-flash-lite-image",
+      "local": "assets/sprites/larva.png",
+      "notes": "Wandering larva/grub. Faces east."
     }
   ]
 }

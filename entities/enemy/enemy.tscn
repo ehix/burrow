@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://entities/enemy/enemy.gd" id="1_enemy"]
 [ext_resource type="Script" path="res://components/health_component.gd" id="2_health"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://entities/web/web_shot.tscn" id="7_shot"]
 [ext_resource type="PackedScene" path="res://entities/web/web_trap.tscn" id="8_trap"]
 [ext_resource type="Resource" path="res://resources/enemies/rival_spider.tres" id="9_type"]
+[ext_resource type="Texture2D" uid="uid://dq3gyd1ch4syh" path="res://assets/sprites/enemy_trapdoor_spider.png" id="10_trapdoor"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 10.0
@@ -25,13 +26,10 @@ enemy_type = ExtResource("9_type")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_body")
 
-[node name="Visual" type="Polygon2D" parent="."]
-color = Color(0.66, 0.24, 0.28, 1)
-polygon = PackedVector2Array(12, 0, 8.485, 8.485, 0, 12, -8.485, 8.485, -12, 0, -8.485, -8.485, 0, -12, 8.485, -8.485)
-
-[node name="Facing" type="Polygon2D" parent="."]
-color = Color(0.95, 0.5, 0.45, 1)
-polygon = PackedVector2Array(10, -4, 19, 0, 10, 4)
+[node name="Sprite" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(0.45, 0.45)
+texture = ExtResource("10_trapdoor")
 
 [node name="HealthComponent" type="Node" parent="."]
 script = ExtResource("2_health")
