@@ -22,6 +22,11 @@ var depth: int = STARTING_DEPTH
 var carried_health: float = NAN
 var carried_hunger: float = NAN
 
+## Debug/display flag: when false the fog-of-war darkness is removed so the lit
+## map is fully visible. Toggled at runtime (L); persists across levels and
+## restarts, so it is deliberately NOT reset by start_new_run().
+var darkness_enabled := true
+
 
 func _ready() -> void:
 	start_new_run()

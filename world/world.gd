@@ -22,6 +22,14 @@ func _process(_delta: float) -> void:
 		camera.global_position = player.global_position
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	# Dev toggle (L): remove/restore the fog-of-war darkness on the map.
+	if event.is_action_pressed("toggle_darkness"):
+		GameState.darkness_enabled = not GameState.darkness_enabled
+		if is_instance_valid(_level) and _level.has_method("apply_darkness"):
+			_level.apply_darkness()
+
+
 func _build_level() -> void:
 	_level = LevelScene.instantiate()
 	add_child(_level)

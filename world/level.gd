@@ -13,6 +13,10 @@ const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
 const LarvaScene := preload("res://entities/larva/larva.tscn")
 
+## Fog-of-war ambient when darkness is on. White (no darkening) when off.
+const DARK_MODULATE := Color(0.05, 0.05, 0.07)
+
+@onready var _canvas_modulate: CanvasModulate = $CanvasModulate
 @onready var _nav_region: NavigationRegion2D = $NavRegion
 @onready var _walls: StaticBody2D = $Walls
 @onready var _occluders: Node2D = $Occluders
@@ -31,10 +35,22 @@ func build() -> void:
 	_build_collision_and_occluders()
 	_build_navigation()
 	_spawn_entities()
+	apply_darkness()
 
 
 func get_player() -> Node2D:
 	return player
+
+
+## Apply the current GameState.darkness_enabled flag: dark ambient + player
+## vision light when on, fully-lit map when off. Safe to call any time.
+func apply_darkness() -> void:
+	var on := GameState.darkness_enabled
+	_canvas_modulate.color = DARK_MODULATE if on else Color(1, 1, 1)
+	if player != null:
+		var light := player.get_node_or_null("VisionLight") as PointLight2D
+		if light != null:
+			light.enabled = on
 
 
 func _build_collision_and_occluders() -> void:
