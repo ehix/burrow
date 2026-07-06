@@ -42,6 +42,15 @@ func get_player() -> Node2D:
 	return player
 
 
+## Total maze size in pixels (including the outer wall border).
+func map_pixel_size() -> Vector2:
+	return Vector2(maze.width, maze.height) * TILE_SIZE
+
+
+func map_center() -> Vector2:
+	return map_pixel_size() * 0.5
+
+
 ## Apply the current GameState.darkness_enabled flag: dark ambient + player
 ## vision light when on, fully-lit map when off. Safe to call any time.
 func apply_darkness() -> void:
