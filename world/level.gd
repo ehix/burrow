@@ -19,7 +19,6 @@ const LarvaScene := preload("res://entities/larva/larva.tscn")
 const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 
 @onready var _canvas_modulate: CanvasModulate = $CanvasModulate
-@onready var _nav_region: NavigationRegion2D = $NavRegion
 @onready var _walls: StaticBody2D = $Walls
 @onready var _occluders: Node2D = $Occluders
 @onready var _renderer: MazeRenderer = $Renderer
@@ -37,7 +36,6 @@ func build() -> void:
 	_renderer.setup(maze, TILE_SIZE)
 	_build_collision_and_occluders()
 	_astar = GridNav.build(maze, TILE_SIZE)
-	_build_navigation()
 	_spawn_entities()
 	apply_darkness()
 
@@ -105,40 +103,6 @@ func _build_collision_and_occluders() -> void:
 			_occluders.add_child(occ)
 
 
-func _build_navigation() -> void:
-	# Two floor triangles per open tile, sharing corner vertices with adjacent
-	# tiles so the region connects into one walkable navmesh. `verts` is a plain
-	# Array (reference type) so the corner-dedup helper can append to it.
-	var verts: Array[Vector2] = []
-	var index_of := {} # Vector2i grid corner -> vertex index
-	var polys: Array[PackedInt32Array] = []
-	for y in maze.height:
-		for x in maze.width:
-			if not maze.is_open(x, y):
-				continue
-			var a := _corner_index(Vector2i(x, y), verts, index_of)
-			var b := _corner_index(Vector2i(x + 1, y), verts, index_of)
-			var c := _corner_index(Vector2i(x + 1, y + 1), verts, index_of)
-			var d := _corner_index(Vector2i(x, y + 1), verts, index_of)
-			polys.append(PackedInt32Array([a, b, c]))
-			polys.append(PackedInt32Array([a, c, d]))
-
-	var nav := NavigationPolygon.new()
-	nav.set_vertices(PackedVector2Array(verts))
-	for poly in polys:
-		nav.add_polygon(poly)
-	_nav_region.navigation_polygon = nav
-
-
-func _corner_index(grid: Vector2i, verts: Array[Vector2], index_of: Dictionary) -> int:
-	if index_of.has(grid):
-		return index_of[grid]
-	var idx := verts.size()
-	verts.push_back(Vector2(grid.x * TILE_SIZE, grid.y * TILE_SIZE))
-	index_of[grid] = idx
-	return idx
-
-
 func _spawn_entities() -> void:
 	# Player at the top-left cell, enemy at the far bottom-right cell.
 	var player_cell := Vector2i(1, 1)
@@ -150,6 +114,7 @@ func _spawn_entities() -> void:
 
 	enemy = EnemyScene.instantiate()
 	enemy.position = _tile_centre(enemy_cell.x, enemy_cell.y)
+	enemy.bind_level(self)
 	_entities.add_child(enemy)
 
 	_spawn_larvae([player_cell, enemy_cell])
