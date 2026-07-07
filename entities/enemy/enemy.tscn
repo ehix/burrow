@@ -20,7 +20,7 @@ radius = 11.0
 
 [node name="Enemy" type="CharacterBody2D"]
 collision_layer = 4
-collision_mask = 33
+collision_mask = 35
 script = ExtResource("1_enemy")
 enemy_type = ExtResource("9_type")
 
@@ -57,7 +57,6 @@ muzzle_offset = 18.0
 [node name="TrapPlacer" type="Node" parent="."]
 script = ExtResource("5_placer")
 trap_scene = ExtResource("8_trap")
-max_active = 2
 
 [node name="Hurtbox" type="Area2D" parent="."]
 collision_layer = 16

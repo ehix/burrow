@@ -24,6 +24,9 @@ var _to := Vector2.ZERO
 var _elapsed := 0.0
 var _buffered := Vector2i.ZERO
 var _slow_gen := 0
+## Seconds of stun remaining. While > 0 the owner cannot start a step (an
+## in-flight step still finishes). Set by a landed hit to impede the victim.
+var _stun_left := 0.0
 
 
 func _ready() -> void:
@@ -42,22 +45,47 @@ func is_moving() -> bool:
 	return _moving
 
 
+func is_stunned() -> bool:
+	return _stun_left > 0.0
+
+
 ## Begin a one-tile step in a cardinal direction. Buffers and returns false if
-## already moving; returns false if blocked; true if a step started.
+## already moving; returns false if stunned or blocked; true if a step started.
 func try_step(dir: Vector2i) -> bool:
 	if dir == Vector2i.ZERO:
+		return false
+	if _stun_left > 0.0:
 		return false
 	if _moving:
 		_buffered = dir
 		return false
 	if _is_blocked(dir):
 		return false
+	_begin_step(dir)
+	return true
+
+
+## Force a one-tile shove in `dir`, bypassing stun (a hit lands even on a stunned
+## victim). Ignored mid-step or into a wall/spider; returns whether it moved.
+func knockback(dir: Vector2i) -> bool:
+	if dir == Vector2i.ZERO or _moving or _is_blocked(dir):
+		return false
+	_buffered = Vector2i.ZERO # a shove cancels any queued input
+	_begin_step(dir)
+	return true
+
+
+## Stop the owner acting for `duration` seconds (longest pending stun wins).
+func stun(duration: float) -> void:
+	_stun_left = maxf(_stun_left, duration)
+
+
+func _begin_step(dir: Vector2i) -> void:
 	var node := _mover_node()
 	_from = node.global_position
 	_to = _from + Vector2(dir) * float(tile_size)
 	_elapsed = 0.0
 	_moving = true
-	return true
 
 
 func _is_blocked(dir: Vector2i) -> bool:
@@ -70,6 +98,8 @@ func _is_blocked(dir: Vector2i) -> bool:
 
 
 func tick(delta: float) -> void:
+	if _stun_left > 0.0:
+		_stun_left = maxf(0.0, _stun_left - delta)
 	if not _moving:
 		return
 	_elapsed += delta * speed_scale

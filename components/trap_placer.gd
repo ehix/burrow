@@ -1,17 +1,19 @@
 class_name TrapPlacer
 extends Node
-## Places web traps, capped at max_active simultaneous traps per owner.
-## Freed traps (spent on consumption, or level teardown) are pruned lazily.
+## Places web traps. There is no hard cap on simultaneous traps — the hunger
+## cost of laying one is what regulates spam. Freed traps (spent on consumption,
+## or level teardown) are still tracked and pruned lazily for active_count().
 
 @export var trap_scene: PackedScene
-@export var max_active: int = 3
+## Hunger added to *every* spider per trap laid — the metabolic tax that keeps
+## trap-laying from being free (hunger regulates spam, no hard cap on webs).
+@export var hunger_cost: float = 6.0
 
 var _active: Array[Node] = []
 
 
 func can_place() -> bool:
-	_prune()
-	return trap_scene != null and _active.size() < max_active
+	return trap_scene != null
 
 
 func active_count() -> int:
@@ -30,6 +32,7 @@ func place(at_position: Vector2, placer: Node) -> Node:
 	if trap.has_method("setup"):
 		trap.setup(placer)
 	_active.append(trap)
+	HungerComponent.charge_all(placer.get_tree(), hunger_cost)
 	return trap
 
 

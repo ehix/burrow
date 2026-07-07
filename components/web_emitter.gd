@@ -8,6 +8,9 @@ extends Node
 @export var cooldown: float = 0.6
 ## How far ahead of the shooter the shot spawns (clears its own body).
 @export var muzzle_offset: float = 18.0
+## Hunger added to *every* spider per shot — the metabolic tax that keeps firing
+## from being free (no hard ammo cap; hunger regulates spam).
+@export var hunger_cost: float = 4.0
 
 var _cooldown_left: float = 0.0
 
@@ -33,6 +36,7 @@ func fire(from_position: Vector2, direction: Vector2, source: Node) -> Node:
 	shot.global_position = from_position + dir * muzzle_offset
 	if shot.has_method("launch"):
 		shot.launch(dir, source)
+	HungerComponent.charge_all(source.get_tree(), hunger_cost)
 	return shot
 
 

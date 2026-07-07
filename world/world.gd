@@ -47,6 +47,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if is_instance_valid(_level) and _level.has_method("apply_darkness"):
 			_level.apply_darkness()
 		camera.reset_smoothing() # snap cleanly between follow and overview
+	# Dev tool (K): walk through walls. (J): freeze the enemy and larvae.
+	elif event.is_action_pressed("dev_noclip"):
+		GameState.noclip = not GameState.noclip
+	elif event.is_action_pressed("dev_freeze"):
+		GameState.freeze_others = not GameState.freeze_others
 
 
 func _build_level() -> void:

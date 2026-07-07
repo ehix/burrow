@@ -9,6 +9,7 @@ extends CharacterBody2D
 const CorpseScene := preload("res://entities/web/web_shot_spent.tscn")
 
 @onready var _mover: GridMover = $GridMover
+@onready var _sprite: Node2D = get_node_or_null("Sprite")
 
 var caught := false
 var _dead := false
@@ -33,9 +34,14 @@ func set_caught(at_position: Vector2) -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if caught or _dead or _mover.is_moving():
+	if caught or _dead or _mover.is_moving() or GameState.freeze_others:
 		return
 	_wander_step()
+
+
+## Flash in distress (called when a web catches it).
+func flash_distress() -> void:
+	CombatFx.flash(_sprite)
 
 
 func _wander_step() -> void:

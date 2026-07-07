@@ -27,6 +27,12 @@ var carried_hunger: float = NAN
 ## restarts, so it is deliberately NOT reset by start_new_run().
 var darkness_enabled := true
 
+## Dev tool (K): the player walks through walls (GridMover blocking ignored).
+var noclip := false
+
+## Dev tool (J): freeze every mover except the player (enemy + larvae stop).
+var freeze_others := false
+
 
 func _ready() -> void:
 	start_new_run()

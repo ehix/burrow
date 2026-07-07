@@ -1,14 +1,24 @@
+class_name WebShot
 extends Area2D
-## A web-shot projectile. Travels along its launch direction, damages the first
-## hurtbox it hits (except the shooter's), and despawns on a wall or after its
-## lifetime. Collision: mask = world(1) | hurtbox(16); it is not itself on any
-## layer. Walls arrive via body_entered, hurtboxes via area_entered.
+## A web-shot projectile. Travels along its launch direction and resolves by what
+## it strikes: an enemy/player hurtbox takes light damage plus an entangling web
+## effect (slow + knockback shove + brief stun + distress flash); a larva is
+## web-killed into an inedible corpse; a placed web trap takes a destructive hit;
+## a wall just stops it. Collision mask = world(1) | larva(8) | hurtbox(16) |
+## trap(32) = 57. Walls/larvae/traps arrive via body_entered, hurtboxes via
+## area_entered. The shot is not on any layer and never hits its own shooter.
 
 const SpentScene := preload("res://entities/web/web_shot_spent.tscn")
 
 @export var speed: float = 340.0
-@export var damage: float = 20.0
+## Light HP damage on a hurtbox hit (a web entangles more than it wounds).
+@export var damage: float = 8.0
 @export var max_lifetime: float = 2.0
+## Entangle: drop the victim's move speed to this fraction for slow_duration.
+@export var slow_factor: float = 0.4
+@export var slow_duration: float = 2.0
+## The victim is shoved one tile along the shot's travel and stunned briefly.
+@export var stun_duration: float = 0.25
 
 var _velocity := Vector2.ZERO
 var _source: Node = null
@@ -36,12 +46,41 @@ func _physics_process(delta: float) -> void:
 		_despawn()
 
 
-func _on_body_entered(_body: Node2D) -> void:
-	# Only world/wall bodies are in our mask — hitting one ends the shot.
+func _on_body_entered(body: Node2D) -> void:
 	if _spent:
 		return
+	if body is WebTrap:
+		(body as WebTrap).take_web_hit()
+	elif body.is_in_group("larvae") and body.has_method("web_kill"):
+		body.web_kill()
+	# else: a wall — nothing to do but splat.
 	_leave_splat()
 	_despawn()
+
+
+func _on_area_entered(area: Area2D) -> void:
+	if _spent or not (area is Hurtbox):
+		return
+	if _is_source(area):
+		return
+	area.receive_hit(damage, _source)
+	var entity := _entity_of(area)
+	if entity != null and entity.has_method("apply_web_hit"):
+		entity.apply_web_hit(_push_dir(), slow_factor, slow_duration, stun_duration)
+	_despawn()
+
+
+## The dominant cardinal the shot is travelling — the direction it shoves a hit.
+func _push_dir() -> Vector2i:
+	if absf(_velocity.x) >= absf(_velocity.y):
+		return Vector2i(int(signf(_velocity.x)), 0)
+	return Vector2i(0, int(signf(_velocity.y)))
+
+
+func _entity_of(hurtbox: Area2D) -> Node:
+	if hurtbox.owner != null:
+		return hurtbox.owner
+	return hurtbox.get_parent()
 
 
 func _leave_splat() -> void:
@@ -52,15 +91,6 @@ func _leave_splat() -> void:
 	holder.add_child(splat)
 	splat.global_position = global_position
 	splat.rotation = rotation
-
-
-func _on_area_entered(area: Area2D) -> void:
-	if _spent or not (area is Hurtbox):
-		return
-	if _is_source(area):
-		return
-	area.receive_hit(damage, _source)
-	_despawn()
 
 
 func _is_source(hurtbox: Area2D) -> bool:

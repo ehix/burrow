@@ -14,11 +14,17 @@ const SpentScene := preload("res://entities/web/web_trap_spent.tscn")
 @export var arm_delay: float = 0.4
 ## Web shots needed to destroy a placed trap.
 @export var hits_to_destroy: int = 3
+## A spider crossing the web is entangled: move speed drops to this fraction...
+@export var web_slow_factor: float = 0.4
+## ...for this many seconds.
+@export var web_slow_duration: float = 1.5
 
 var owner_spider: Node = null
 var caught_larva: Node = null
 var spent := false
 var web_hits := 0
+## The placer is immune to its own web's slow until it has stepped off once.
+var _owner_left := false
 
 @onready var _catch_area: Area2D = get_node_or_null("CatchArea")
 @onready var _block_shape: CollisionShape2D = get_node_or_null("BlockShape")
@@ -36,6 +42,7 @@ func _ready() -> void:
 		timer.timeout.connect(_arm)
 	if _catch_area != null:
 		_catch_area.body_entered.connect(_on_body_entered)
+		_catch_area.body_exited.connect(_on_body_exited)
 
 
 func _arm() -> void:
@@ -49,7 +56,23 @@ func _on_body_entered(body: Node) -> void:
 	if body.is_in_group("larvae"):
 		catch_larva(body)
 	elif body.is_in_group("spiders"):
+		_entangle(body)
 		try_consume(body)
+
+
+func _on_body_exited(body: Node) -> void:
+	# The placer becomes vulnerable to its own web once it has stepped clear.
+	if body == owner_spider:
+		_owner_left = true
+
+
+## Slow a spider that crosses the web, unless it is the placer who has not yet
+## stepped off (you are immune to a web you just laid until you leave it).
+func _entangle(spider: Node) -> void:
+	if spider == owner_spider and not _owner_left:
+		return
+	if spider.has_method("apply_web_hit"):
+		spider.apply_web_hit(Vector2i.ZERO, web_slow_factor, web_slow_duration, 0.0)
 
 
 ## Hold a larva. Emits larva_trapped and immediately resolves consumption if a
@@ -60,7 +83,12 @@ func catch_larva(larva: Node) -> void:
 	caught_larva = larva
 	if larva.has_method("set_caught"):
 		larva.set_caught(global_position)
+	if larva.has_method("flash_distress"):
+		larva.flash_distress()
 	EventBus.larva_trapped.emit(larva, self)
+	# A spider overlapping the web (its own tile or an adjacent one — the catch
+	# area reaches one tile) eats immediately. Otherwise the larva stays held
+	# until a spider steps adjacent (its body_entered resolves the consume).
 	if _catch_area != null:
 		for body in _catch_area.get_overlapping_bodies():
 			if body.is_in_group("spiders"):

@@ -69,3 +69,31 @@ func test_satiate_overflow_past_full() -> void:
 	assert_eq(hunger.current_hunger, 0.0)
 	assert_eq(overflow, 20.0)
 	assert_signal_emitted_with_parameters(hunger, "overflowed", [20.0])
+
+
+func test_add_raises_hunger_clamped_to_max() -> void:
+	var hunger := _make_hunger(_make_health())
+	hunger.current_hunger = 90.0
+	hunger.add(5.0)
+	assert_eq(hunger.current_hunger, 95.0, "add raises hunger")
+	hunger.add(20.0)
+	assert_eq(hunger.current_hunger, 100.0, "clamped at max")
+
+
+func test_charge_all_taxes_every_spider() -> void:
+	# Two spiders in the tree; charge_all should raise both their hungers.
+	var a := Node2D.new()
+	a.add_to_group("spiders")
+	var ha := HungerComponent.new()
+	ha.current_hunger = 10.0
+	a.add_child(ha)
+	add_child_autofree(a)
+	var b := Node2D.new()
+	b.add_to_group("spiders")
+	var hb := HungerComponent.new()
+	hb.current_hunger = 20.0
+	b.add_child(hb)
+	add_child_autofree(b)
+	HungerComponent.charge_all(get_tree(), 4.0)
+	assert_eq(ha.current_hunger, 14.0, "first spider taxed")
+	assert_eq(hb.current_hunger, 24.0, "second spider taxed")

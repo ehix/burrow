@@ -67,6 +67,26 @@ func satiate(amount: float) -> float:
 	return overflow
 
 
+## Raise hunger by `amount` (clamped to max). Used by the metabolic cost of
+## firing webs and laying traps — actions make every spider hungrier.
+func add(amount: float) -> void:
+	if amount <= 0.0:
+		return
+	current_hunger = minf(max_hunger, current_hunger + amount)
+	hunger_changed.emit(current_hunger, max_hunger)
+
+
+## Charge every spider in the scene `amount` hunger. The metabolic tax on a web
+## action applies to all spiders, so spamming shots/traps is self-limiting.
+static func charge_all(tree: SceneTree, amount: float) -> void:
+	if tree == null or amount <= 0.0:
+		return
+	for spider in tree.get_nodes_in_group("spiders"):
+		for child in spider.get_children():
+			if child is HungerComponent:
+				(child as HungerComponent).add(amount)
+
+
 func is_starving() -> bool:
 	return current_hunger >= max_hunger
 

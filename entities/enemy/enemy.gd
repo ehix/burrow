@@ -20,6 +20,13 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 @export var eat_range: float = 30.0
 ## Hunger removed by eating one larva.
 @export var eat_satiation: float = 40.0
+## Close-quarters strike when it catches the player: damage + shove + stun.
+@export var melee_range: float = 56.0
+@export var melee_damage: float = 12.0
+@export var melee_stun: float = 0.3
+@export var melee_cooldown: float = 0.6
+## Seconds between the enemy laying web traps while hunting food.
+@export var trap_interval: float = 5.0
 
 @onready var health: HealthComponent = $HealthComponent
 @onready var hunger: HungerComponent = $HungerComponent
@@ -37,6 +44,8 @@ var _facing := Vector2.RIGHT
 var _dead := false
 var _path: Array[Vector2i] = []
 var _path_i := 0
+var _melee_left := 0.0
+var _trap_left := 0.0
 
 
 ## Level calls this right after instancing so the enemy can path on the grid.
@@ -65,12 +74,16 @@ func _apply_type() -> void:
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
+	if GameState.freeze_others: # dev freeze toggle (J) halts the enemy
+		return
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player") as Node2D
 
 	_update_state()
 
 	_repath_left -= delta
+	_melee_left = maxf(0.0, _melee_left - delta)
+	_trap_left = maxf(0.0, _trap_left - delta)
 	match state:
 		State.CHASE:
 			_do_chase()
@@ -109,7 +122,9 @@ func _do_chase() -> void:
 		_repath_left = repath_interval
 	_follow_path()
 	var to_player := _player.global_position - global_position
-	if to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
+	if to_player.length() <= melee_range:
+		_melee_player(to_player)
+	elif to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
 		web_emitter.fire(global_position, to_player, self)
 
 
@@ -121,10 +136,27 @@ func _do_seek_food() -> void:
 	if global_position.distance_to(larva.global_position) <= eat_range:
 		_eat_larva(larva)
 		return
+	# Lay a web across its own tile now and then — a placed web catches wandering
+	# larvae on the enemy's behalf (feeding it) even when it can't chase them all.
+	if _trap_left <= 0.0 and not _mover.is_moving() and trap_placer.can_place():
+		trap_placer.place(global_position, self)
+		_trap_left = trap_interval
 	if _repath_left <= 0.0:
 		_set_path_to(_tile_of(larva.global_position))
 		_repath_left = repath_interval
 	_follow_path()
+
+
+## Strike the player in close quarters: damage, a shove away, a stun, a flash.
+func _melee_player(to_player: Vector2) -> void:
+	if _melee_left > 0.0 or _player == null:
+		return
+	_melee_left = melee_cooldown
+	var hurtbox := _player.get_node_or_null("Hurtbox") as Hurtbox
+	if hurtbox != null:
+		hurtbox.receive_hit(melee_damage, self)
+	if _player.has_method("apply_web_hit"):
+		_player.apply_web_hit(_dominant(to_player), 1.0, 0.0, melee_stun)
 
 
 func _do_flee() -> void:
@@ -247,10 +279,19 @@ func _nearest_in_group(group: String) -> Node2D:
 	return best
 
 
-## Apply a web slow to this spider's movement (called by a web shot).
-func apply_web_slow(factor: float, duration: float) -> void:
-	if _mover != null:
-		_mover.apply_slow(factor, duration)
+## Take a landed web/melee hit: flash in distress, get shoved one tile along
+## `push_dir` (Vector2i.ZERO = no shove), slowed, and stunned. Mirrors the
+## player's reaction so combat is symmetric.
+func apply_web_hit(push_dir: Vector2i, factor: float, slow_duration: float, stun_duration: float) -> void:
+	CombatFx.flash(facing_visual)
+	if _mover == null:
+		return
+	if push_dir != Vector2i.ZERO:
+		_mover.knockback(push_dir)
+	if factor < 1.0:
+		_mover.apply_slow(factor, slow_duration)
+	if stun_duration > 0.0:
+		_mover.stun(stun_duration)
 
 
 func _on_died() -> void:

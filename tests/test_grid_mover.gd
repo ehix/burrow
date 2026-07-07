@@ -84,3 +84,31 @@ func test_a_later_slow_supersedes_an_earlier_timer() -> void:
 	assert_eq(mover.speed_scale, 0.3, "the later slow is active")
 	await wait_seconds(0.15)     # the first (short) timer has now elapsed
 	assert_eq(mover.speed_scale, 0.3, "stale timer must not reset the active slow")
+
+
+func test_stun_blocks_stepping_until_it_elapses() -> void:
+	var m := _make_mover()
+	var mover: GridMover = m[1]
+	mover.stun(0.2)
+	assert_true(mover.is_stunned())
+	assert_false(mover.try_step(Vector2i.RIGHT), "cannot step while stunned")
+	mover.tick(0.25) # stun elapses (ticked in real time)
+	assert_false(mover.is_stunned())
+	assert_true(mover.try_step(Vector2i.RIGHT), "can step once the stun clears")
+
+
+func test_knockback_shoves_even_while_stunned() -> void:
+	var m := _make_mover()
+	var parent: Node2D = m[0]
+	var mover: GridMover = m[1]
+	mover.stun(1.0)
+	assert_true(mover.knockback(Vector2i.RIGHT), "a hit shoves past the stun")
+	mover.tick(0.1) # complete the shove
+	assert_almost_eq(parent.global_position.x, 48.0, 0.001, "shoved one tile")
+
+
+func test_knockback_into_a_wall_does_not_move() -> void:
+	var m := _make_mover(false) # everything blocked
+	var mover: GridMover = m[1]
+	assert_false(mover.knockback(Vector2i.RIGHT), "no shove into a wall")
+	assert_false(mover.is_moving())

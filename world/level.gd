@@ -10,6 +10,11 @@ const MAZE_ROWS := 9
 const LARVA_COUNT := 6
 ## Fraction of dead-ends to braid into loops (0 = perfect maze). Tunable feel.
 const LOOP_CHANCE := 0.7
+## Seconds between larva spawns while below the map's cap.
+const LARVA_SPAWN_INTERVAL := 3.5
+## One larva per this many open tiles sets the on-board cap (map-size scaled).
+const LARVA_TILES_PER_CAP := 10
+const LARVA_CAP_MAX := 18
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
@@ -28,6 +33,8 @@ var maze: MazeData
 var player: Node2D
 var enemy: Node2D
 var _astar: AStarGrid2D
+var _larva_cap := LARVA_COUNT
+var _spawn_accum := 0.0
 
 
 ## Build the whole level. Called by World right after instancing.
@@ -36,8 +43,21 @@ func build() -> void:
 	_renderer.setup(maze, TILE_SIZE)
 	_build_collision_and_occluders()
 	_astar = GridNav.build(maze, TILE_SIZE)
+	_larva_cap = mini(LARVA_CAP_MAX, maxi(LARVA_COUNT, maze.open_cells().size() / LARVA_TILES_PER_CAP))
 	_spawn_entities()
 	apply_darkness()
+
+
+## Keep the maze stocked: spawn a larva every interval while under the cap.
+func _process(delta: float) -> void:
+	if maze == null:
+		return
+	_spawn_accum += delta
+	if _spawn_accum < LARVA_SPAWN_INTERVAL:
+		return
+	_spawn_accum = 0.0
+	if get_tree().get_nodes_in_group("larvae").size() < _larva_cap:
+		_spawn_larva_at_random()
 
 
 func get_player() -> Node2D:
@@ -129,12 +149,33 @@ func _spawn_larvae(reserved: Array) -> void:
 			break
 		if cell in reserved:
 			continue
-		var larva := LarvaScene.instantiate()
-		larva.position = _tile_centre(cell.x, cell.y)
-		_entities.add_child(larva)
-		if larva.has_method("set_facing"):
-			larva.set_facing(TileTypes.default_facing(maze.classify(cell.x, cell.y)))
+		_spawn_larva_at(cell)
 		placed += 1
+
+
+## Spawn one larva at a random open cell that no spider is standing on.
+func _spawn_larva_at_random() -> void:
+	var cells := maze.open_cells()
+	if cells.is_empty():
+		return
+	var occupied := {}
+	for spider in get_tree().get_nodes_in_group("spiders"):
+		var s := spider as Node2D
+		if s != null:
+			occupied[tile_of(s.global_position)] = true
+	cells.shuffle()
+	for cell in cells:
+		if not occupied.has(cell):
+			_spawn_larva_at(cell)
+			return
+
+
+func _spawn_larva_at(cell: Vector2i) -> void:
+	var larva := LarvaScene.instantiate()
+	larva.position = _tile_centre(cell.x, cell.y)
+	_entities.add_child(larva)
+	if larva.has_method("set_facing"):
+		larva.set_facing(TileTypes.default_facing(maze.classify(cell.x, cell.y)))
 
 
 func _tile_centre(tx: int, ty: int) -> Vector2:
