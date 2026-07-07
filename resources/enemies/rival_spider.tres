@@ -7,4 +7,4 @@ script = ExtResource("1_type")
 display_name = "Rival Spider"
 max_health = 80.0
 move_speed = 85.0
-hunger_rate = 3.0
+hunger_rate = 1.2
