@@ -74,3 +74,13 @@ func test_apply_slow_reduces_step_speed() -> void:
 	mover.try_step(Vector2i.RIGHT)
 	mover.tick(0.05) # at half speed this is only a quarter of the way
 	assert_almost_eq(parent.global_position.x, 12.0, 0.5, "slowed step advances slower")
+
+
+func test_a_later_slow_supersedes_an_earlier_timer() -> void:
+	var m := _make_mover()
+	var mover: GridMover = m[1]
+	mover.apply_slow(0.5, 0.05) # short slow
+	mover.apply_slow(0.3, 0.5)  # longer slow applied second
+	assert_eq(mover.speed_scale, 0.3, "the later slow is active")
+	await wait_seconds(0.15)     # the first (short) timer has now elapsed
+	assert_eq(mover.speed_scale, 0.3, "stale timer must not reset the active slow")

@@ -23,6 +23,7 @@ var _from := Vector2.ZERO
 var _to := Vector2.ZERO
 var _elapsed := 0.0
 var _buffered := Vector2i.ZERO
+var _slow_gen := 0
 
 
 func _ready() -> void:
@@ -83,9 +84,15 @@ func tick(delta: float) -> void:
 			try_step(d)
 
 
-## Slow to `factor` of normal speed for `duration` seconds, then restore.
+## Slow to `factor` of normal speed for `duration` seconds, then restore. A
+## newer slow supersedes an older one — a stale timer will not reset an active
+## slow (generation guard).
 func apply_slow(factor: float, duration: float) -> void:
 	speed_scale = factor
 	if is_inside_tree():
+		_slow_gen += 1
+		var gen := _slow_gen
 		get_tree().create_timer(duration).timeout.connect(
-			func() -> void: speed_scale = 1.0)
+			func() -> void:
+				if gen == _slow_gen:
+					speed_scale = 1.0)
