@@ -12,10 +12,13 @@ const SpentScene := preload("res://entities/web/web_trap_spent.tscn")
 @export var satiation: float = 40.0
 ## Seconds before the blocking body becomes solid (lets the placer leave).
 @export var arm_delay: float = 0.4
+## Web shots needed to destroy a placed trap.
+@export var hits_to_destroy: int = 3
 
 var owner_spider: Node = null
 var caught_larva: Node = null
 var spent := false
+var web_hits := 0
 
 @onready var _catch_area: Area2D = get_node_or_null("CatchArea")
 @onready var _block_shape: CollisionShape2D = get_node_or_null("BlockShape")
@@ -83,6 +86,20 @@ func try_consume(spider: Node) -> void:
 	spent = true
 	_leave_torn_web()
 	queue_free()
+
+
+## A web shot struck this trap. The Nth hit destroys it, leaving a torn web.
+func take_web_hit() -> void:
+	if spent:
+		return
+	web_hits += 1
+	if web_hits >= hits_to_destroy:
+		spent = true
+		if is_instance_valid(caught_larva):
+			caught_larva.queue_free()
+			caught_larva = null
+		_leave_torn_web()
+		queue_free()
 
 
 func _leave_torn_web() -> void:

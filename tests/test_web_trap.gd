@@ -79,3 +79,21 @@ func test_spent_trap_cannot_be_consumed_twice() -> void:
 	trap.try_consume(second[0]) # already spent
 	assert_almost_eq((second[1] as HungerComponent).current_hunger, 90.0, 0.001,
 		"second spider gets nothing from a spent trap")
+
+
+func test_third_web_hit_destroys_the_trap() -> void:
+	var trap := _make_trap()
+	trap.take_web_hit()
+	trap.take_web_hit()
+	assert_false(trap.spent, "two hits do not destroy the trap")
+	trap.take_web_hit()
+	assert_true(trap.spent, "the third hit destroys the trap")
+
+
+func test_web_hits_ignored_once_spent() -> void:
+	var trap := _make_trap()
+	var pair := _make_spider(50.0)
+	trap.catch_larva(_make_larva())
+	trap.try_consume(pair[0]) # spent via consumption
+	trap.take_web_hit() # must be a no-op, not error
+	assert_true(trap.spent)
