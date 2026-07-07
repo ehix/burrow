@@ -4,13 +4,12 @@ extends CharacterBody2D
 ## traps, and carries HP + Hunger (via child components) between levels. Relays
 ## its component signals to the EventBus so the generic HUD can listen.
 
-@export var move_speed: float = 130.0
-
 @onready var health: HealthComponent = $HealthComponent
 @onready var hunger: HungerComponent = $HungerComponent
 @onready var web_emitter: WebEmitter = $WebEmitter
 @onready var trap_placer: TrapPlacer = $TrapPlacer
 @onready var sprite: Sprite2D = $Sprite
+@onready var _mover: GridMover = $GridMover
 
 var facing := Vector2.RIGHT
 var _dead := false
@@ -33,18 +32,31 @@ func _ready() -> void:
 func _physics_process(_delta: float) -> void:
 	if _dead:
 		return
-	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	velocity = input * move_speed
-	if input != Vector2.ZERO:
-		facing = input.normalized()
-		# Sprite is drawn facing east (rotation 0), so aim it along movement.
-		sprite.rotation = facing.angle()
-	move_and_slide()
+	var dir := _dominant_dir(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
+	if dir != Vector2i.ZERO:
+		facing = Vector2(dir)
+		sprite.rotation = facing.angle() # sprite drawn facing east (rotation 0)
+		_mover.try_step(dir)
 
 	if Input.is_action_pressed("fire"):
 		web_emitter.fire(global_position, facing, self)
 	if Input.is_action_just_pressed("place_trap"):
 		trap_placer.place(global_position, self)
+
+
+## Reduce analog movement input to one cardinal grid direction (ties -> x).
+static func _dominant_dir(input: Vector2) -> Vector2i:
+	if input.length_squared() < 0.04:
+		return Vector2i.ZERO
+	if absf(input.x) >= absf(input.y):
+		return Vector2i(int(signf(input.x)), 0)
+	return Vector2i(0, int(signf(input.y)))
+
+
+## Apply a web slow to this spider's movement (called by a web shot).
+func apply_web_slow(factor: float, duration: float) -> void:
+	if _mover != null:
+		_mover.apply_slow(factor, duration)
 
 
 ## Snapshot vitals into GameState before the level is freed on descent.
