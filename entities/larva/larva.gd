@@ -1,47 +1,67 @@
 class_name Larva
 extends CharacterBody2D
-## A wandering creature. Drifts along its facing, reverses when it hits a wall,
-## and freezes when a trap catches it. Body collides with walls only (mask =
-## world) so it passes through traps and spiders until a trap's area catches it.
+## A wandering creature. Steps cell-to-cell on the maze grid, avoiding an
+## immediate reversal unless it is dead-ended. Freezes when a trap catches it,
+## and can be killed (not eaten) by a web shot, leaving an inedible corpse.
+## Body collides with walls only (mask = world) so it passes through traps and
+## spiders until a trap's catch area grabs it.
 
-@export var speed: float = 42.0
+const CorpseScene := preload("res://entities/web/web_shot_spent.tscn")
 
-var direction := Vector2.RIGHT
+@onready var _mover: GridMover = $GridMover
+
 var caught := false
+var _dead := false
+var _last_dir := Vector2i.RIGHT
 
 
 func _ready() -> void:
 	add_to_group("larvae")
-	_apply_rotation()
 
 
 ## Set initial facing (Level derives this from the spawn tile's type).
 func set_facing(dir: Vector2i) -> void:
 	if dir != Vector2i.ZERO:
-		direction = Vector2(dir).normalized()
-		_apply_rotation()
+		_last_dir = dir
+		rotation = Vector2(dir).angle()
 
 
 ## Called by a trap: stop and snap to the trap centre.
 func set_caught(at_position: Vector2) -> void:
 	caught = true
 	global_position = at_position
-	velocity = Vector2.ZERO
 
 
 func _physics_process(_delta: float) -> void:
-	if caught:
+	if caught or _dead or _mover.is_moving():
 		return
-	velocity = direction * speed
-	if move_and_slide():
-		reverse()
+	_wander_step()
 
 
-func reverse() -> void:
-	direction = -direction
-	_apply_rotation()
+func _wander_step() -> void:
+	# Prefer any non-reverse direction; fall back to reversing at a dead-end.
+	var options: Array[Vector2i] = []
+	for d in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+		if d != -_last_dir:
+			options.append(d)
+	options.shuffle()
+	options.append(-_last_dir)
+	for d in options:
+		if _mover.try_step(d):
+			_last_dir = d
+			rotation = Vector2(d).angle()
+			return
 
 
-func _apply_rotation() -> void:
-	if direction != Vector2.ZERO:
-		rotation = direction.angle()
+## A web shot killed this larva: drop out of the edible pool, leave a corpse.
+func web_kill() -> void:
+	if _dead:
+		return
+	_dead = true
+	remove_from_group("larvae")
+	var holder := get_parent()
+	if holder != null:
+		var corpse := CorpseScene.instantiate()
+		holder.add_child(corpse)
+		corpse.global_position = global_position
+	queue_free()
