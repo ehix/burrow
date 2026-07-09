@@ -22,6 +22,9 @@ extends CharacterBody2D
 @onready var _mover: GridMover = $GridMover
 @onready var _plane: PlaneComponent = $PlaneComponent
 @onready var _camouflage: CamouflageSkill = $CamouflageSkill
+@onready var _status: StatusEffectComponent = $StatusEffectComponent
+@onready var _sense: SenseSkill = $SenseSkill
+@onready var _remove_walls: RemoveWallsSkill = $RemoveWallsSkill
 
 var facing := Vector2.RIGHT
 var _dead := false
@@ -36,6 +39,8 @@ func _ready() -> void:
 	_mover.block_check = _blocked
 	_mover.step_finished.connect(_on_step_finished)
 	_plane.plane_changed.connect(_on_plane_changed)
+	_status.effect_applied.connect(_on_effect_applied)
+	_status.effect_expired.connect(_on_effect_expired)
 	_restore_vitals()
 	health.health_changed.connect(_on_health_changed)
 	health.damaged.connect(func(amount: float) -> void: EventBus.player_damaged.emit(amount))
@@ -75,6 +80,10 @@ func _physics_process(delta: float) -> void:
 		_plane.transition()
 	if Input.is_action_just_pressed("camouflage"):
 		_camouflage.activate(self)
+	if Input.is_action_just_pressed("sense"):
+		_sense.activate(self)
+	if Input.is_action_just_pressed("remove_walls_skill"):
+		_remove_walls.activate(self)
 
 
 ## Called by Level right after instancing, mirroring Enemy.bind_level() — lets
@@ -114,6 +123,21 @@ func _blocked(dir: Vector2i) -> bool:
 ## cool-toned tint on the ceiling, restored to normal on the ground.
 func _on_plane_changed(plane: Level.Layer) -> void:
 	sprite.modulate = Color(0.55, 0.65, 0.85, 0.85) if plane == Level.Layer.CEILING else Color.WHITE
+
+
+## SenseSkill (and FungusSenseItem) both just apply a timed "sense" tag on
+## this component — this is where that tag actually does something: the
+## Level's wall occluders stop blocking the player's vision light, so nearby
+## structure/critters/hostiles show through a wall within light range (a
+## local x-ray, not a full-map reveal — that's the separate darkness toggle).
+func _on_effect_applied(id: StringName, _magnitude: float, _duration: float) -> void:
+	if id == &"sense" and _level != null:
+		_level.set_sense_active(true)
+
+
+func _on_effect_expired(id: StringName) -> void:
+	if id == &"sense" and _level != null:
+		_level.set_sense_active(false)
 
 
 ## Strike one tile ahead: light damage + shove + stun on a spider, or an

@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://entities/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://components/grid_mover.gd" id="10_mover"]
@@ -12,6 +12,9 @@
 [ext_resource type="Texture2D" uid="uid://dftihn8h8qdhc" path="res://assets/sprites/player_wolf_spider.png" id="9_wolf"]
 [ext_resource type="Script" path="res://components/plane_component.gd" id="11_plane"]
 [ext_resource type="Script" path="res://entities/skills/camouflage_skill.gd" id="12_camo"]
+[ext_resource type="Script" path="res://components/status_effect_component.gd" id="13_status"]
+[ext_resource type="Script" path="res://entities/skills/sense_skill.gd" id="14_sense"]
+[ext_resource type="Script" path="res://entities/skills/remove_walls_skill.gd" id="15_removewalls"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 10.0
@@ -91,3 +94,14 @@ script = ExtResource("11_plane")
 
 [node name="CamouflageSkill" type="Node" parent="."]
 script = ExtResource("12_camo")
+
+[node name="StatusEffectComponent" type="Node" parent="."]
+script = ExtResource("13_status")
+
+[node name="SenseSkill" type="Node" parent="."]
+script = ExtResource("14_sense")
+
+[node name="RemoveWallsSkill" type="Node" parent="."]
+script = ExtResource("15_removewalls")
+cooldown = 1.0
+hunger_cost = 25.0

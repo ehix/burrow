@@ -337,12 +337,27 @@ func _eat_larva(larva: Node) -> void:
 
 # --- perception ---------------------------------------------------------------
 
+## Vision alone decides CHASE (design §3 guardrail: Camouflage breaks on any
+## attack, but while it holds, it should actually work — a camouflaged player
+## is invisible to this check regardless of range/line-of-sight, so an active
+## CHASE drops straight back to SEEK_FOOD/PATROL the moment camouflage goes up
+## (see _update_state's fallback branch), and a patrolling enemy never enters
+## CHASE against a hidden player in the first place).
 func _can_see_player() -> bool:
 	if _player == null or not is_instance_valid(_player):
+		return false
+	if _player_is_camouflaged():
 		return false
 	if global_position.distance_to(_player.global_position) > vision_range:
 		return false
 	return _has_line_of_sight(_player.global_position)
+
+
+func _player_is_camouflaged() -> bool:
+	if _player == null:
+		return false
+	var camo := _player.get_node_or_null("CamouflageSkill") as CamouflageSkill
+	return camo != null and camo.active
 
 
 func _has_line_of_sight(target_pos: Vector2) -> bool:

@@ -15,6 +15,10 @@ const LARVA_SPAWN_INTERVAL := 3.5
 ## One larva per this many open tiles sets the on-board cap (map-size scaled).
 const LARVA_TILES_PER_CAP := 10
 const LARVA_CAP_MAX := 18
+## Pits seeded naturally at build time (design §7), away from both spawns —
+## without these the ceiling plane has nothing to bypass in a normal
+## playthrough short of the Water Ingress hazard or the dev pit-toggle tool.
+const NATURAL_PIT_COUNT := 2
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
@@ -70,6 +74,7 @@ func build() -> void:
 	_astar = GridNav.build(maze, TILE_SIZE)
 	_larva_cap = mini(LARVA_CAP_MAX, maxi(LARVA_COUNT, maze.open_cells().size() / LARVA_TILES_PER_CAP))
 	_spawn_entities()
+	_seed_natural_pits()
 	apply_darkness()
 	_hazard_director = HazardDirector.new()
 	add_child(_hazard_director)
@@ -125,6 +130,20 @@ func apply_darkness() -> void:
 		var light := player.get_node_or_null("VisionLight") as PointLight2D
 		if light != null:
 			light.enabled = on
+
+
+## SenseSkill's x-ray (design §4): while active, every wall occluder stops
+## blocking light — the vision light passes through nearby walls instead of
+## stopping at them, revealing structure/critters/hostiles just beyond one
+## within light range. A local x-ray, not the full-map reveal the darkness
+## dev toggle does. Only affects walls that exist right now; a wall carved
+## open/collapsed mid-effect is unaffected either way (its occluder is
+## freed/spawned fresh, defaulting to normally-visible).
+func set_sense_active(active: bool) -> void:
+	for nodes in _wall_nodes.values():
+		var occ = nodes.get("occluder")
+		if occ != null and is_instance_valid(occ):
+			occ.visible = not active
 
 
 func _build_collision_and_occluders() -> void:
@@ -280,6 +299,23 @@ func _spawn_entities() -> void:
 	_entities.add_child(enemy)
 
 	_spawn_larvae([player_cell, enemy_cell])
+
+
+## Flag a handful of random open, non-spawn tiles as pits so the ceiling
+## plane has something to bypass in a normal playthrough, not just via the
+## Water Ingress hazard or the dev pit-toggle tool.
+func _seed_natural_pits() -> void:
+	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
+	var cells := maze.open_cells()
+	cells.shuffle()
+	var placed := 0
+	for cell in cells:
+		if placed >= NATURAL_PIT_COUNT:
+			break
+		if reserved.has(cell):
+			continue
+		set_pit_at(cell, true)
+		placed += 1
 
 
 func _spawn_larvae(reserved: Array) -> void:

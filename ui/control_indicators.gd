@@ -42,6 +42,8 @@ func _ready() -> void:
 	_add_one_shot(root, "Toggle Pit (P)", "dev_toggle_pit")
 	_add_one_shot(root, "Trigger Hazard (H)", "dev_trigger_hazard")
 	_add_one_shot(root, "Camouflage (V)", "camouflage")
+	_add_one_shot(root, "Sense (N)", "sense")
+	_add_one_shot(root, "Remove Walls Skill (M)", "remove_walls_skill")
 	_add_held(root, "Paused (Esc)", func() -> bool: return get_tree().paused)
 
 
