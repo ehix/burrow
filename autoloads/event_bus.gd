@@ -32,3 +32,23 @@ signal health_changed(who: Node, value: float, max_value: float)
 
 ## The run descended (or reset) to a new depth.
 signal depth_changed(depth: int)
+
+## GameState.runes changed (earned or spent). Design §5: Economy.
+signal runes_changed(total: int)
+
+## `who` switched between Level.Layer.GROUND and Level.Layer.CEILING (design
+## §1: Dual-Plane Map Architecture). `plane` is a Level.Layer value.
+signal plane_changed(who: Node, plane: int)
+
+## A world hazard fired (design §7). `hazard_name` is e.g. "water_ingress",
+## "seismic_compaction", "centipede_express".
+signal hazard_triggered(hazard_name: String)
+
+## A timed status effect (Poison, Speed, Sense, Armor, ...) was applied to or
+## expired on `who`, via its StatusEffectComponent.
+signal status_effect_applied(who: Node, id: StringName, magnitude: float, duration: float)
+signal status_effect_expired(who: Node, id: StringName)
+
+## `who` consumed a Cicada Nymph [Rare] — a radial ping should reveal their
+## position (design §6).
+signal location_revealed(who: Node)
