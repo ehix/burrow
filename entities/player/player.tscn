@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://entities/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://components/grid_mover.gd" id="10_mover"]
@@ -10,6 +10,8 @@
 [ext_resource type="PackedScene" path="res://entities/web/web_shot.tscn" id="7_shot"]
 [ext_resource type="PackedScene" path="res://entities/web/web_trap.tscn" id="8_trap"]
 [ext_resource type="Texture2D" uid="uid://dftihn8h8qdhc" path="res://assets/sprites/player_wolf_spider.png" id="9_wolf"]
+[ext_resource type="Script" path="res://components/plane_component.gd" id="11_plane"]
+[ext_resource type="Script" path="res://entities/skills/camouflage_skill.gd" id="12_camo"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 10.0
@@ -83,3 +85,9 @@ texture_scale = 1.3
 script = ExtResource("10_mover")
 tile_size = 48
 step_time = 0.12
+
+[node name="PlaneComponent" type="Node" parent="."]
+script = ExtResource("11_plane")
+
+[node name="CamouflageSkill" type="Node" parent="."]
+script = ExtResource("12_camo")

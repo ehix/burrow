@@ -8,6 +8,14 @@ const PLAYER_WIN_COLOR := Color(0.6, 0.9, 0.55)
 const ENEMY_WIN_COLOR := Color(0.9, 0.5, 0.5)
 const BANNER_HOLD_TIME := 1.2
 const BANNER_FADE_TIME := 0.8
+const HAZARD_TOAST_HOLD_TIME := 1.5
+const HAZARD_TOAST_FADE_TIME := 1.0
+## hazard_triggered's raw id -> a readable label, e.g. "water_ingress" -> "Water Ingress!".
+const HAZARD_DISPLAY_NAMES := {
+	"water_ingress": "Water Ingress!",
+	"seismic_compaction": "Seismic Compaction!",
+	"centipede_express": "Centipede Express!",
+}
 
 @onready var health_bar: ProgressBar = $Root/HealthBar
 @onready var hunger_bar: ProgressBar = $Root/HungerBar
@@ -15,8 +23,10 @@ const BANNER_FADE_TIME := 0.8
 @onready var enemy_hunger_bar: ProgressBar = $Root/EnemyHungerBar
 @onready var depth_label: Label = $Root/DepthLabel
 @onready var wins_label: Label = $Root/WinsLabel
+@onready var runes_label: Label = $Root/RunesLabel
 @onready var paused_label: Label = $Root/PausedLabel
 @onready var round_banner_label: Label = $Root/RoundBannerLabel
+@onready var hazard_toast_label: Label = $Root/HazardToastLabel
 
 
 func _ready() -> void:
@@ -26,8 +36,11 @@ func _ready() -> void:
 	EventBus.depth_changed.connect(_on_depth_changed)
 	EventBus.player_died.connect(_on_player_died)
 	EventBus.enemy_defeated.connect(_on_enemy_defeated)
+	EventBus.runes_changed.connect(_on_runes_changed)
+	EventBus.hazard_triggered.connect(_on_hazard_triggered)
 	_on_depth_changed(GameState.depth)
 	_update_wins_label()
+	_on_runes_changed(GameState.runes)
 
 
 func set_paused_visible(is_paused: bool) -> void:
@@ -76,6 +89,20 @@ func _on_player_died() -> void:
 
 func _update_wins_label() -> void:
 	wins_label.text = "Wins: You %d - Enemy %d" % [GameState.player_wins, GameState.enemy_wins]
+
+
+func _on_runes_changed(total: int) -> void:
+	runes_label.text = "Runes: %d" % total
+
+
+## A world hazard fired (design §7) — a brief toast, same fade pattern as the
+## round banner.
+func _on_hazard_triggered(hazard_name: String) -> void:
+	hazard_toast_label.text = HAZARD_DISPLAY_NAMES.get(hazard_name, hazard_name)
+	hazard_toast_label.modulate = Color(1, 0.85, 0.4, 1.0)
+	var tween := hazard_toast_label.create_tween()
+	tween.tween_interval(HAZARD_TOAST_HOLD_TIME)
+	tween.tween_property(hazard_toast_label, "modulate:a", 0.0, HAZARD_TOAST_FADE_TIME)
 
 
 func _show_round_banner(text: String, color: Color) -> void:

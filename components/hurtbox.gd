@@ -7,6 +7,11 @@ extends Area2D
 ## HealthComponent reference: a hand-written NodePath value in a .tscn does
 ## not auto-resolve into a Node-typed @export (it silently stays null), which
 ## is exactly what left melee/web-shot damage a no-op on both spiders.
+##
+## Every existing attack (melee, web shot) resolves through receive_hit(), so
+## it's also the single choke point for the Camouflage guardrail: an attack
+## registering here breaks Camouflage on both the victim (this Hurtbox's
+## owner) and the attacker (`source`), if either has it active.
 
 @export var health_path: NodePath
 var health: HealthComponent
@@ -21,5 +26,7 @@ func _ready() -> void:
 
 func receive_hit(amount: float, source: Node = null) -> void:
 	took_hit.emit(amount, source)
+	CamouflageSkill.break_if_present(get_parent())
+	CamouflageSkill.break_if_present(source)
 	if health != null:
 		health.take_damage(amount)

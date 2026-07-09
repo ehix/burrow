@@ -67,6 +67,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_dev_remove_wall()
 	elif event.is_action_pressed("dev_god_mode"):
 		GameState.god_mode = not GameState.god_mode
+	# Dev tool (P): flag/clear a pit on the tile ahead — pits have no natural
+	# map-generation source yet, so this is how to get one to test ceiling
+	# traversal against. (H): force a random eligible hazard now, bypassing
+	# HazardDirector's 50-120s base intervals.
+	elif event.is_action_pressed("dev_toggle_pit"):
+		_dev_toggle_pit()
+	elif event.is_action_pressed("dev_trigger_hazard"):
+		if is_instance_valid(_level):
+			_level.trigger_random_hazard_now()
 	elif event.is_action_pressed("pause"):
 		_toggle_pause()
 
@@ -125,6 +134,20 @@ func _dev_remove_wall() -> void:
 	var target_world := player.global_position + player.facing * float(Level.TILE_SIZE)
 	var tile: Vector2i = _level.tile_of(target_world)
 	_level.dev_remove_wall_at(tile)
+
+
+## Dev tool (P): flag/clear a pit on the open tile directly ahead of the
+## player, so the ceiling plane's "bypasses ground hazards" behaviour has
+## something to demonstrate against.
+func _dev_toggle_pit() -> void:
+	var player := _current_player() as Player
+	if player == null or not is_instance_valid(_level) or _level.maze == null:
+		return
+	var target_world := player.global_position + player.facing * float(Level.TILE_SIZE)
+	var tile: Vector2i = _level.tile_of(target_world)
+	if not _level.maze.is_open(tile.x, tile.y):
+		return
+	_level.set_pit_at(tile, not _level.maze.is_pit(tile.x, tile.y))
 
 
 ## Enemy cleared → a partial victory heal, then carry the player's vitals

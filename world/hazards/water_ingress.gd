@@ -24,7 +24,7 @@ func trigger(level: Node) -> void:
 		for dy in range(-FLOOD_RADIUS, FLOOD_RADIUS + 1):
 			var tile := origin + Vector2i(dx, dy)
 			if level.maze.is_open(tile.x, tile.y) and not level.maze.is_boundary(tile.x, tile.y):
-				level.maze.set_pit(tile.x, tile.y, true)
+				level.set_pit_at(tile, true)
 				flooded.append(tile)
 	EventBus.hazard_triggered.emit("water_ingress")
 	if level.get_tree() != null:
@@ -36,4 +36,4 @@ func _recede(level: Node, tiles: Array[Vector2i]) -> void:
 	if level == null or not is_instance_valid(level) or level.maze == null:
 		return
 	for tile in tiles:
-		level.maze.set_pit(tile.x, tile.y, false)
+		level.set_pit_at(tile, false)

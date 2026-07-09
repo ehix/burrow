@@ -38,6 +38,10 @@ func _ready() -> void:
 	_add_one_shot(root, "Reset Map (R)", "dev_reset_map")
 	_add_one_shot(root, "Remove Wall (X)", "dev_remove_wall")
 	_add_held(root, "God Mode (G)", func() -> bool: return GameState.god_mode)
+	_add_one_shot(root, "Toggle Plane (C)", "toggle_plane")
+	_add_one_shot(root, "Toggle Pit (P)", "dev_toggle_pit")
+	_add_one_shot(root, "Trigger Hazard (H)", "dev_trigger_hazard")
+	_add_one_shot(root, "Camouflage (V)", "camouflage")
 	_add_held(root, "Paused (Esc)", func() -> bool: return get_tree().paused)
 
 

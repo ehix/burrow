@@ -48,6 +48,10 @@ var _spawn_accum := 0.0
 ## Seismic Compaction's collapse pass) can find/free or (re)create the exact
 ## nodes for a tile.
 var _wall_nodes: Dictionary = {}
+## Pit/flood tile -> its visual marker, so MazeData's ground-hazard overlay
+## stays visible in sync — mirrors _wall_nodes.
+var _pit_nodes: Dictionary = {}
+var _hazard_director: HazardDirector
 
 
 func _ready() -> void:
@@ -67,6 +71,9 @@ func build() -> void:
 	_larva_cap = mini(LARVA_CAP_MAX, maxi(LARVA_COUNT, maze.open_cells().size() / LARVA_TILES_PER_CAP))
 	_spawn_entities()
 	apply_darkness()
+	_hazard_director = HazardDirector.new()
+	add_child(_hazard_director)
+	_hazard_director.bind_level(self)
 
 
 ## Keep the maze stocked: spawn a larva every interval while under the cap.
@@ -193,11 +200,47 @@ func is_blocked(tile: Vector2i, plane: Layer) -> bool:
 	return maze.is_ground_blocked(tile.x, tile.y)
 
 
+## Flag/clear a ground-hazard tile (pit or flood) and keep its visual marker
+## in sync with MazeData's overlay. The one entry point hazards/skills/dev
+## tools should use instead of poking `maze.set_pit` directly.
+func set_pit_at(tile: Vector2i, value: bool) -> void:
+	if maze == null:
+		return
+	maze.set_pit(tile.x, tile.y, value)
+	if value:
+		if not _pit_nodes.has(tile):
+			_pit_nodes[tile] = _spawn_pit_marker(tile)
+	else:
+		var marker = _pit_nodes.get(tile)
+		if marker != null and is_instance_valid(marker):
+			marker.queue_free()
+		_pit_nodes.erase(tile)
+
+
+func _spawn_pit_marker(tile: Vector2i) -> Node2D:
+	var half := TILE_SIZE * 0.5
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)])
+	poly.color = Color(0.15, 0.08, 0.05, 0.85)
+	poly.position = _tile_centre(tile.x, tile.y)
+	add_child(poly)
+	return poly
+
+
 ## BlockadeSkill: patch a pit tile for ground traversal by placing a blockade
 ## on it. No-op if `tile` isn't currently a pit.
 func patch_pit_at(tile: Vector2i) -> void:
-	if maze != null:
-		maze.set_pit(tile.x, tile.y, false)
+	set_pit_at(tile, false)
+
+
+## Force one eligible hazard to fire right now, bypassing its schedule (dev
+## tool H) — HazardDirector's own base intervals (50-120s) are far too slow to
+## exercise interactively otherwise.
+func trigger_random_hazard_now() -> void:
+	if _hazard_director != null:
+		_hazard_director.trigger_random_now()
 
 
 ## Inverse of dev_remove_wall_at: collapses an open, currently-unoccupied tile
@@ -228,6 +271,8 @@ func _spawn_entities() -> void:
 	player = PlayerScene.instantiate()
 	player.position = _tile_centre(player_cell.x, player_cell.y)
 	_entities.add_child(player)
+	if player.has_method("bind_level"):
+		player.bind_level(self)
 
 	enemy = EnemyScene.instantiate()
 	enemy.position = _tile_centre(enemy_cell.x, enemy_cell.y)

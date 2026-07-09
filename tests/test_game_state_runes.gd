@@ -4,6 +4,14 @@ extends GutTest
 ## same way player_wins/enemy_wins already do.
 
 
+func before_each() -> void:
+	# Defensive reset, not just after_each: GameState now also earns runes off
+	# EventBus.enemy_defeated/excess_consumed, which other test files emit —
+	# start each test from a known-zero balance regardless of run order.
+	GameState.runes = 0
+	GameState.purchased_upgrades = []
+
+
 func after_each() -> void:
 	GameState.runes = 0
 	GameState.purchased_upgrades = []
@@ -65,3 +73,13 @@ func test_runes_survive_a_new_run_permadeath_reset() -> void:
 	GameState.earn_runes(75)
 	GameState.start_new_run()
 	assert_eq(GameState.runes, 75, "currency is session-long, like the win tally")
+
+
+func test_enemy_defeated_earns_the_round_win_bonus() -> void:
+	EventBus.enemy_defeated.emit("killed")
+	assert_eq(GameState.runes, GameState.ROUND_WIN_RUNES)
+
+
+func test_excess_consumed_earns_runes_proportional_to_the_overflow() -> void:
+	EventBus.excess_consumed.emit(null, 12.7)
+	assert_eq(GameState.runes, 12, "fractional overflow truncates to whole runes")

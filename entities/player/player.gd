@@ -20,10 +20,13 @@ extends CharacterBody2D
 @onready var trap_placer: TrapPlacer = $TrapPlacer
 @onready var sprite: Sprite2D = $Sprite
 @onready var _mover: GridMover = $GridMover
+@onready var _plane: PlaneComponent = $PlaneComponent
+@onready var _camouflage: CamouflageSkill = $CamouflageSkill
 
 var facing := Vector2.RIGHT
 var _dead := false
 var _melee_left := 0.0
+var _level: Level
 
 
 func _ready() -> void:
@@ -32,6 +35,7 @@ func _ready() -> void:
 	# Route blocking through the player so the dev noclip toggle can bypass it.
 	_mover.block_check = _blocked
 	_mover.step_finished.connect(_on_step_finished)
+	_plane.plane_changed.connect(_on_plane_changed)
 	_restore_vitals()
 	health.health_changed.connect(_on_health_changed)
 	health.damaged.connect(func(amount: float) -> void: EventBus.player_damaged.emit(amount))
@@ -67,18 +71,49 @@ func _physics_process(delta: float) -> void:
 		trap_placer.place(global_position, self)
 	if Input.is_action_just_pressed("melee"):
 		_melee()
+	if Input.is_action_just_pressed("toggle_plane"):
+		_plane.transition()
+	if Input.is_action_just_pressed("camouflage"):
+		_camouflage.activate(self)
 
 
-## Blocking seam for the GridMover: the noclip dev toggle passes through walls;
-## otherwise checks a tile the enemy has already committed to (mid-step, not
-## just physically standing on) before falling back to the body's own physics
-## (walls, traps, a stationary spider).
+## Called by Level right after instancing, mirroring Enemy.bind_level() — lets
+## the player's PlaneComponent resolve ceiling-plane blocking without a
+## NodePath wired in the .tscn.
+func bind_level(level: Level) -> void:
+	_level = level
+	_plane.level = level
+
+
+## Blocking seam for the GridMover: the noclip dev toggle passes through walls.
+## On the ceiling plane, blocking is decided entirely by PlaneComponent (wall
+## geometry only — pits/floods don't reach up there, design §1); there's no
+## separate physical collider for the ceiling, so test_move against the
+## ground's colliders would be the wrong check there. On the ground, a pit
+## has no physical collider either (it's a MazeData-only overlay), so
+## test_move alone can't see it — is_blocked(..., GROUND) is added as an
+## *additional* blocking condition, on top of the original test_move check
+## (unchanged), so ground movement's physics (traps, a stationary spider,
+## dynamic obstacles) still behave exactly as before, now correctly blocked by
+## a pit as well.
 func _blocked(dir: Vector2i) -> bool:
 	if GameState.noclip:
 		return false
 	if GridMover.spider_tile_contested(_mover, self, dir):
 		return true
+	if _level != null:
+		var target := _level.tile_of(global_position) + dir
+		if _plane.current_plane == Level.Layer.CEILING:
+			return _level.is_blocked(target, Level.Layer.CEILING)
+		if _level.is_blocked(target, Level.Layer.GROUND):
+			return true
 	return test_move(global_transform, Vector2(dir) * float(_mover.tile_size))
+
+
+## Visual cue for which plane the player currently occupies — a dim,
+## cool-toned tint on the ceiling, restored to normal on the ground.
+func _on_plane_changed(plane: Level.Layer) -> void:
+	sprite.modulate = Color(0.55, 0.65, 0.85, 0.85) if plane == Level.Layer.CEILING else Color.WHITE
 
 
 ## Strike one tile ahead: light damage + shove + stun on a spider, or an

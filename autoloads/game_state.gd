@@ -53,10 +53,18 @@ var enemy_wins := 0
 var runes: int = 0
 var purchased_upgrades: Array[StringName] = []
 
+## Flat reward for clearing a round — not depth-scaled, so currency growth
+## stays predictable regardless of how fast a run is descending.
+const ROUND_WIN_RUNES := 20
+
 
 func _ready() -> void:
 	EventBus.enemy_defeated.connect(func(_cause: String) -> void: player_wins += 1)
 	EventBus.player_died.connect(func() -> void: enemy_wins += 1)
+	# Runes are earned by play (design §5): a flat bonus for clearing a round,
+	# plus 1 rune per point of hunger overflow from eating past full.
+	EventBus.enemy_defeated.connect(func(_cause: String) -> void: earn_runes(ROUND_WIN_RUNES))
+	EventBus.excess_consumed.connect(func(_by: Node, amount: float) -> void: earn_runes(int(amount)))
 	start_new_run()
 
 
