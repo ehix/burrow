@@ -50,3 +50,41 @@
 	- Slows enemy movement for a fixed amount of time.
 3. Camouflage:
 	- Player spider opacity increased temporarily.
+
+---
+
+## Development (Godot 4.7 rebuild — slice 1)
+
+The playable project lives at the repo root (`project.godot`). The Godot 3.x
+`prototype/` is kept as reference only and is excluded from the project via
+`prototype/.gdignore`.
+
+Full design: [`docs/superpowers/specs/2026-07-06-burrow-rebuild-design.md`](docs/superpowers/specs/2026-07-06-burrow-rebuild-design.md).
+
+### Run
+
+1. Open the project in **Godot 4.7** (GDScript only, no Mono needed).
+2. Press Play — `world/world.tscn` is the main scene.
+
+Controls: **WASD / arrows** move, **Space** fires a web shot along your facing,
+**E** lays a trap. Clear the enemy (kill or starve it) to burrow to the next
+depth; HP + Hunger carry forward. Die and it's permadeath back to depth 1.
+
+### Art
+
+All sprites/tilesets are being regenerated in **SpriteCook**. Until then,
+entities render as flat placeholder `Polygon2D` shapes and the maze draws as
+flat floor/wall rects (`world/maze/maze_renderer.gd`) — swap in a `TileMapLayer`
+once the tileset exists; the collision / occluder / navigation pipeline is built
+separately from the maze grid, so it is unaffected.
+
+### Tests
+
+Pure-logic tests (maze generation, tile classification, health, hunger, trap
+resolution) live in `tests/` and use **GUT**. Install GUT from the AssetLib
+(`addons/gut/`), then run the suite from the GUT panel or:
+
+```
+godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
+```
+

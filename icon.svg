@@ -1,0 +1,16 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="16" fill="#1a1420"/>
+  <!-- crude spider placeholder; replaced by SpriteCook art -->
+  <g stroke="#c9a86a" stroke-width="4" stroke-linecap="round" fill="none">
+    <line x1="40" y1="44" x2="18" y2="30"/>
+    <line x1="40" y1="56" x2="16" y2="54"/>
+    <line x1="40" y1="72" x2="16" y2="78"/>
+    <line x1="40" y1="84" x2="20" y2="98"/>
+    <line x1="88" y1="44" x2="110" y2="30"/>
+    <line x1="88" y1="56" x2="112" y2="54"/>
+    <line x1="88" y1="72" x2="112" y2="78"/>
+    <line x1="88" y1="84" x2="108" y2="98"/>
+  </g>
+  <ellipse cx="64" cy="52" rx="18" ry="16" fill="#c9a86a"/>
+  <ellipse cx="64" cy="78" rx="22" ry="24" fill="#8a6a3a"/>
+</svg>

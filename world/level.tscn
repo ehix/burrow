@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://world/level.gd" id="1_level"]
+[ext_resource type="Script" path="res://world/maze/maze_renderer.gd" id="2_renderer"]
+
+[node name="Level" type="Node2D"]
+script = ExtResource("1_level")
+
+[node name="CanvasModulate" type="CanvasModulate" parent="."]
+color = Color(0.05, 0.05, 0.07, 1)
+
+[node name="Renderer" type="Node2D" parent="."]
+script = ExtResource("2_renderer")
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Occluders" type="Node2D" parent="."]
+
+[node name="Entities" type="Node2D" parent="."]

@@ -1,0 +1,30 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://entities/web/web_trap.gd" id="1_trap"]
+[ext_resource type="Texture2D" uid="uid://cgme8yu4ka4xb" path="res://assets/sprites/web_trap.png" id="2_trap_tex"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_block"]
+radius = 11.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_catch"]
+radius = 40.0
+
+[node name="WebTrap" type="StaticBody2D"]
+collision_layer = 32
+collision_mask = 0
+script = ExtResource("1_trap")
+
+[node name="BlockShape" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_block")
+
+[node name="Visual" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_trap_tex")
+
+[node name="CatchArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 14
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CatchArea"]
+shape = SubResource("CircleShape2D_catch")

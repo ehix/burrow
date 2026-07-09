@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EnemyType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/enemy_type.gd" id="1_type"]
+
+[resource]
+script = ExtResource("1_type")
+display_name = "Rival Spider"
+max_health = 80.0
+move_speed = 85.0
+hunger_rate = 3.0

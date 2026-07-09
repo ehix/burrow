@@ -1,0 +1,21 @@
+# Normalize line endings to LF for all text files
+* text=auto eol=lf
+
+# Godot text resources are text
+*.gd    text
+*.tscn  text
+*.tres  text
+*.godot text
+*.cfg   text
+*.import text
+
+# Binary assets — never touch line endings
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.ogg   binary
+*.wav   binary
+*.mp3   binary
+*.ttf   binary
+*.otf   binary
