@@ -71,6 +71,45 @@ func test_satiate_overflow_past_full() -> void:
 	assert_signal_emitted_with_parameters(hunger, "overflowed", [20.0])
 
 
+func test_satiate_overflow_heals_the_sibling_health() -> void:
+	var health := _make_health(100.0)
+	health.current_health = 60.0 # damaged, so the heal is visible
+	var hunger := _make_hunger(health)
+	hunger.excess_heal_ratio = 0.5
+	hunger.current_hunger = 30.0
+	hunger.satiate(50.0) # only 30 needed; 20 overflows -> heals 20 * 0.5 = 10
+	assert_almost_eq(health.current_health, 70.0, 0.001, "overflow heals at excess_heal_ratio")
+
+
+func test_satiate_without_overflow_does_not_heal() -> void:
+	var health := _make_health(100.0)
+	health.current_health = 60.0
+	var hunger := _make_hunger(health)
+	hunger.excess_heal_ratio = 0.5
+	hunger.current_hunger = 60.0
+	hunger.satiate(40.0) # no overflow: exactly enough to reach zero hunger
+	assert_almost_eq(health.current_health, 60.0, 0.001, "no overflow, no heal")
+
+
+func test_satiate_overflow_heal_clamps_at_max_health() -> void:
+	var health := _make_health(100.0) # already full
+	var hunger := _make_hunger(health)
+	hunger.excess_heal_ratio = 0.5
+	hunger.current_hunger = 30.0
+	hunger.satiate(50.0) # 20 overflow, would heal 10, but already at max
+	assert_almost_eq(health.current_health, 100.0, 0.001, "heal clamps at max health")
+
+
+func test_zero_excess_heal_ratio_disables_the_heal() -> void:
+	var health := _make_health(100.0)
+	health.current_health = 60.0
+	var hunger := _make_hunger(health)
+	hunger.excess_heal_ratio = 0.0
+	hunger.current_hunger = 30.0
+	hunger.satiate(50.0) # 20 overflow, but the ratio is disabled
+	assert_almost_eq(health.current_health, 60.0, 0.001, "a zero ratio disables the heal entirely")
+
+
 func test_add_raises_hunger_clamped_to_max() -> void:
 	var hunger := _make_hunger(_make_health())
 	hunger.current_hunger = 90.0

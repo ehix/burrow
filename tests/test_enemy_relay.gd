@@ -23,3 +23,17 @@ func test_enemy_relays_damage_to_event_bus() -> void:
 	enemy.health.take_damage(10.0)
 	var expected := enemy.health.current_health
 	assert_signal_emitted_with_parameters(EventBus, "health_changed", [enemy, expected, enemy.health.max_health])
+
+
+## Regression: _eat_larva used to hardcode the emitted overflow to 0.0
+## regardless of the real satiate() result.
+func test_eat_larva_emits_the_real_overflow() -> void:
+	var enemy: Enemy = EnemyScene.instantiate()
+	add_child_autofree(enemy)
+	enemy.hunger.current_hunger = 5.0 # eat_satiation (40) will overflow by 35
+	var larva := Node2D.new()
+	larva.add_to_group("larvae")
+	add_child_autofree(larva)
+	watch_signals(EventBus)
+	enemy._eat_larva(larva)
+	assert_signal_emitted_with_parameters(EventBus, "larva_consumed", [enemy, 35.0])

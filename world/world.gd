@@ -4,6 +4,11 @@ extends Node2D
 
 const LevelScene := preload("res://world/level.tscn")
 
+## Fraction of missing health restored to the player on a round win — a
+## post-victory breather, not a full heal, so health still matters within a
+## level but a hard-won fight doesn't bleed straight into the next depth's.
+@export var victory_heal_fraction: float = 0.5
+
 @onready var camera: Camera2D = $Camera2D
 @onready var hud: CanvasLayer = $HUD
 
@@ -122,13 +127,15 @@ func _dev_remove_wall() -> void:
 	_level.dev_remove_wall_at(tile)
 
 
-## Enemy cleared → carry the player's vitals forward and descend to a fresh,
-## harder maze.
+## Enemy cleared → a partial victory heal, then carry the player's vitals
+## forward and descend to a fresh, harder maze.
 func _on_enemy_defeated(_cause: String) -> void:
 	if _rebuilding:
 		return
-	var player := _current_player()
-	if player != null and player.has_method("store_vitals"):
+	var player := _current_player() as Player
+	if player != null:
+		var missing := player.health.max_health - player.health.current_health
+		player.health.heal(missing * victory_heal_fraction)
 		player.store_vitals()
 	GameState.advance_depth()
 	_replace_level()

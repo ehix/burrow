@@ -16,6 +16,10 @@ signal overflowed(amount: float)  ## a meal pushed hunger past full
 @export var hunger_rate: float = 4.0
 ## HP lost per second while hunger is maxed.
 @export var starvation_damage_rate: float = 6.0
+## HP restored per point of hunger overflow (eating past full) — a small
+## reward for eating even when not hungry, on top of the flat overflow event.
+## Tunable starting point; feel out in playtest.
+@export var excess_heal_ratio: float = 0.5
 ## Sibling HealthComponent to drain when starving. Auto-found among siblings if
 ## left empty.
 @export var health_path: NodePath
@@ -58,6 +62,8 @@ func tick(delta: float) -> void:
 
 ## Eat: reduce hunger by `amount`. Returns the overflow (how far the meal
 ## pushed past full, >= 0), and emits overflowed() when that is positive.
+## Overflow also heals the sibling HealthComponent (excess_heal_ratio) — eating
+## past satiation is always worthwhile, not just wasted once you're full.
 func satiate(amount: float) -> float:
 	if amount <= 0.0:
 		return 0.0
@@ -66,6 +72,8 @@ func satiate(amount: float) -> float:
 	hunger_changed.emit(current_hunger, max_hunger)
 	if overflow > 0.0:
 		overflowed.emit(overflow)
+		if health != null and excess_heal_ratio > 0.0:
+			health.heal(overflow * excess_heal_ratio)
 	return overflow
 
 

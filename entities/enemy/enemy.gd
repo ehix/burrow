@@ -330,8 +330,8 @@ func _tile_of(world: Vector2) -> Vector2i:
 func _eat_larva(larva: Node) -> void:
 	if not larva.is_in_group("larvae"):
 		return
-	hunger.satiate(eat_satiation)
-	EventBus.larva_consumed.emit(self, 0.0)
+	var overflow := hunger.satiate(eat_satiation)
+	EventBus.larva_consumed.emit(self, overflow)
 	larva.queue_free()
 
 
