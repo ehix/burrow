@@ -24,7 +24,7 @@ func _entry_for(indicators: ControlIndicators, text: String) -> ControlIndicator
 
 func test_builds_one_entry_per_tracked_action() -> void:
 	var indicators := _make()
-	assert_eq(indicators._entries.size(), 17)
+	assert_eq(indicators._entries.size(), 24)
 
 
 func test_held_entry_lights_up_while_its_check_is_true() -> void:

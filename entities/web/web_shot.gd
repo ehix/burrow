@@ -51,6 +51,8 @@ func _on_body_entered(body: Node2D) -> void:
 		return
 	if body is WebTrap:
 		(body as WebTrap).take_web_hit()
+	elif body is Blockade:
+		(body as Blockade).take_hit()
 	elif body.is_in_group("larvae") and body.has_method("web_kill"):
 		body.web_kill()
 	# else: a wall — nothing to do but splat.

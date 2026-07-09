@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=31 format=3]
 
 [ext_resource type="Script" path="res://entities/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://components/grid_mover.gd" id="10_mover"]
@@ -15,6 +15,18 @@
 [ext_resource type="Script" path="res://components/status_effect_component.gd" id="13_status"]
 [ext_resource type="Script" path="res://entities/skills/sense_skill.gd" id="14_sense"]
 [ext_resource type="Script" path="res://entities/skills/remove_walls_skill.gd" id="15_removewalls"]
+[ext_resource type="Script" path="res://entities/skills/net_hold_skill.gd" id="16_nethold"]
+[ext_resource type="Script" path="res://entities/skills/net_projectile_skill.gd" id="17_netproj"]
+[ext_resource type="PackedScene" path="res://entities/skills/scenes/net_shot.tscn" id="18_netshot"]
+[ext_resource type="Script" path="res://entities/skills/hatchlings_skill.gd" id="19_hatch"]
+[ext_resource type="PackedScene" path="res://entities/skills/scenes/tiny_spiderling.tscn" id="20_spiderling"]
+[ext_resource type="Script" path="res://entities/skills/egg_mine_skill.gd" id="21_eggmine"]
+[ext_resource type="PackedScene" path="res://entities/skills/scenes/cocoon_mine.tscn" id="22_mine"]
+[ext_resource type="Script" path="res://entities/skills/blockade_skill.gd" id="23_blockadeskill"]
+[ext_resource type="PackedScene" path="res://entities/skills/scenes/blockade.tscn" id="24_blockade"]
+[ext_resource type="Script" path="res://entities/skills/silk_tunnel_skill.gd" id="25_silk"]
+[ext_resource type="Script" path="res://entities/skills/decoy_skill.gd" id="26_decoyskill"]
+[ext_resource type="PackedScene" path="res://entities/skills/scenes/decoy.tscn" id="27_decoy"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 10.0
@@ -105,3 +117,30 @@ script = ExtResource("14_sense")
 script = ExtResource("15_removewalls")
 cooldown = 1.0
 hunger_cost = 25.0
+
+[node name="NetHoldSkill" type="Node" parent="."]
+script = ExtResource("16_nethold")
+
+[node name="NetProjectileSkill" type="Node" parent="."]
+script = ExtResource("17_netproj")
+net_shot_scene = ExtResource("18_netshot")
+
+[node name="HatchlingsSkill" type="Node" parent="."]
+script = ExtResource("19_hatch")
+hatchling_scene = ExtResource("20_spiderling")
+
+[node name="EggMineSkill" type="Node" parent="."]
+script = ExtResource("21_eggmine")
+mine_scene = ExtResource("22_mine")
+
+[node name="BlockadeSkill" type="Node" parent="."]
+script = ExtResource("23_blockadeskill")
+blockade_scene = ExtResource("24_blockade")
+
+[node name="SilkTunnelSkill" type="Node" parent="."]
+script = ExtResource("25_silk")
+trap_scene = ExtResource("8_trap")
+
+[node name="DecoySkill" type="Node" parent="."]
+script = ExtResource("26_decoyskill")
+decoy_scene = ExtResource("27_decoy")

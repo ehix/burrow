@@ -25,6 +25,17 @@ extends CharacterBody2D
 @onready var _status: StatusEffectComponent = $StatusEffectComponent
 @onready var _sense: SenseSkill = $SenseSkill
 @onready var _remove_walls: RemoveWallsSkill = $RemoveWallsSkill
+## Every class-specific skill below is attached to the player for testing
+## all seven at once — this is not final class balance (see SpiderClassData,
+## not yet wired onto Player/Enemy for real class selection), just a kitchen
+## -sink loadout so each skill can actually be exercised in a running game.
+@onready var _net_hold: NetHoldSkill = $NetHoldSkill
+@onready var _net_projectile: NetProjectileSkill = $NetProjectileSkill
+@onready var _hatchlings: HatchlingsSkill = $HatchlingsSkill
+@onready var _egg_mine: EggMineSkill = $EggMineSkill
+@onready var _blockade: BlockadeSkill = $BlockadeSkill
+@onready var _silk_tunnel: SilkTunnelSkill = $SilkTunnelSkill
+@onready var _decoy: DecoySkill = $DecoySkill
 
 var facing := Vector2.RIGHT
 var _dead := false
@@ -84,6 +95,20 @@ func _physics_process(delta: float) -> void:
 		_sense.activate(self)
 	if Input.is_action_just_pressed("remove_walls_skill"):
 		_remove_walls.activate(self)
+	if Input.is_action_just_pressed("net_hold"):
+		_net_hold.activate(self)
+	if Input.is_action_just_pressed("net_projectile"):
+		_net_projectile.activate(self)
+	if Input.is_action_just_pressed("hatchlings"):
+		_hatchlings.activate(self)
+	if Input.is_action_just_pressed("egg_mine"):
+		_egg_mine.activate(self)
+	if Input.is_action_just_pressed("blockade"):
+		_blockade.activate(self)
+	if Input.is_action_just_pressed("silk_tunnel"):
+		_silk_tunnel.activate(self)
+	if Input.is_action_just_pressed("decoy"):
+		_decoy.activate(self)
 
 
 ## Called by Level right after instancing, mirroring Enemy.bind_level() — lets
@@ -170,6 +195,14 @@ func _melee() -> void:
 			continue
 		if larva.has_method("web_kill"):
 			larva.web_kill()
+		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
+		return
+	for node in get_tree().get_nodes_in_group("blockades"):
+		var blockade := node as Node2D
+		if blockade == null or blockade.global_position.distance_to(target) > melee_range:
+			continue
+		if blockade.has_method("take_hit"):
+			blockade.take_hit()
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
 

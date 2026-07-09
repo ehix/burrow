@@ -44,6 +44,13 @@ func _ready() -> void:
 	_add_one_shot(root, "Camouflage (V)", "camouflage")
 	_add_one_shot(root, "Sense (N)", "sense")
 	_add_one_shot(root, "Remove Walls Skill (M)", "remove_walls_skill")
+	_add_one_shot(root, "Net Hold (B)", "net_hold")
+	_add_one_shot(root, "Net Projectile (T)", "net_projectile")
+	_add_one_shot(root, "Hatchlings (Y)", "hatchlings")
+	_add_one_shot(root, "Egg Mine (U)", "egg_mine")
+	_add_one_shot(root, "Blockade (O)", "blockade")
+	_add_one_shot(root, "Silk Tunnel (I)", "silk_tunnel")
+	_add_one_shot(root, "Decoy (Z)", "decoy")
 	_add_held(root, "Paused (Esc)", func() -> bool: return get_tree().paused)
 
 
