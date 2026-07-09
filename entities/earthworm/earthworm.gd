@@ -1,13 +1,18 @@
 class_name Earthworm
 extends StaticBody2D
 ## Hazard/obstacle creature (design §6): highly durable, inedible, blocks a
-## corridor tile like a wall until melee'd enough times. A landed melee hit
-## doesn't kill it — it flips to RETREATING and burrows toward the nearest
-## map-boundary tile, then despawns there. "Burrows out of map bounds" is
-## flavour for "despawns at the edge, freeing the corridor": it never actually
-## steps outside the maze grid, so the outer-boundary guardrail is never at
-## stake here. Not yet instanced by Level in this pass, and `take_hit()` isn't
-## yet called from Player._melee/Enemy melee (see design doc).
+## corridor tile like a wall until melee'd enough times — on the world
+## collision layer, so it blocks spiders via their existing test_move checks
+## with zero changes to Player/Enemy's own collision masks (same approach as
+## Blockade). A landed melee hit doesn't kill it — it flips to RETREATING and
+## burrows toward the nearest map-boundary tile, then despawns there.
+## "Burrows out of map bounds" is flavour for "despawns at the edge, freeing
+## the corridor": it never actually steps outside the maze grid, so the
+## outer-boundary guardrail is never at stake here. Instanced by
+## Level._seed_earthworms(); `take_hit()` is called from Player._melee only
+## (not Enemy — Enemy's own melee only ever targets the player directly, it
+## has no "hit whatever's in front" sweep to extend). Placeholder visual: a
+## drawn worm silhouette, no art asset yet.
 
 enum State { BLOCKING, RETREATING }
 
@@ -19,6 +24,14 @@ var state: State = State.BLOCKING
 var _hits := 0
 var _level: Node
 var _retreat_dir := Vector2.ZERO
+
+
+func _ready() -> void:
+	add_to_group("earthworms")
+
+
+func _draw() -> void:
+	draw_rect(Rect2(Vector2(-16, -6), Vector2(32, 12)), Color(0.65, 0.5, 0.35, 0.9))
 
 
 func bind_level(level: Node) -> void:

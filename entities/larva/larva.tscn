@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://entities/larva/larva.gd" id="1_larva"]
 [ext_resource type="Texture2D" uid="uid://xsv8tmi0accp" path="res://assets/sprites/larva.png" id="2_larva_tex"]
 [ext_resource type="Script" path="res://components/grid_mover.gd" id="3_mover"]
+[ext_resource type="Script" path="res://entities/larva/larva_growth.gd" id="4_growth"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_larva"]
 radius = 5.0
@@ -24,3 +25,6 @@ texture = ExtResource("2_larva_tex")
 script = ExtResource("3_mover")
 tile_size = 48
 step_time = 0.34
+
+[node name="LarvaGrowth" type="Node" parent="."]
+script = ExtResource("4_growth")

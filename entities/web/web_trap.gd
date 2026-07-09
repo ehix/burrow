@@ -97,14 +97,17 @@ func catch_larva(larva: Node) -> void:
 
 
 ## A spider eats the caught larva: satiate it, announce the meal, remove the
-## larva, and spend the trap. No-op if empty or already spent.
+## larva, and spend the trap. No-op if empty or already spent. Uses the
+## larva's own growth-scaled heal_value() (design §2) when it has one —
+## falls back to the trap's flat `satiation` for a bare test double.
 func try_consume(spider: Node) -> void:
 	if spent or caught_larva == null:
 		return
 	var hunger := _find_hunger(spider)
+	var heal_amount: float = caught_larva.heal_value() if caught_larva.has_method("heal_value") else satiation
 	var overflow := 0.0
 	if hunger != null:
-		overflow = hunger.satiate(satiation)
+		overflow = hunger.satiate(heal_amount)
 	EventBus.larva_consumed.emit(spider, overflow)
 	if overflow > 0.0:
 		EventBus.excess_consumed.emit(spider, overflow)

@@ -327,10 +327,13 @@ func _tile_of(world: Vector2) -> Vector2i:
 
 # --- eating -------------------------------------------------------------------
 
+## Uses the larva's own growth-scaled heal_value() (design §2) when it has
+## one — falls back to the flat eat_satiation for a bare test double.
 func _eat_larva(larva: Node) -> void:
 	if not larva.is_in_group("larvae"):
 		return
-	var overflow := hunger.satiate(eat_satiation)
+	var heal_amount: float = larva.heal_value() if larva.has_method("heal_value") else eat_satiation
+	var overflow := hunger.satiate(heal_amount)
 	EventBus.larva_consumed.emit(self, overflow)
 	larva.queue_free()
 
