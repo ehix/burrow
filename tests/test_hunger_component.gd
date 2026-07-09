@@ -97,3 +97,37 @@ func test_charge_all_taxes_every_spider() -> void:
 	HungerComponent.charge_all(get_tree(), 4.0)
 	assert_eq(ha.current_hunger, 14.0, "first spider taxed")
 	assert_eq(hb.current_hunger, 24.0, "second spider taxed")
+
+
+func test_god_mode_freezes_hunger_for_the_player() -> void:
+	var owner := Node2D.new()
+	owner.add_to_group("player")
+	var hunger := HungerComponent.new()
+	hunger.max_hunger = 100.0
+	hunger.hunger_rate = 10.0
+	hunger.current_hunger = 50.0
+	owner.add_child(hunger)
+	add_child_autofree(owner)
+	GameState.god_mode = true
+	hunger.tick(5.0) # would otherwise add 50 hunger
+	hunger.add(20.0) # metabolic action cost also frozen
+	GameState.god_mode = false # don't leak into other tests
+	assert_eq(hunger.current_hunger, 50.0, "god mode freezes the player's hunger")
+
+
+func test_charge_all_drains_health_instead_once_starving() -> void:
+	# A spider already at max hunger has nowhere for the charge to go, so the
+	# fail-safe drains its health instead (actions never go free while starving).
+	var spider := Node2D.new()
+	spider.add_to_group("spiders")
+	var health := HealthComponent.new()
+	health.max_health = 100.0
+	health.current_health = 100.0
+	spider.add_child(health)
+	var hunger := HungerComponent.new()
+	hunger.current_hunger = hunger.max_hunger # already starving
+	spider.add_child(hunger)
+	add_child_autofree(spider)
+	HungerComponent.charge_all(get_tree(), 6.0)
+	assert_eq(hunger.current_hunger, hunger.max_hunger, "hunger stays capped, does not overflow")
+	assert_almost_eq(health.current_health, 94.0, 0.001, "the charge drained health instead")

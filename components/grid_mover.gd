@@ -49,6 +49,36 @@ func is_stunned() -> bool:
 	return _stun_left > 0.0
 
 
+## The tile this mover currently owns: its landing tile if a step is in
+## flight, else its current tile. Blocking checks must consult this — not just
+## live physical overlap — or a step that was validly started toward an empty
+## tile can still land on someone who arrives there (e.g. via knockback) after
+## the step began, since a step's own blocking check only runs once, at start.
+func committed_tile() -> Vector2i:
+	var pos := _to if _moving else _mover_node().global_position
+	var ts := float(tile_size)
+	return Vector2i(int(floorf(pos.x / ts)), int(floorf(pos.y / ts)))
+
+
+## True if stepping `dir` from `self_node` would land on a tile another spider
+## already owns — occupied now, or already committed to via an in-flight step.
+## Shared by Player and Enemy so spiders can't land on each other's tile.
+static func spider_tile_contested(mover: GridMover, self_node: Node2D, dir: Vector2i) -> bool:
+	var target_pos := self_node.global_position + Vector2(dir) * float(mover.tile_size)
+	var ts := float(mover.tile_size)
+	var target_tile := Vector2i(int(floorf(target_pos.x / ts)), int(floorf(target_pos.y / ts)))
+	for node in self_node.get_tree().get_nodes_in_group("spiders"):
+		if node == self_node:
+			continue
+		var other := node as Node2D
+		if other == null:
+			continue
+		var other_mover := other.get_node_or_null("GridMover") as GridMover
+		if other_mover != null and other_mover.committed_tile() == target_tile:
+			return true
+	return false
+
+
 ## Begin a one-tile step in a cardinal direction. Buffers and returns false if
 ## already moving; returns false if stunned or blocked; true if a step started.
 func try_step(dir: Vector2i) -> bool:
@@ -78,6 +108,24 @@ func knockback(dir: Vector2i) -> bool:
 ## Stop the owner acting for `duration` seconds (longest pending stun wins).
 func stun(duration: float) -> void:
 	_stun_left = maxf(_stun_left, duration)
+
+
+## Drop any queued step. Callers whose input can be released mid-step (the
+## player) must call this the instant input stops, or a step that finishes
+## right after release will still auto-continue into a stale buffered
+## direction (the "moves two tiles per tap" bug).
+func cancel_buffer() -> void:
+	_buffered = Vector2i.ZERO
+
+
+## Halt any in-flight step immediately and drop the buffer. Callers that
+## forcibly reposition the owner from outside the step animation (a trap
+## snapping a caught larva to its centre) must call this, or tick() will keep
+## lerping toward the pre-capture destination on the next frame and drag the
+## owner right back off the position that was just set.
+func stop() -> void:
+	_moving = false
+	_buffered = Vector2i.ZERO
 
 
 func _begin_step(dir: Vector2i) -> void:

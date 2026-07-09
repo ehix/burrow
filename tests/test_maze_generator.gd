@@ -28,6 +28,20 @@ func test_different_seed_differs() -> void:
 	assert_false(a.equals(b), "different seeds should (almost surely) differ")
 
 
+func test_set_open_carves_a_wall_into_floor() -> void:
+	var maze := MazeGenerator.generate(5, 4, 123)
+	assert_false(maze.is_open(0, 0), "the border is a wall")
+	maze.set_open(0, 0)
+	assert_true(maze.is_open(0, 0), "dev remove-wall carves it into floor")
+
+
+func test_set_open_out_of_bounds_is_a_noop() -> void:
+	var maze := MazeGenerator.generate(5, 4, 123)
+	maze.set_open(-1, -1) # must not error
+	maze.set_open(999, 999)
+	assert_false(maze.is_open(-1, -1))
+
+
 func test_outer_border_is_solid_wall() -> void:
 	var maze := MazeGenerator.generate(6, 6, 3)
 	for x in maze.width:

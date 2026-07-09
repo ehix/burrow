@@ -26,6 +26,13 @@ func is_open(x: int, y: int) -> bool:
 	return _cells[y * width + x] == 1
 
 
+## Carve a wall tile into floor (dev "remove wall" tool). No-op out of bounds.
+func set_open(x: int, y: int) -> void:
+	if x < 0 or x >= width or y < 0 or y >= height:
+		return
+	_cells[y * width + x] = 1
+
+
 ## Every open tile coordinate, row-major.
 func open_cells() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []

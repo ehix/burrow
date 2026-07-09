@@ -5,12 +5,14 @@ extends Node2D
 const LevelScene := preload("res://world/level.tscn")
 
 @onready var camera: Camera2D = $Camera2D
+@onready var hud: CanvasLayer = $HUD
 
 var _level: Node2D
 var _rebuilding := false
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS # must keep receiving input to unpause
 	EventBus.enemy_defeated.connect(_on_enemy_defeated)
 	EventBus.player_died.connect(_on_player_died)
 	_build_level()
@@ -52,10 +54,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		GameState.noclip = not GameState.noclip
 	elif event.is_action_pressed("dev_freeze"):
 		GameState.freeze_others = not GameState.freeze_others
+	# Dev tool (R): regenerate the map. (X): remove the wall ahead of the
+	# player. (G): toggle player god mode.
+	elif event.is_action_pressed("dev_reset_map"):
+		_dev_reset_map()
+	elif event.is_action_pressed("dev_remove_wall"):
+		_dev_remove_wall()
+	elif event.is_action_pressed("dev_god_mode"):
+		GameState.god_mode = not GameState.god_mode
+	elif event.is_action_pressed("pause"):
+		_toggle_pause()
 
 
 func _build_level() -> void:
 	_level = LevelScene.instantiate()
+	# World is PROCESS_MODE_ALWAYS so its own input keeps working while paused;
+	# without this explicit override Level would inherit ALWAYS from World too
+	# and pausing would freeze nothing at all.
+	_level.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_level)
 	_level.build()
 	_snap_camera()
@@ -75,6 +91,35 @@ func _snap_camera() -> void:
 
 func _current_player() -> Node2D:
 	return get_tree().get_first_node_in_group("player") as Node2D
+
+
+## Dev tool (R): instantly regenerate the map at the same depth with a fresh
+## random layout. Treated as a new spawn — health and hunger reset to defaults
+## rather than carrying the player's current vitals forward.
+func _dev_reset_map() -> void:
+	if _rebuilding:
+		return
+	GameState.clear_carried_vitals()
+	GameState.run_seed = randi()
+	_replace_level()
+
+
+## Pause (Esc): freezes gameplay (everything but this node and the HUD, both
+## PROCESS_MODE_ALWAYS) and shows a "PAUSED" label.
+func _toggle_pause() -> void:
+	get_tree().paused = not get_tree().paused
+	if hud != null and hud.has_method("set_paused_visible"):
+		hud.set_paused_visible(get_tree().paused)
+
+
+## Dev tool (X): destroy the wall tile directly ahead of the player.
+func _dev_remove_wall() -> void:
+	var player := _current_player() as Player
+	if player == null or not is_instance_valid(_level):
+		return
+	var target_world := player.global_position + player.facing * float(Level.TILE_SIZE)
+	var tile: Vector2i = _level.tile_of(target_world)
+	_level.dev_remove_wall_at(tile)
 
 
 ## Enemy cleared → carry the player's vitals forward and descend to a fresh,

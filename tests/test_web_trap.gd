@@ -13,8 +13,12 @@ func _make_spider(hunger_value: float) -> Array:
 	hunger.max_hunger = 100.0
 	hunger.current_hunger = hunger_value
 	spider.add_child(hunger)
+	var health := HealthComponent.new()
+	health.max_health = 100.0
+	health.current_health = 100.0
+	spider.add_child(health)
 	autofree(spider)
-	return [spider, hunger]
+	return [spider, hunger, health]
 
 
 func _make_trap() -> WebTrap:
@@ -97,3 +101,60 @@ func test_web_hits_ignored_once_spent() -> void:
 	trap.try_consume(pair[0]) # spent via consumption
 	trap.take_web_hit() # must be a no-op, not error
 	assert_true(trap.spent)
+
+
+func test_consuming_a_larva_never_damages_the_spider() -> void:
+	var trap := _make_trap()
+	var pair := _make_spider(50.0)
+	trap.catch_larva(_make_larva())
+	trap.try_consume(pair[0])
+	assert_eq((pair[2] as HealthComponent).current_health, 100.0,
+		"harvesting a caught larva must never cost health")
+
+
+## A minimal double recording apply_web_hit calls, since the fake spiders
+## above are plain Node2Ds without Player/Enemy's real reaction method.
+class RecordingSpider:
+	extends Node2D
+	var hits: Array = []
+	func apply_web_hit(push_dir: Vector2i, factor: float, slow_duration: float, stun_duration: float) -> void:
+		hits.append([push_dir, factor, slow_duration, stun_duration])
+
+
+func test_entangle_slows_the_placer_too_no_owner_immunity() -> void:
+	var trap := _make_trap()
+	trap.web_slow_factor = 0.5
+	trap.web_slow_duration = 1.5
+	var owner := RecordingSpider.new()
+	autofree(owner)
+	trap.setup(owner)
+	trap._entangle(owner) # the placer crossing their own web
+	assert_eq(owner.hits.size(), 1, "the placer is entangled by their own web")
+	assert_eq(owner.hits[0][1], 0.5, "50% slow factor")
+	assert_eq(owner.hits[0][2], 1.5, "slow duration applied")
+	assert_eq(owner.hits[0][3], 0.0, "no stun from a web crossing")
+
+
+func test_body_entered_skips_entangle_when_a_spider_eats_the_caught_larva() -> void:
+	var trap := _make_trap()
+	trap.catch_larva(_make_larva())
+	var spider := RecordingSpider.new()
+	spider.add_to_group("spiders")
+	var hunger := HungerComponent.new()
+	hunger.max_hunger = 100.0
+	hunger.current_hunger = 50.0
+	spider.add_child(hunger)
+	autofree(spider)
+	trap._on_body_entered(spider)
+	assert_eq(spider.hits.size(), 0, "eating a caught larva must not also entangle you")
+	assert_true(trap.spent, "the larva was consumed")
+	assert_almost_eq(hunger.current_hunger, 10.0, 0.001)
+
+
+func test_body_entered_still_entangles_when_the_web_is_empty() -> void:
+	var trap := _make_trap()
+	var spider := RecordingSpider.new()
+	spider.add_to_group("spiders")
+	autofree(spider)
+	trap._on_body_entered(spider) # nothing caught: just crossing the web
+	assert_eq(spider.hits.size(), 1, "crossing an empty web still entangles")

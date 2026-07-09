@@ -25,6 +25,9 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 @export var melee_damage: float = 12.0
 @export var melee_stun: float = 0.3
 @export var melee_cooldown: float = 0.6
+## Hunger added to every spider per swing (charge_all's max-hunger fail-safe
+## drains health instead once a spider is already starving).
+@export var melee_hunger_cost: float = 5.0
 ## Seconds between the enemy laying web traps while hunting food.
 @export var trap_interval: float = 5.0
 
@@ -57,8 +60,35 @@ func _ready() -> void:
 	add_to_group("spiders")
 	add_to_group("enemy")
 	_apply_type()
+	_mover.block_check = _blocked
 	health.died.connect(_on_died)
+	# Distress flash is reserved for actually being hurt — never for a status
+	# effect like a web's slow, which deals no damage.
+	health.damaged.connect(func(_amount: float) -> void: CombatFx.flash(facing_visual))
+	health.health_changed.connect(_on_health_changed)
+	hunger.hunger_changed.connect(_on_hunger_changed)
+	# Prime the HUD with this instance's depth-scaled starting vitals (a fresh
+	# enemy is spawned each depth, so the HUD needs a fresh snapshot every time).
+	EventBus.health_changed.emit(self, health.current_health, health.max_health)
+	EventBus.hunger_changed.emit(self, hunger.current_hunger, hunger.max_hunger)
 	_player = get_tree().get_first_node_in_group("player") as Node2D
+
+
+func _on_health_changed(value: float, max_value: float) -> void:
+	EventBus.health_changed.emit(self, value, max_value)
+
+
+func _on_hunger_changed(value: float, max_value: float) -> void:
+	EventBus.hunger_changed.emit(self, value, max_value)
+
+
+## Blocking seam for the GridMover: checks a tile the player has already
+## committed to (mid-step, not just physically standing on) before falling
+## back to the body's own physics (walls, traps, a stationary spider).
+func _blocked(dir: Vector2i) -> bool:
+	if GridMover.spider_tile_contested(_mover, self, dir):
+		return true
+	return test_move(global_transform, Vector2(dir) * float(_mover.tile_size))
 
 
 func _apply_type() -> void:
@@ -148,15 +178,19 @@ func _do_seek_food() -> void:
 
 
 ## Strike the player in close quarters: damage, a shove away, a stun, a flash.
+## Costs hunger to swing (charge_all's max-hunger fail-safe drains health once
+## the enemy is already starving).
 func _melee_player(to_player: Vector2) -> void:
 	if _melee_left > 0.0 or _player == null:
 		return
 	_melee_left = melee_cooldown
+	HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 	var hurtbox := _player.get_node_or_null("Hurtbox") as Hurtbox
 	if hurtbox != null:
 		hurtbox.receive_hit(melee_damage, self)
 	if _player.has_method("apply_web_hit"):
 		_player.apply_web_hit(_dominant(to_player), 1.0, 0.0, melee_stun)
+	CombatFx.spawn_slash(get_parent(), _player.global_position, to_player)
 
 
 func _do_flee() -> void:
@@ -279,11 +313,12 @@ func _nearest_in_group(group: String) -> Node2D:
 	return best
 
 
-## Take a landed web/melee hit: flash in distress, get shoved one tile along
-## `push_dir` (Vector2i.ZERO = no shove), slowed, and stunned. Mirrors the
-## player's reaction so combat is symmetric.
+## Take a landed web/melee hit: get shoved one tile along `push_dir`
+## (Vector2i.ZERO = no shove), slowed, and stunned. Mirrors the player's
+## reaction so combat is symmetric. No flash here — that's reserved for actual
+## damage (see the HealthComponent.damaged hookup in _ready), since a pure
+## web-crossing slow deals none.
 func apply_web_hit(push_dir: Vector2i, factor: float, slow_duration: float, stun_duration: float) -> void:
-	CombatFx.flash(facing_visual)
 	if _mover == null:
 		return
 	if push_dir != Vector2i.ZERO:

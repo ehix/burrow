@@ -23,4 +23,4 @@ texture = ExtResource("2_larva_tex")
 [node name="GridMover" type="Node" parent="."]
 script = ExtResource("3_mover")
 tile_size = 48
-step_time = 0.14
+step_time = 0.34

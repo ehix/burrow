@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_world"]
 [ext_resource type="PackedScene" path="res://ui/hud.tscn" id="2_hud"]
+[ext_resource type="PackedScene" path="res://ui/control_indicators.tscn" id="3_indicators"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1_world")
@@ -11,3 +12,5 @@ position_smoothing_enabled = true
 position_smoothing_speed = 7.0
 
 [node name="HUD" parent="." instance=ExtResource("2_hud")]
+
+[node name="ControlIndicators" parent="." instance=ExtResource("3_indicators")]

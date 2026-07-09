@@ -50,3 +50,31 @@ func test_health_changed_carries_values() -> void:
 	watch_signals(h)
 	h.take_damage(25.0)
 	assert_signal_emitted_with_parameters(h, "health_changed", [75.0, 100.0])
+
+
+func test_god_mode_blocks_damage_for_the_player() -> void:
+	var owner := Node2D.new()
+	owner.add_to_group("player")
+	var h := HealthComponent.new()
+	h.max_health = 100.0
+	h.current_health = 100.0
+	owner.add_child(h)
+	add_child_autofree(owner)
+	GameState.god_mode = true
+	h.take_damage(50.0)
+	GameState.god_mode = false # don't leak into other tests
+	assert_eq(h.current_health, 100.0, "god mode blocks damage to the player")
+
+
+func test_god_mode_does_not_protect_a_non_player_spider() -> void:
+	var owner := Node2D.new()
+	owner.add_to_group("spiders") # e.g. the enemy: not the "player" group
+	var h := HealthComponent.new()
+	h.max_health = 100.0
+	h.current_health = 100.0
+	owner.add_child(h)
+	add_child_autofree(owner)
+	GameState.god_mode = true
+	h.take_damage(50.0)
+	GameState.god_mode = false
+	assert_eq(h.current_health, 50.0, "god mode is scoped to the player only")

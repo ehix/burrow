@@ -21,6 +21,8 @@ func _ready() -> void:
 func take_damage(amount: float) -> void:
 	if amount <= 0.0 or is_dead():
 		return
+	if GameState.god_mode and _is_player_owned():
+		return
 	var previous := current_health
 	current_health = maxf(0.0, current_health - amount)
 	damaged.emit(amount)
@@ -52,3 +54,10 @@ func is_dead() -> bool:
 
 func fraction() -> float:
 	return current_health / max_health if max_health > 0.0 else 0.0
+
+
+## Dev god-mode (G) is scoped to the player: check the owner's group rather
+## than a broad flag, so the enemy stays fully mortal while it's on.
+func _is_player_owned() -> bool:
+	var parent := get_parent()
+	return parent != null and parent.is_in_group("player")

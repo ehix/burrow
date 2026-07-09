@@ -20,7 +20,7 @@ radius = 11.0
 
 [node name="Enemy" type="CharacterBody2D"]
 collision_layer = 4
-collision_mask = 35
+collision_mask = 3
 script = ExtResource("1_enemy")
 enemy_type = ExtResource("9_type")
 
@@ -63,7 +63,7 @@ collision_layer = 16
 collision_mask = 0
 monitoring = false
 script = ExtResource("6_hurtbox")
-health = NodePath("../HealthComponent")
+health_path = NodePath("../HealthComponent")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
 shape = SubResource("CircleShape2D_hurt")

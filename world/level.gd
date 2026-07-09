@@ -35,6 +35,9 @@ var enemy: Node2D
 var _astar: AStarGrid2D
 var _larva_cap := LARVA_COUNT
 var _spawn_accum := 0.0
+## Wall tile -> {collision, occluder}, so the dev "remove wall" tool can find
+## and free the exact nodes for a carved-out tile.
+var _wall_nodes: Dictionary = {}
 
 
 ## Build the whole level. Called by World right after instancing.
@@ -121,6 +124,28 @@ func _build_collision_and_occluders() -> void:
 			occ.occluder = occ_poly
 			occ.position = centre
 			_occluders.add_child(occ)
+			_wall_nodes[Vector2i(x, y)] = {"collision": col, "occluder": occ}
+
+
+## Dev tool (X): destroy the wall tile at `tile`, carving it into floor. Frees
+## its collision + occluder, opens it in the maze data and the AStar grid, and
+## redraws. No-op out of bounds or if the tile is already open.
+func dev_remove_wall_at(tile: Vector2i) -> bool:
+	if maze == null or not (tile.x >= 0 and tile.x < maze.width and tile.y >= 0 and tile.y < maze.height):
+		return false
+	if maze.is_open(tile.x, tile.y):
+		return false
+	maze.set_open(tile.x, tile.y)
+	var nodes: Dictionary = _wall_nodes.get(tile, {})
+	if nodes.get("collision") != null and is_instance_valid(nodes["collision"]):
+		nodes["collision"].queue_free()
+	if nodes.get("occluder") != null and is_instance_valid(nodes["occluder"]):
+		nodes["occluder"].queue_free()
+	_wall_nodes.erase(tile)
+	if _astar != null:
+		_astar.set_point_solid(tile, false)
+	_renderer.queue_redraw()
+	return true
 
 
 func _spawn_entities() -> void:

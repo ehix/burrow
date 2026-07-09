@@ -33,8 +33,22 @@ var noclip := false
 ## Dev tool (J): freeze every mover except the player (enemy + larvae stop).
 var freeze_others := false
 
+## Dev tool (G): freezes the player's health and hunger — no incoming damage,
+## no starvation drain, no metabolic action cost, no passive hunger growth.
+## Scoped to the player only (checked via the "player" group), not other spiders.
+var god_mode := false
+
+## Round tally: one "round" is one depth, decided by whoever clears it first
+## (enemy defeated = a player win, player died = an enemy win). A session-long
+## count, deliberately NOT reset by start_new_run() — permadeath resets the
+## run's depth/vitals, not the scoreboard.
+var player_wins := 0
+var enemy_wins := 0
+
 
 func _ready() -> void:
+	EventBus.enemy_defeated.connect(func(_cause: String) -> void: player_wins += 1)
+	EventBus.player_died.connect(func() -> void: enemy_wins += 1)
 	start_new_run()
 
 
@@ -43,9 +57,15 @@ func _ready() -> void:
 func start_new_run(seed_value: int = -1) -> void:
 	run_seed = seed_value if seed_value >= 0 else randi()
 	depth = STARTING_DEPTH
+	clear_carried_vitals()
+	EventBus.depth_changed.emit(depth)
+
+
+## Drop any carried vitals so the next spawn uses the component defaults (full
+## health, no hunger) instead of continuing a previous run's state.
+func clear_carried_vitals() -> void:
 	carried_health = NAN
 	carried_hunger = NAN
-	EventBus.depth_changed.emit(depth)
 
 
 ## Descend to the next, harder maze. Player vitals are expected to already be

@@ -31,7 +31,7 @@ fill_to = Vector2(1, 0.5)
 
 [node name="Player" type="CharacterBody2D"]
 collision_layer = 2
-collision_mask = 37
+collision_mask = 5
 script = ExtResource("1_player")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
@@ -68,7 +68,7 @@ collision_layer = 16
 collision_mask = 0
 monitoring = false
 script = ExtResource("6_hurtbox")
-health = NodePath("../HealthComponent")
+health_path = NodePath("../HealthComponent")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
 shape = SubResource("CircleShape2D_hurt")

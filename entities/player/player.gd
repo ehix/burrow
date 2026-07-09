@@ -4,11 +4,15 @@ extends CharacterBody2D
 ## traps, and carries HP + Hunger (via child components) between levels. Relays
 ## its component signals to the EventBus so the generic HUD can listen.
 
-## Close-quarters strike (F): damage + shove the spider one tile ahead.
+## Close-quarters strike (F): damage + shove the spider one tile ahead, or
+## kills a larva outright (mirrors a web shot; harvesting stays trap-only).
 @export var melee_range: float = 60.0
 @export var melee_damage: float = 14.0
 @export var melee_stun: float = 0.3
 @export var melee_cooldown: float = 0.5
+## Hunger added to every spider per swing (charge_all's max-hunger fail-safe
+## drains health instead once a spider is already starving).
+@export var melee_hunger_cost: float = 5.0
 
 @onready var health: HealthComponent = $HealthComponent
 @onready var hunger: HungerComponent = $HungerComponent
@@ -31,6 +35,9 @@ func _ready() -> void:
 	_restore_vitals()
 	health.health_changed.connect(_on_health_changed)
 	health.damaged.connect(func(amount: float) -> void: EventBus.player_damaged.emit(amount))
+	# Distress flash is reserved for actually being hurt — never for a status
+	# effect like a web's slow, which deals no damage.
+	health.damaged.connect(func(_amount: float) -> void: CombatFx.flash(sprite))
 	health.died.connect(_on_died)
 	hunger.hunger_changed.connect(_on_hunger_changed)
 	hunger.overflowed.connect(func(amount: float) -> void: EventBus.excess_consumed.emit(self, amount))
@@ -49,6 +56,10 @@ func _physics_process(delta: float) -> void:
 		facing = Vector2(dir)
 		sprite.rotation = facing.angle() # sprite drawn facing east (rotation 0)
 		_mover.try_step(dir)
+	else:
+		# No input this frame: drop any queued step so a step finishing right
+		# after release doesn't auto-continue into a stale buffered direction.
+		_mover.cancel_buffer()
 
 	if Input.is_action_pressed("fire"):
 		web_emitter.fire(global_position, facing, self)
@@ -59,20 +70,28 @@ func _physics_process(delta: float) -> void:
 
 
 ## Blocking seam for the GridMover: the noclip dev toggle passes through walls;
-## otherwise the body's own physics decides (walls, traps, the other spider).
+## otherwise checks a tile the enemy has already committed to (mid-step, not
+## just physically standing on) before falling back to the body's own physics
+## (walls, traps, a stationary spider).
 func _blocked(dir: Vector2i) -> bool:
 	if GameState.noclip:
 		return false
+	if GridMover.spider_tile_contested(_mover, self, dir):
+		return true
 	return test_move(global_transform, Vector2(dir) * float(_mover.tile_size))
 
 
-## Strike the spider one tile ahead: light damage, a shove, a stun, a flash.
+## Strike one tile ahead: light damage + shove + stun on a spider, or an
+## outright kill on a larva. The slash VFX always plays on a swing, even a
+## whiff; hunger is only spent on a landed hit (the max-hunger fail-safe in
+## charge_all drains health once starving).
 func _melee() -> void:
 	if _melee_left > 0.0:
 		return
 	_melee_left = melee_cooldown
 	var push := _dominant_dir(facing)
 	var target := global_position + facing * float(_mover.tile_size)
+	CombatFx.spawn_slash(get_parent(), target, facing) # always shows, hit or miss
 	for node in get_tree().get_nodes_in_group("spiders"):
 		if node == self:
 			continue
@@ -84,16 +103,33 @@ func _melee() -> void:
 			hurtbox.receive_hit(melee_damage, self)
 		if spider.has_method("apply_web_hit"):
 			spider.apply_web_hit(push, 1.0, 0.0, melee_stun) # shove + stun, no slow
+		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
+		return
+	for node in get_tree().get_nodes_in_group("larvae"):
+		var larva := node as Node2D
+		if larva == null or larva.global_position.distance_to(target) > melee_range:
+			continue
+		if larva.has_method("web_kill"):
+			larva.web_kill()
+		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
 
 
 ## A step landed on a larva's tile — give a tiny visual shunt (juice only).
+## Exact tile comparison rather than a pixel-distance threshold, so it can't
+## be missed by any small position drift (e.g. right after a knockback/stun).
 func _on_step_finished() -> void:
+	var my_tile := _mover_tile_of(global_position)
 	for node in get_tree().get_nodes_in_group("larvae"):
 		var larva := node as Node2D
-		if larva != null and larva.global_position.distance_to(global_position) < 12.0:
+		if larva != null and _mover_tile_of(larva.global_position) == my_tile:
 			CombatFx.shunt(sprite, facing * 5.0)
 			return
+
+
+func _mover_tile_of(world: Vector2) -> Vector2i:
+	var ts := float(_mover.tile_size)
+	return Vector2i(int(floorf(world.x / ts)), int(floorf(world.y / ts)))
 
 
 ## Reduce analog movement input to one cardinal grid direction (ties -> x).
@@ -105,11 +141,12 @@ static func _dominant_dir(input: Vector2) -> Vector2i:
 	return Vector2i(0, int(signf(input.y)))
 
 
-## Take a landed web/melee hit: flash in distress, get shoved one tile along
-## `push_dir` (Vector2i.ZERO = no shove), slowed, and stunned. Called by web
-## shots, web traps, and melee strikes; symmetric across both spiders.
+## Take a landed web/melee hit: get shoved one tile along `push_dir`
+## (Vector2i.ZERO = no shove), slowed, and stunned. Called by web shots, web
+## traps, and melee strikes; symmetric across both spiders. No flash here —
+## that's reserved for actual damage (see the HealthComponent.damaged hookup
+## in _ready), since a pure web-crossing slow deals none.
 func apply_web_hit(push_dir: Vector2i, factor: float, slow_duration: float, stun_duration: float) -> void:
-	CombatFx.flash(sprite)
 	if _mover == null:
 		return
 	if push_dir != Vector2i.ZERO:

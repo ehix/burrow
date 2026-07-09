@@ -18,6 +18,7 @@ var _last_dir := Vector2i.RIGHT
 
 func _ready() -> void:
 	add_to_group("larvae")
+	_mover.step_finished.connect(_on_step_finished)
 
 
 ## Set initial facing (Level derives this from the spawn tile's type).
@@ -27,9 +28,13 @@ func set_facing(dir: Vector2i) -> void:
 		rotation = Vector2(dir).angle()
 
 
-## Called by a trap: stop and snap to the trap centre.
+## Called by a trap: stop and snap to the trap centre. Halts the mover first —
+## a larva is often caught mid-step (the catch area is wider than a tile), and
+## without this the in-flight step keeps lerping toward its pre-capture
+## destination on the next frame, dragging the larva right back off-centre.
 func set_caught(at_position: Vector2) -> void:
 	caught = true
+	_mover.stop()
 	global_position = at_position
 
 
@@ -42,6 +47,25 @@ func _physics_process(_delta: float) -> void:
 ## Flash in distress (called when a web catches it).
 func flash_distress() -> void:
 	CombatFx.flash(_sprite)
+
+
+## A step landed on a spider's tile: give the larva a tiny visual bump to
+## acknowledge the interaction (juice only — mirrors the spider's own shunt
+## when it steps onto a larva, never touches the grid position). Compares
+## exact tile coordinates rather than a pixel-distance threshold, so it can't
+## be missed by any small position drift (e.g. right after a knockback/stun).
+func _on_step_finished() -> void:
+	var my_tile := _tile_of(global_position)
+	for node in get_tree().get_nodes_in_group("spiders"):
+		var spider := node as Node2D
+		if spider != null and _tile_of(spider.global_position) == my_tile:
+			CombatFx.shunt(_sprite, Vector2(_last_dir) * 5.0)
+			return
+
+
+func _tile_of(world: Vector2) -> Vector2i:
+	var ts := float(_mover.tile_size)
+	return Vector2i(int(floorf(world.x / ts)), int(floorf(world.y / ts)))
 
 
 func _wander_step() -> void:
