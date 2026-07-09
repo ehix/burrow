@@ -51,6 +51,7 @@ func _ready() -> void:
 	_add_one_shot(root, "Blockade (O)", "blockade")
 	_add_one_shot(root, "Silk Tunnel (I)", "silk_tunnel")
 	_add_one_shot(root, "Decoy (Z)", "decoy")
+	_add_one_shot(root, "Cycle Class (Q)", "cycle_class")
 	_add_held(root, "Paused (Esc)", func() -> bool: return get_tree().paused)
 
 

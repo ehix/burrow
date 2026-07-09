@@ -44,6 +44,10 @@ signal plane_changed(who: Node, plane: int)
 ## "seismic_compaction", "centipede_express".
 signal hazard_triggered(hazard_name: String)
 
+## Dev tool (Q): the player's active spider class changed (design §3).
+## `spider_class` is a SpiderClassData.SpiderClass value.
+signal class_changed(spider_class: int)
+
 ## A timed status effect (Poison, Speed, Sense, Armor, ...) was applied to or
 ## expired on `who`, via its StatusEffectComponent.
 signal status_effect_applied(who: Node, id: StringName, magnitude: float, duration: float)

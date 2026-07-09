@@ -37,10 +37,34 @@ extends CharacterBody2D
 @onready var _silk_tunnel: SilkTunnelSkill = $SilkTunnelSkill
 @onready var _decoy: DecoySkill = $DecoySkill
 
+## The four class archetypes (design §3), each authored as a .tres — the same
+## "author a Resource, don't fork the scene" pattern EnemyType established.
+## Dev tool (Q, in World) cycles GameState.selected_class through these live.
+const NetCasterData: SpiderClassData = preload("res://resources/spiders/net_caster.tres")
+const WolfData: SpiderClassData = preload("res://resources/spiders/wolf.tres")
+const WeaverData: SpiderClassData = preload("res://resources/spiders/weaver.tres")
+const DecoyData: SpiderClassData = preload("res://resources/spiders/decoy.tres")
+
+## Which class-specific skills respond to input for each class — everything
+## else in the kitchen-sink loadout stays attached but inert. Sense and
+## Remove Walls are general utilities (design §4), not class-locked, so they
+## aren't in this map at all and always respond regardless of active class.
+const CLASS_SKILLS := {
+	0: ["net_hold", "net_projectile"],     # SpiderClassData.SpiderClass.NET_CASTER
+	1: ["hatchlings", "egg_mine"],         # .WOLF
+	2: ["blockade", "silk_tunnel"],        # .WEAVER
+	3: ["camouflage", "decoy"],            # .DECOY
+}
+
 var facing := Vector2.RIGHT
 var _dead := false
 var _melee_left := 0.0
 var _level: Level
+var _class_data_by_id: Dictionary = {}
+var _active_class: int = SpiderClassData.SpiderClass.WOLF
+var _active_class_data: SpiderClassData
+var _base_melee_damage: float
+var _base_web_cooldown: float
 
 
 func _ready() -> void:
@@ -52,6 +76,15 @@ func _ready() -> void:
 	_plane.plane_changed.connect(_on_plane_changed)
 	_status.effect_applied.connect(_on_effect_applied)
 	_status.effect_expired.connect(_on_effect_expired)
+	_class_data_by_id = {
+		SpiderClassData.SpiderClass.NET_CASTER: NetCasterData,
+		SpiderClassData.SpiderClass.WOLF: WolfData,
+		SpiderClassData.SpiderClass.WEAVER: WeaverData,
+		SpiderClassData.SpiderClass.DECOY: DecoyData,
+	}
+	_base_melee_damage = melee_damage
+	_base_web_cooldown = web_emitter.cooldown
+	apply_class(GameState.selected_class)
 	_restore_vitals()
 	health.health_changed.connect(_on_health_changed)
 	health.damaged.connect(func(amount: float) -> void: EventBus.player_damaged.emit(amount))
@@ -81,7 +114,7 @@ func _physics_process(delta: float) -> void:
 		# after release doesn't auto-continue into a stale buffered direction.
 		_mover.cancel_buffer()
 
-	if Input.is_action_pressed("fire"):
+	if Input.is_action_pressed("fire") and _active_class_data != null and _active_class_data.web_enabled:
 		web_emitter.fire(global_position, facing, self)
 	if Input.is_action_just_pressed("place_trap"):
 		trap_placer.place(global_position, self)
@@ -89,25 +122,28 @@ func _physics_process(delta: float) -> void:
 		_melee()
 	if Input.is_action_just_pressed("toggle_plane"):
 		_plane.transition()
-	if Input.is_action_just_pressed("camouflage"):
-		_camouflage.activate(self)
+	# Sense and Remove Walls are general utilities — always available,
+	# regardless of active class. Everything below is class-gated: pressing
+	# a key for a skill that isn't part of the current class silently no-ops.
 	if Input.is_action_just_pressed("sense"):
 		_sense.activate(self)
 	if Input.is_action_just_pressed("remove_walls_skill"):
 		_remove_walls.activate(self)
-	if Input.is_action_just_pressed("net_hold"):
+	if Input.is_action_just_pressed("camouflage") and _is_active_skill("camouflage"):
+		_camouflage.activate(self)
+	if Input.is_action_just_pressed("net_hold") and _is_active_skill("net_hold"):
 		_net_hold.activate(self)
-	if Input.is_action_just_pressed("net_projectile"):
+	if Input.is_action_just_pressed("net_projectile") and _is_active_skill("net_projectile"):
 		_net_projectile.activate(self)
-	if Input.is_action_just_pressed("hatchlings"):
+	if Input.is_action_just_pressed("hatchlings") and _is_active_skill("hatchlings"):
 		_hatchlings.activate(self)
-	if Input.is_action_just_pressed("egg_mine"):
+	if Input.is_action_just_pressed("egg_mine") and _is_active_skill("egg_mine"):
 		_egg_mine.activate(self)
-	if Input.is_action_just_pressed("blockade"):
+	if Input.is_action_just_pressed("blockade") and _is_active_skill("blockade"):
 		_blockade.activate(self)
-	if Input.is_action_just_pressed("silk_tunnel"):
+	if Input.is_action_just_pressed("silk_tunnel") and _is_active_skill("silk_tunnel"):
 		_silk_tunnel.activate(self)
-	if Input.is_action_just_pressed("decoy"):
+	if Input.is_action_just_pressed("decoy") and _is_active_skill("decoy"):
 		_decoy.activate(self)
 
 
@@ -117,6 +153,29 @@ func _physics_process(delta: float) -> void:
 func bind_level(level: Level) -> void:
 	_level = level
 	_plane.level = level
+
+
+## Switches which class is active, live (dev tool Q — see World._cycle_class).
+## Recomputes melee/web stats from the base values captured at _ready() so
+## repeated calls (cycling through all four) never compound — each call is
+## relative to the untouched base, not the previous class's already-modified
+## numbers. No-op (falls back to whatever was already active) if `spider_class`
+## isn't a recognised id.
+func apply_class(spider_class: int) -> void:
+	var data: SpiderClassData = _class_data_by_id.get(spider_class)
+	if data == null:
+		return
+	_active_class = spider_class
+	_active_class_data = data
+	melee_damage = _base_melee_damage * data.melee_damage_mult
+	web_emitter.cooldown = _base_web_cooldown / maxf(0.01, data.web_fire_rate_mult)
+
+
+## Whether `action`'s skill belongs to the currently active class. Sense and
+## Remove Walls (general utilities) never go through this check at all.
+func _is_active_skill(action: String) -> bool:
+	var skills: Array = CLASS_SKILLS.get(_active_class, [])
+	return action in skills
 
 
 ## Blocking seam for the GridMover: the noclip dev toggle passes through walls.

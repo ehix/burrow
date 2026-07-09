@@ -38,6 +38,15 @@ var freeze_others := false
 ## Scoped to the player only (checked via the "player" group), not other spiders.
 var god_mode := false
 
+## Dev tool (Q, in World): which of the four spider classes the player is
+## currently testing (design §3). Stored as a plain int (SpiderClassData's
+## enum values) rather than the enum type itself, so this file doesn't need
+## to know about SpiderClassData at parse time. Persists across levels and
+## restarts, same as the other dev toggles above — NOT reset by
+## start_new_run(). Player.apply_class() reads this on spawn; World._cycle_class()
+## is the only writer.
+var selected_class: int = 1  # SpiderClassData.SpiderClass.WOLF
+
 ## Round tally: one "round" is one depth, decided by whoever clears it first
 ## (enemy defeated = a player win, player died = an enemy win). A session-long
 ## count, deliberately NOT reset by start_new_run() — permadeath resets the

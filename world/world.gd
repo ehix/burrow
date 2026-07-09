@@ -76,6 +76,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("dev_trigger_hazard"):
 		if is_instance_valid(_level):
 			_level.trigger_random_hazard_now()
+	# Dev tool (Q): cycle the player through the four spider classes live,
+	# for testing each kit without restarting (design §3).
+	elif event.is_action_pressed("cycle_class"):
+		_cycle_class()
 	elif event.is_action_pressed("pause"):
 		_toggle_pause()
 
@@ -124,6 +128,19 @@ func _toggle_pause() -> void:
 	get_tree().paused = not get_tree().paused
 	if hud != null and hud.has_method("set_paused_visible"):
 		hud.set_paused_visible(get_tree().paused)
+
+
+## Dev tool (Q): advance GameState.selected_class to the next of the four
+## spider classes and re-apply it to the current player live — no restart or
+## level rebuild needed, just a stat/skill-loadout swap on the existing
+## instance.
+func _cycle_class() -> void:
+	var player := _current_player() as Player
+	if player == null:
+		return
+	GameState.selected_class = (GameState.selected_class + 1) % 4
+	player.apply_class(GameState.selected_class)
+	EventBus.class_changed.emit(GameState.selected_class)
 
 
 ## Dev tool (X): destroy the wall tile directly ahead of the player.

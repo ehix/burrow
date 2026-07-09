@@ -16,6 +16,13 @@ const HAZARD_DISPLAY_NAMES := {
 	"seismic_compaction": "Seismic Compaction!",
 	"centipede_express": "Centipede Express!",
 }
+## class_changed's raw SpiderClassData.SpiderClass id -> a readable label.
+const CLASS_DISPLAY_NAMES := {
+	0: "Net-Caster",
+	1: "Wolf Spider",
+	2: "Weaver",
+	3: "Decoy",
+}
 
 @onready var health_bar: ProgressBar = $Root/HealthBar
 @onready var hunger_bar: ProgressBar = $Root/HungerBar
@@ -24,6 +31,7 @@ const HAZARD_DISPLAY_NAMES := {
 @onready var depth_label: Label = $Root/DepthLabel
 @onready var wins_label: Label = $Root/WinsLabel
 @onready var runes_label: Label = $Root/RunesLabel
+@onready var class_label: Label = $Root/ClassLabel
 @onready var paused_label: Label = $Root/PausedLabel
 @onready var round_banner_label: Label = $Root/RoundBannerLabel
 @onready var hazard_toast_label: Label = $Root/HazardToastLabel
@@ -38,9 +46,11 @@ func _ready() -> void:
 	EventBus.enemy_defeated.connect(_on_enemy_defeated)
 	EventBus.runes_changed.connect(_on_runes_changed)
 	EventBus.hazard_triggered.connect(_on_hazard_triggered)
+	EventBus.class_changed.connect(_on_class_changed)
 	_on_depth_changed(GameState.depth)
 	_update_wins_label()
 	_on_runes_changed(GameState.runes)
+	_on_class_changed(GameState.selected_class)
 
 
 func set_paused_visible(is_paused: bool) -> void:
@@ -93,6 +103,10 @@ func _update_wins_label() -> void:
 
 func _on_runes_changed(total: int) -> void:
 	runes_label.text = "Runes: %d" % total
+
+
+func _on_class_changed(spider_class: int) -> void:
+	class_label.text = "Class: %s" % CLASS_DISPLAY_NAMES.get(spider_class, "?")
 
 
 ## A world hazard fired (design §7) — a brief toast, same fade pattern as the
