@@ -70,17 +70,26 @@ func _tile_of(world: Vector2) -> Vector2i:
 
 func _wander_step() -> void:
 	# Prefer any non-reverse direction; fall back to reversing at a dead-end.
+	# A web currently holding a caught larva is a boundary too, like a wall —
+	# even though larvae otherwise pass through webs freely, an occupied web
+	# is someone else's meal, not open ground to wander onto.
+	var my_tile := _tile_of(global_position)
 	var options: Array[Vector2i] = []
 	for d in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
-		if d != -_last_dir:
+		if d != -_last_dir and not _is_occupied_web(my_tile + d):
 			options.append(d)
 	options.shuffle()
-	options.append(-_last_dir)
+	if not _is_occupied_web(my_tile - _last_dir):
+		options.append(-_last_dir)
 	for d in options:
 		if _mover.try_step(d):
 			_last_dir = d
 			rotation = Vector2(d).angle()
 			return
+
+
+func _is_occupied_web(tile: Vector2i) -> bool:
+	return WebTrap.tile_has_caught_web(get_tree(), tile, _mover.tile_size)
 
 
 ## A web shot killed this larva: drop out of the edible pool, leave a corpse.

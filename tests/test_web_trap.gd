@@ -125,6 +125,7 @@ func test_entangle_slows_the_placer_too_no_owner_immunity() -> void:
 	var trap := _make_trap()
 	trap.web_slow_factor = 0.5
 	trap.web_slow_duration = 1.5
+	trap._entangle_armed = true # past the placement grace period
 	var owner := RecordingSpider.new()
 	autofree(owner)
 	trap.setup(owner)
@@ -133,6 +134,60 @@ func test_entangle_slows_the_placer_too_no_owner_immunity() -> void:
 	assert_eq(owner.hits[0][1], 0.5, "50% slow factor")
 	assert_eq(owner.hits[0][2], 1.5, "slow duration applied")
 	assert_eq(owner.hits[0][3], 0.0, "no stun from a web crossing")
+
+
+## Regression: a trap spawns at the placer's own position, so its CatchArea
+## sees their already-standing body as a "new" overlap the instant it's
+## created — without a grace period the placer got entangled the moment they
+## placed the trap, before crossing anything. If a larva is then caught and
+## eaten a second later, the trap is gone but that earlier slow keeps running.
+func test_entangle_is_a_noop_during_the_placement_grace_period() -> void:
+	var trap := _make_trap()
+	var spider := RecordingSpider.new()
+	autofree(spider)
+	trap.setup(spider)
+	trap._entangle(spider) # fresh trap: _entangle_armed defaults to false
+	assert_eq(spider.hits.size(), 0, "no entangle in the instant after placement")
+
+
+func test_entangle_works_normally_once_armed() -> void:
+	var trap := _make_trap()
+	trap._entangle_armed = true
+	var spider := RecordingSpider.new()
+	autofree(spider)
+	trap._entangle(spider)
+	assert_eq(spider.hits.size(), 1, "entangle works normally once the grace period has passed")
+
+
+func test_catch_and_consume_are_unaffected_by_the_grace_period() -> void:
+	# Catching/eating a larva must work immediately, even during the grace
+	# period — only the entangle slow is gated, nothing else.
+	var trap := _make_trap()
+	var pair := _make_spider(50.0)
+	trap.catch_larva(_make_larva())
+	trap.try_consume(pair[0])
+	assert_true(trap.spent, "consuming a larva is unaffected by the entangle grace period")
+
+
+func test_tile_has_caught_web_true_when_a_trap_holds_a_larva() -> void:
+	var trap := _make_trap()
+	trap.global_position = Vector2(240, 240) # tile (5,5)
+	trap.catch_larva(_make_larva())
+	assert_true(WebTrap.tile_has_caught_web(get_tree(), Vector2i(5, 5), 48))
+
+
+func test_tile_has_caught_web_false_when_the_web_is_empty() -> void:
+	var trap := _make_trap()
+	trap.global_position = Vector2(240, 240) # tile (5,5)
+	assert_false(WebTrap.tile_has_caught_web(get_tree(), Vector2i(5, 5), 48),
+		"an empty web is not a boundary — only an occupied one is")
+
+
+func test_tile_has_caught_web_false_at_a_different_tile() -> void:
+	var trap := _make_trap()
+	trap.global_position = Vector2(240, 240) # tile (5,5)
+	trap.catch_larva(_make_larva())
+	assert_false(WebTrap.tile_has_caught_web(get_tree(), Vector2i(9, 9), 48))
 
 
 func test_body_entered_skips_entangle_when_a_spider_eats_the_caught_larva() -> void:
@@ -153,6 +208,7 @@ func test_body_entered_skips_entangle_when_a_spider_eats_the_caught_larva() -> v
 
 func test_body_entered_still_entangles_when_the_web_is_empty() -> void:
 	var trap := _make_trap()
+	trap._entangle_armed = true # past the placement grace period
 	var spider := RecordingSpider.new()
 	spider.add_to_group("spiders")
 	autofree(spider)

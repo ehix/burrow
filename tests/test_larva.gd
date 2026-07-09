@@ -4,6 +4,7 @@ extends GutTest
 ## exists — otherwise @onready $GridMover is null and _physics_process errors.
 
 const LarvaScene := preload("res://entities/larva/larva.tscn")
+const WebTrapScene := preload("res://entities/web/web_trap.tscn")
 
 
 func _make_larva() -> Larva:
@@ -73,3 +74,25 @@ func test_set_caught_stops_a_mid_flight_step_from_dragging_it_off_centre() -> vo
 	larva._mover.tick(0.1) # further frames must not drag it back off that position
 	assert_eq(larva.global_position, Vector2(700, 700),
 		"a caught larva must not drift off the trap centre")
+
+
+## An occupied web is a boundary for other larvae, like a dead end — an empty
+## web isn't (larvae otherwise pass through webs freely).
+func test_wander_never_steps_onto_a_tile_with_a_caught_larva() -> void:
+	var larva := _make_larva()
+	larva.global_position = Vector2(264, 264) # tile (5,5)
+	larva._last_dir = Vector2i.RIGHT
+
+	var trap: WebTrap = WebTrapScene.instantiate()
+	add_child_autofree(trap)
+	trap.global_position = Vector2(312, 264) # tile (6,5), directly RIGHT of the larva
+	trap.catch_larva(_make_larva()) # occupy it
+
+	larva._wander_step()
+	assert_ne(larva._last_dir, Vector2i.RIGHT, "never steps onto the occupied web's tile")
+
+
+func test_wander_is_unaffected_by_an_empty_web() -> void:
+	var larva := _make_larva()
+	larva.global_position = Vector2(264, 264) # tile (5,5)
+	assert_false(larva._is_occupied_web(Vector2i(6, 5)), "no trap there at all — not a boundary")

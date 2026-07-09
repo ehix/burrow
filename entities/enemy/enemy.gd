@@ -16,6 +16,11 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 @export var flee_health_fraction: float = 0.3
 @export var hungry_fraction: float = 0.6
 @export var repath_interval: float = 0.35
+## Minimum time to stay in PATROL or SEEK_FOOD before switching between them,
+## so hunger hovering right at hungry_fraction doesn't flicker every frame.
+## FLEE and CHASE always override immediately regardless — an emergency flee
+## or spotting the player should never be delayed by "stickiness".
+@export var state_min_duration: float = 1.5
 ## Distance at which the enemy eats a larva by contact.
 @export var eat_range: float = 30.0
 ## Hunger removed by eating one larva.
@@ -49,6 +54,12 @@ var _path: Array[Vector2i] = []
 var _path_i := 0
 var _melee_left := 0.0
 var _trap_left := 0.0
+var _state_lock_left := 0.0
+## Tile -> the _patrol_tick it was last patrolled through, so patrol can bias
+## toward unexplored ground instead of a pure random walk. A monotonic step
+## counter rather than wall-clock time, so it's deterministic and testable.
+var _tile_last_visited: Dictionary = {}
+var _patrol_tick := 0
 
 
 ## Level calls this right after instancing so the enemy can path on the grid.
@@ -61,6 +72,10 @@ func _ready() -> void:
 	add_to_group("enemy")
 	_apply_type()
 	_mover.block_check = _blocked
+	# The enemy starts in PATROL without ever "transitioning" into it, so the
+	# idle-state lock (normally armed by _update_state on a state change) needs
+	# arming here too, or the very first hunger check would ignore it.
+	_state_lock_left = state_min_duration
 	health.died.connect(_on_died)
 	# Distress flash is reserved for actually being hurt — never for a status
 	# effect like a web's slow, which deals no damage.
@@ -114,6 +129,7 @@ func _physics_process(delta: float) -> void:
 	_repath_left -= delta
 	_melee_left = maxf(0.0, _melee_left - delta)
 	_trap_left = maxf(0.0, _trap_left - delta)
+	_state_lock_left = maxf(0.0, _state_lock_left - delta)
 	match state:
 		State.CHASE:
 			_do_chase()
@@ -131,15 +147,22 @@ func _update_state() -> void:
 		next = State.FLEE
 	elif _can_see_player():
 		next = State.CHASE
-	elif hunger.fraction() >= hungry_fraction:
-		next = State.SEEK_FOOD
+	elif state == State.PATROL or state == State.SEEK_FOOD:
+		# Only these two idle states are sticky against each other — a low-health
+		# flee or spotting the player (above) always overrides immediately.
+		if _state_lock_left > 0.0:
+			next = state
+		else:
+			next = State.SEEK_FOOD if hunger.fraction() >= hungry_fraction else State.PATROL
 	else:
-		next = State.PATROL
+		next = State.SEEK_FOOD if hunger.fraction() >= hungry_fraction else State.PATROL
 
 	if next != state:
 		state = next
 		_repath_left = 0.0
 		_path = []
+		if next == State.PATROL or next == State.SEEK_FOOD:
+			_state_lock_left = state_min_duration
 
 
 # --- per-state behaviour ------------------------------------------------------
@@ -193,6 +216,9 @@ func _melee_player(to_player: Vector2) -> void:
 	CombatFx.spawn_slash(get_parent(), _player.global_position, to_player)
 
 
+## Run from the player; if truly cornered (no escape tile at all) turn and
+## fight instead of standing there uselessly — the moment you actually corner
+## a fleeing enemy should be a decisive one, not an anticlimax.
 func _do_flee() -> void:
 	if _mover.is_moving():
 		return
@@ -200,21 +226,48 @@ func _do_flee() -> void:
 	if away == Vector2.ZERO:
 		away = Vector2.RIGHT
 	var dir := _dominant(away)
-	if not _mover.try_step(dir):
-		_mover.try_step(_dominant(Vector2(away.y, -away.x))) # try a perpendicular
-	_face(dir)
+	if _mover.try_step(dir):
+		_face(dir)
+		return
+	var perpendicular := _dominant(Vector2(away.y, -away.x))
+	if _mover.try_step(perpendicular):
+		_face(perpendicular)
+		return
+	_fight_back()
 
 
+## No escape route this frame: attack like CHASE would, instead of idling.
+func _fight_back() -> void:
+	if _player == null:
+		return
+	var to_player := _player.global_position - global_position
+	if to_player.length() <= melee_range:
+		_melee_player(to_player)
+	elif to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
+		web_emitter.fire(global_position, to_player, self)
+
+
+## Sweeps toward unexplored ground instead of a pure random walk: candidate
+## tiles are tried least-recently-visited first (never-visited sorts first of
+## all), falling back down the list if the preferred direction is blocked.
 func _do_patrol() -> void:
 	if _mover.is_moving():
 		return
-	# Greedy random walk on open tiles.
+	var my_tile := _tile_of(global_position)
+	_patrol_tick += 1
+	_tile_last_visited[my_tile] = _patrol_tick
 	var options: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
-	options.shuffle()
+	options.shuffle() # random tie-break among equally-stale (e.g. never-visited) candidates
+	options.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return _tick_last_visited(my_tile + a) < _tick_last_visited(my_tile + b))
 	for d in options:
 		if _mover.try_step(d):
 			_face(d)
 			return
+
+
+func _tick_last_visited(tile: Vector2i) -> int:
+	return _tile_last_visited.get(tile, -1)
 
 
 # --- grid path following ------------------------------------------------------
