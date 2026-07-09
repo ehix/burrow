@@ -48,6 +48,11 @@ signal hazard_triggered(hazard_name: String)
 ## `spider_class` is a SpiderClassData.SpiderClass value.
 signal class_changed(spider_class: int)
 
+## A fresh enemy rolled its class for this depth (design §2/§3). Independent
+## of the player's class_changed — a fresh Enemy is spawned every depth, so
+## this fires once per descent, not on any dev toggle.
+signal enemy_class_changed(spider_class: int)
+
 ## A timed status effect (Poison, Speed, Sense, Armor, ...) was applied to or
 ## expired on `who`, via its StatusEffectComponent.
 signal status_effect_applied(who: Node, id: StringName, magnitude: float, duration: float)

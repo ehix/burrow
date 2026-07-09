@@ -36,6 +36,27 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 ## Seconds between the enemy laying web traps while hunting food.
 @export var trap_interval: float = 5.0
 
+## Class kit (design §2/§3): each enemy rolls one of the four classes at
+## spawn — independent per spawn, not persisted across depths like
+## GameState.selected_class is for the player — and scales melee/web stats
+## the same way Player.apply_class() does.
+const NetCasterData: SpiderClassData = preload("res://resources/spiders/net_caster.tres")
+const WolfData: SpiderClassData = preload("res://resources/spiders/wolf.tres")
+const WeaverData: SpiderClassData = preload("res://resources/spiders/weaver.tres")
+const DecoyClassData: SpiderClassData = preload("res://resources/spiders/decoy.tres")
+
+const NetShotScene := preload("res://entities/skills/scenes/net_shot.tscn")
+const TinySpiderlingScene := preload("res://entities/skills/scenes/tiny_spiderling.tscn")
+const CocoonMineScene := preload("res://entities/skills/scenes/cocoon_mine.tscn")
+const BlockadeScene := preload("res://entities/skills/scenes/blockade.tscn")
+const DecoyPropScene := preload("res://entities/skills/scenes/decoy.tscn")
+const WebTrapScene := preload("res://entities/web/web_trap.tscn")
+
+## How often the enemy reconsiders using a skill (design §2/§3) — a skill's
+## own cooldown already prevents spamming once chosen; this only paces the
+## *decision* itself so it isn't re-evaluated every single physics frame.
+const SKILL_DECISION_INTERVAL := 0.75
+
 @onready var health: HealthComponent = $HealthComponent
 @onready var hunger: HungerComponent = $HungerComponent
 @onready var web_emitter: WebEmitter = $WebEmitter
@@ -54,7 +75,7 @@ var _player: Node2D
 var _current_target: Node2D
 var _level: Node
 var _repath_left := 0.0
-var _facing := Vector2.RIGHT
+var facing := Vector2.RIGHT
 var _dead := false
 var _path: Array[Vector2i] = []
 var _path_i := 0
@@ -66,6 +87,13 @@ var _state_lock_left := 0.0
 ## counter rather than wall-clock time, so it's deterministic and testable.
 var _tile_last_visited: Dictionary = {}
 var _patrol_tick := 0
+var active_class: int = SpiderClassData.SpiderClass.WOLF
+var _class_data_by_id: Dictionary = {}
+var _active_class_data: SpiderClassData
+var _skills: Array[SkillComponent] = []
+var _skill_decision_left := 0.0
+var _base_melee_damage: float
+var _base_web_cooldown: float
 
 
 ## Level calls this right after instancing so the enemy can path on the grid.
@@ -93,6 +121,15 @@ func _ready() -> void:
 	EventBus.health_changed.emit(self, health.current_health, health.max_health)
 	EventBus.hunger_changed.emit(self, hunger.current_hunger, hunger.max_hunger)
 	_player = get_tree().get_first_node_in_group("player") as Node2D
+	_class_data_by_id = {
+		SpiderClassData.SpiderClass.NET_CASTER: NetCasterData,
+		SpiderClassData.SpiderClass.WOLF: WolfData,
+		SpiderClassData.SpiderClass.WEAVER: WeaverData,
+		SpiderClassData.SpiderClass.DECOY: DecoyClassData,
+	}
+	_base_melee_damage = melee_damage
+	_base_web_cooldown = web_emitter.cooldown
+	_apply_class(randi() % 4)
 
 
 func _on_health_changed(value: float, max_value: float) -> void:
@@ -122,6 +159,53 @@ func _apply_type() -> void:
 	health.current_health = health.max_health
 
 
+## Rolls this enemy's class: scales melee/web stats from the base values
+## snapshotted at _ready() and attaches its two skills. Mirrors
+## Player.apply_class() so class differentiation feels consistent across
+## both spiders, but this is a fresh roll every spawn — not a persisted dev
+## preference like GameState.selected_class.
+func _apply_class(spider_class: int) -> void:
+	var data: SpiderClassData = _class_data_by_id.get(spider_class)
+	if data == null:
+		return
+	active_class = spider_class
+	_active_class_data = data
+	melee_damage = _base_melee_damage * data.melee_damage_mult
+	web_emitter.cooldown = _base_web_cooldown / maxf(0.01, data.web_fire_rate_mult)
+	for skill in _skills:
+		skill.queue_free()
+	_skills = _make_skills(spider_class)
+	for skill in _skills:
+		add_child(skill)
+	EventBus.enemy_class_changed.emit(spider_class)
+
+
+## The two skill instances for `spider_class`, with their scene dependencies
+## wired the same way player.tscn wires each one's.
+func _make_skills(spider_class: int) -> Array[SkillComponent]:
+	match spider_class:
+		SpiderClassData.SpiderClass.NET_CASTER:
+			var proj := NetProjectileSkill.new()
+			proj.net_shot_scene = NetShotScene
+			return [NetHoldSkill.new(), proj]
+		SpiderClassData.SpiderClass.WEAVER:
+			var blockade := BlockadeSkill.new()
+			blockade.blockade_scene = BlockadeScene
+			var silk := SilkTunnelSkill.new()
+			silk.trap_scene = WebTrapScene
+			return [blockade, silk]
+		SpiderClassData.SpiderClass.DECOY:
+			var decoy := DecoySkill.new()
+			decoy.decoy_scene = DecoyPropScene
+			return [CamouflageSkill.new(), decoy]
+		_: # WOLF
+			var hatch := HatchlingsSkill.new()
+			hatch.hatchling_scene = TinySpiderlingScene
+			var mine := EggMineSkill.new()
+			mine.mine_scene = CocoonMineScene
+			return [hatch, mine]
+
+
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
@@ -136,6 +220,10 @@ func _physics_process(delta: float) -> void:
 	_melee_left = maxf(0.0, _melee_left - delta)
 	_trap_left = maxf(0.0, _trap_left - delta)
 	_state_lock_left = maxf(0.0, _state_lock_left - delta)
+	_skill_decision_left -= delta
+	if _skill_decision_left <= 0.0:
+		_skill_decision_left = SKILL_DECISION_INTERVAL
+		_consider_using_a_skill()
 	match state:
 		State.CHASE:
 			_do_chase()
@@ -185,7 +273,7 @@ func _do_chase() -> void:
 	var to_target := _current_target.global_position - global_position
 	if to_target.length() <= melee_range:
 		_melee_target(_current_target, to_target)
-	elif to_target.length() <= attack_range and _has_line_of_sight(_current_target.global_position):
+	elif to_target.length() <= attack_range and _web_enabled() and _has_line_of_sight(_current_target.global_position):
 		web_emitter.fire(global_position, to_target, self)
 
 
@@ -256,8 +344,68 @@ func _fight_back() -> void:
 	var to_player := _player.global_position - global_position
 	if to_player.length() <= melee_range:
 		_melee_target(_player, to_player)
-	elif to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
+	elif to_player.length() <= attack_range and _web_enabled() and _has_line_of_sight(_player.global_position):
 		web_emitter.fire(global_position, to_player, self)
+
+
+func _web_enabled() -> bool:
+	return _active_class_data == null or _active_class_data.web_enabled
+
+
+# --- class skills (AI) --------------------------------------------------------
+
+## Utility-scores each owned skill against a "do nothing extra" baseline
+## (design §2/§3): EnemyUtilityAI.best() picks the highest scorer.
+## depth_intel biases willingness upward at deeper levels — never a
+## stat/damage change, just how eagerly the enemy reaches for its kit
+## (guardrail: intelligence scaling alone can't compound into an unfair
+## fight — health/damage stay solely on EnemyType/depth_scale()).
+func _consider_using_a_skill() -> void:
+	if _skills.is_empty():
+		return
+	var intel := EnemyUtilityAI.depth_intel(GameState.depth)
+	var candidates: Array[EnemyUtilityAI.Candidate] = [
+		EnemyUtilityAI.Candidate.new(EnemyUtilityAI.Action.PATROL, 0.35), # baseline: nothing extra
+	]
+	for skill in _skills:
+		if not skill.can_activate():
+			continue
+		var base_score := _score_skill(skill)
+		if base_score <= 0.0:
+			continue
+		candidates.append(EnemyUtilityAI.Candidate.new(
+			EnemyUtilityAI.Action.USE_SKILL, base_score * (0.5 + 0.5 * intel), {"skill": skill}))
+	var winner := EnemyUtilityAI.best(candidates)
+	if winner != null and winner.action == EnemyUtilityAI.Action.USE_SKILL:
+		(winner.context["skill"] as SkillComponent).activate(self)
+
+
+## Simple, class-agnostic heuristics for whether each owned skill is worth
+## using right now, grouped by the state it makes sense in — combat skills
+## during an active CHASE, defensive/escape skills while FLEEing, and
+## NetHold (harvesting) during SEEK_FOOD. Deliberately kept on Enemy, not
+## SkillComponent, so skill scripts stay usable by any spider — player or
+## enemy — without carrying AI-specific concerns.
+func _score_skill(skill: SkillComponent) -> float:
+	if skill is NetHoldSkill:
+		return 0.7 if state == State.SEEK_FOOD and _nearest_caught_trap() != null else 0.0
+	if skill is NetProjectileSkill or skill is HatchlingsSkill \
+			or skill is EggMineSkill or skill is SilkTunnelSkill:
+		return 0.6 if state == State.CHASE and _current_target != null else 0.0
+	if skill is BlockadeSkill or skill is CamouflageSkill or skill is DecoySkill:
+		return 0.6 if state == State.FLEE else 0.0
+	return 0.0
+
+
+## A caught larva within easy reach — worth a Net Hold instead of walking
+## all the way up to the trap and eating normally.
+func _nearest_caught_trap() -> Node:
+	for node in get_tree().get_nodes_in_group("traps"):
+		var trap := node as WebTrap
+		if trap != null and trap.caught_larva != null \
+				and global_position.distance_to(trap.global_position) <= eat_range * 2.0:
+			return trap
+	return null
 
 
 ## Sweeps toward unexplored ground instead of a pure random walk: candidate
@@ -327,9 +475,9 @@ func _dominant(v: Vector2) -> Vector2i:
 func _face(dir: Vector2i) -> void:
 	if dir == Vector2i.ZERO:
 		return
-	_facing = Vector2(dir)
+	facing = Vector2(dir)
 	if facing_visual != null:
-		facing_visual.rotation = _facing.angle()
+		facing_visual.rotation = facing.angle()
 
 
 func _tile_of(world: Vector2) -> Vector2i:

@@ -118,6 +118,14 @@ max_value = 100.0
 value = 0.0
 modulate = Color(0.75, 0.55, 0.35, 1)
 
+[node name="EnemyClassLabel" type="Label" parent="Root"]
+offset_left = 260.0
+offset_top = 112.0
+offset_right = 560.0
+offset_bottom = 136.0
+modulate = Color(1, 0.75, 0.75, 1)
+text = "Enemy Class: ?"
+
 [node name="PausedLabel" type="Label" parent="Root"]
 visible = false
 anchor_left = 0.5

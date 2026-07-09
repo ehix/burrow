@@ -32,6 +32,7 @@ const CLASS_DISPLAY_NAMES := {
 @onready var wins_label: Label = $Root/WinsLabel
 @onready var runes_label: Label = $Root/RunesLabel
 @onready var class_label: Label = $Root/ClassLabel
+@onready var enemy_class_label: Label = $Root/EnemyClassLabel
 @onready var paused_label: Label = $Root/PausedLabel
 @onready var round_banner_label: Label = $Root/RoundBannerLabel
 @onready var hazard_toast_label: Label = $Root/HazardToastLabel
@@ -47,6 +48,7 @@ func _ready() -> void:
 	EventBus.runes_changed.connect(_on_runes_changed)
 	EventBus.hazard_triggered.connect(_on_hazard_triggered)
 	EventBus.class_changed.connect(_on_class_changed)
+	EventBus.enemy_class_changed.connect(_on_enemy_class_changed)
 	_on_depth_changed(GameState.depth)
 	_update_wins_label()
 	_on_runes_changed(GameState.runes)
@@ -107,6 +109,10 @@ func _on_runes_changed(total: int) -> void:
 
 func _on_class_changed(spider_class: int) -> void:
 	class_label.text = "Class: %s" % CLASS_DISPLAY_NAMES.get(spider_class, "?")
+
+
+func _on_enemy_class_changed(spider_class: int) -> void:
+	enemy_class_label.text = "Enemy Class: %s" % CLASS_DISPLAY_NAMES.get(spider_class, "?")
 
 
 ## A world hazard fired (design §7) — a brief toast, same fade pattern as the
