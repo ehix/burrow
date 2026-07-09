@@ -45,6 +45,14 @@ var god_mode := false
 var player_wins := 0
 var enemy_wins := 0
 
+## Currency (design §5: Economy). Earned by play (e.g. excess consumption,
+## clearing a round), spent only on permanent upgrades via buy_upgrade().
+## Session-long like player_wins/enemy_wins — deliberately NOT reset by
+## start_new_run(). "Permanent" means for this session: true cross-session
+## persistence needs a save system, which doesn't exist in this project yet.
+var runes: int = 0
+var purchased_upgrades: Array[StringName] = []
+
 
 func _ready() -> void:
 	EventBus.enemy_defeated.connect(func(_cause: String) -> void: player_wins += 1)
@@ -94,3 +102,34 @@ func store_player_vitals(health: float, hunger: float) -> void:
 ## True once vitals have been carried at least once this run.
 func has_carried_vitals() -> bool:
 	return not is_nan(carried_health)
+
+
+## Add runes (e.g. an excess-consumption reward, a round win). No-op on a
+## non-positive amount.
+func earn_runes(amount: int) -> void:
+	if amount <= 0:
+		return
+	runes += amount
+	EventBus.runes_changed.emit(runes)
+
+
+## Spend runes on something other than an upgrade purchase. Returns false
+## (no-op) if `amount` exceeds the current balance.
+func spend_runes(amount: int) -> bool:
+	if amount <= 0 or runes < amount:
+		return false
+	runes -= amount
+	EventBus.runes_changed.emit(runes)
+	return true
+
+
+## The only spend path for a permanent upgrade: charges its rune_cost and
+## records it as purchased. Returns false (no charge, not recorded) if
+## already purchased or unaffordable.
+func buy_upgrade(upgrade: UpgradeCatalog) -> bool:
+	if upgrade == null or upgrade.upgrade_id in purchased_upgrades:
+		return false
+	if not spend_runes(upgrade.rune_cost):
+		return false
+	purchased_upgrades.append(upgrade.upgrade_id)
+	return true
