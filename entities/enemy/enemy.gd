@@ -46,6 +46,12 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 var state: State = State.PATROL
 
 var _player: Node2D
+## Whichever spider CHASE is actually pursuing right now — the real player,
+## or a closer visible Decoy (design §3: Decoy diverts aggro). Re-picked by
+## _acquire_target() every _update_state() tick; only meaningful in CHASE —
+## FLEE/_fight_back() always react to the real player specifically, since
+## fleeing from (or striking back at) a harmless decoy prop makes no sense.
+var _current_target: Node2D
 var _level: Node
 var _repath_left := 0.0
 var _facing := Vector2.RIGHT
@@ -143,13 +149,15 @@ func _physics_process(delta: float) -> void:
 
 func _update_state() -> void:
 	var next := state
+	var target := _acquire_target()
 	if health.fraction() <= flee_health_fraction:
 		next = State.FLEE
-	elif _can_see_player():
+	elif target != null:
+		_current_target = target
 		next = State.CHASE
 	elif state == State.PATROL or state == State.SEEK_FOOD:
 		# Only these two idle states are sticky against each other — a low-health
-		# flee or spotting the player (above) always overrides immediately.
+		# flee or spotting a target (above) always overrides immediately.
 		if _state_lock_left > 0.0:
 			next = state
 		else:
@@ -168,17 +176,17 @@ func _update_state() -> void:
 # --- per-state behaviour ------------------------------------------------------
 
 func _do_chase() -> void:
-	if _player == null:
+	if _current_target == null or not is_instance_valid(_current_target):
 		return
 	if _repath_left <= 0.0:
-		_set_path_to(_tile_of(_player.global_position))
+		_set_path_to(_tile_of(_current_target.global_position))
 		_repath_left = repath_interval
 	_follow_path()
-	var to_player := _player.global_position - global_position
-	if to_player.length() <= melee_range:
-		_melee_player(to_player)
-	elif to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
-		web_emitter.fire(global_position, to_player, self)
+	var to_target := _current_target.global_position - global_position
+	if to_target.length() <= melee_range:
+		_melee_target(_current_target, to_target)
+	elif to_target.length() <= attack_range and _has_line_of_sight(_current_target.global_position):
+		web_emitter.fire(global_position, to_target, self)
 
 
 func _do_seek_food() -> void:
@@ -200,20 +208,22 @@ func _do_seek_food() -> void:
 	_follow_path()
 
 
-## Strike the player in close quarters: damage, a shove away, a stun, a flash.
-## Costs hunger to swing (charge_all's max-hunger fail-safe drains health once
-## the enemy is already starving).
-func _melee_player(to_player: Vector2) -> void:
-	if _melee_left > 0.0 or _player == null:
+## Strike `target` (the real player, or a Decoy that diverted CHASE) in close
+## quarters: damage, a shove away, a stun, a flash. Costs hunger to swing
+## (charge_all's max-hunger fail-safe drains health once the enemy is already
+## starving). Works unmodified against a Decoy: it carries the same
+## Hurtbox/apply_web_hit contract every real spider does.
+func _melee_target(target: Node2D, to_target: Vector2) -> void:
+	if _melee_left > 0.0 or target == null:
 		return
 	_melee_left = melee_cooldown
 	HungerComponent.charge_all(get_tree(), melee_hunger_cost)
-	var hurtbox := _player.get_node_or_null("Hurtbox") as Hurtbox
+	var hurtbox := target.get_node_or_null("Hurtbox") as Hurtbox
 	if hurtbox != null:
 		hurtbox.receive_hit(melee_damage, self)
-	if _player.has_method("apply_web_hit"):
-		_player.apply_web_hit(_dominant(to_player), 1.0, 0.0, melee_stun)
-	CombatFx.spawn_slash(get_parent(), _player.global_position, to_player)
+	if target.has_method("apply_web_hit"):
+		target.apply_web_hit(_dominant(to_target), 1.0, 0.0, melee_stun)
+	CombatFx.spawn_slash(get_parent(), target.global_position, to_target)
 
 
 ## Run from the player; if truly cornered (no escape tile at all) turn and
@@ -237,12 +247,15 @@ func _do_flee() -> void:
 
 
 ## No escape route this frame: attack like CHASE would, instead of idling.
+## Always the real player specifically — FLEE is triggered by low health
+## against a genuine threat, so cornered-and-fighting-back never targets a
+## harmless Decoy prop even if CHASE had been diverted to one beforehand.
 func _fight_back() -> void:
 	if _player == null:
 		return
 	var to_player := _player.global_position - global_position
 	if to_player.length() <= melee_range:
-		_melee_player(to_player)
+		_melee_target(_player, to_player)
 	elif to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
 		web_emitter.fire(global_position, to_player, self)
 
@@ -340,12 +353,51 @@ func _eat_larva(larva: Node) -> void:
 
 # --- perception ---------------------------------------------------------------
 
-## Vision alone decides CHASE (design §3 guardrail: Camouflage breaks on any
-## attack, but while it holds, it should actually work — a camouflaged player
-## is invisible to this check regardless of range/line-of-sight, so an active
-## CHASE drops straight back to SEEK_FOOD/PATROL the moment camouflage goes up
-## (see _update_state's fallback branch), and a patrolling enemy never enters
-## CHASE against a hidden player in the first place).
+## Whichever of {the real player, any visible Decoy} is nearest right now —
+## the actual "divert aggro" mechanic (design §3): a Decoy placed closer than
+## the player wins the contest even while the player is also visible, not
+## just as a fallback once the player is hidden/camouflaged. Returns null if
+## neither is currently visible. _update_state() stores the result in
+## _current_target for CHASE to act on.
+func _acquire_target() -> Node2D:
+	var best: Node2D = null
+	var best_dist := INF
+	if _can_see_player():
+		best = _player
+		best_dist = global_position.distance_to(_player.global_position)
+	var decoy := _nearest_visible_decoy(best_dist)
+	if decoy != null:
+		best = decoy
+	return best
+
+
+## Nearest node in the "decoys" group within vision_range and line-of-sight,
+## strictly closer than `closer_than` (so a farther decoy never displaces an
+## already-closer player). Returns null if none qualify.
+func _nearest_visible_decoy(closer_than: float = INF) -> Node2D:
+	var best: Node2D = null
+	var best_dist := closer_than
+	for node in get_tree().get_nodes_in_group("decoys"):
+		var decoy := node as Node2D
+		if decoy == null or not is_instance_valid(decoy):
+			continue
+		var d := global_position.distance_to(decoy.global_position)
+		if d >= best_dist or d > vision_range:
+			continue
+		if not _has_line_of_sight(decoy.global_position):
+			continue
+		best = decoy
+		best_dist = d
+	return best
+
+
+## Vision alone decides whether the real player is a CHASE candidate (design
+## §3 guardrail: Camouflage breaks on any attack, but while it holds, it
+## should actually work — a camouflaged player is invisible to this check
+## regardless of range/line-of-sight). A patrolling enemy never enters CHASE
+## against a hidden player in the first place, and an active CHASE drops back
+## to SEEK_FOOD/PATROL the moment camouflage goes up, *unless* a visible
+## Decoy is still around to hold its attention instead (see _acquire_target).
 func _can_see_player() -> bool:
 	if _player == null or not is_instance_valid(_player):
 		return false
