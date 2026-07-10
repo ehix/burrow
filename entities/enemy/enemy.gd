@@ -209,7 +209,7 @@ func _make_skills(spider_class: int) -> Array[SkillComponent]:
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
-	if GameState.freeze_others: # dev freeze toggle (J) halts the enemy
+	if GameState.freeze_others or GameState.freeze_enemy: # dev freeze (J) or playtest mode (0)
 		return
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player") as Node2D

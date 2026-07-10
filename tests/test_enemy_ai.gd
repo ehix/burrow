@@ -6,6 +6,10 @@ extends GutTest
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
 
 
+func after_each() -> void:
+	GameState.freeze_enemy = false # don't leak into other tests
+
+
 func _make_enemy() -> Enemy:
 	var enemy: Enemy = EnemyScene.instantiate()
 	add_child_autofree(enemy)
@@ -86,3 +90,13 @@ func test_flee_fights_back_when_fully_cornered() -> void:
 	enemy.state = Enemy.State.FLEE
 	enemy._do_flee()
 	assert_gt(enemy._melee_left, 0.0, "a cornered enemy fights back instead of idling")
+
+
+# --- Playtest Mode (dev tool 0) --------------------------------------------------
+
+func test_freeze_enemy_halts_physics_process() -> void:
+	var enemy := _make_enemy()
+	GameState.freeze_enemy = true
+	var repath_before := enemy._repath_left
+	enemy._physics_process(1.0)
+	assert_eq(enemy._repath_left, repath_before, "a demobilized enemy takes no physics step")

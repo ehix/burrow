@@ -33,10 +33,26 @@ var noclip := false
 ## Dev tool (J): freeze every mover except the player (enemy + larvae stop).
 var freeze_others := false
 
+## Narrower than freeze_others: halts only the enemy's own AI decisions
+## (movement, chasing, attacking, skill use). Larvae and hazards are
+## untouched, so catch-system testing (Playtest Mode, below) sees them
+## behaving exactly as in live play. Set by playtest_mode, below; not bound
+## to its own key.
+var freeze_enemy := false
+
 ## Dev tool (G): freezes the player's health and hunger — no incoming damage,
 ## no starvation drain, no metabolic action cost, no passive hunger growth.
 ## Scoped to the player only (checked via the "player" group), not other spiders.
 var god_mode := false
+
+## Dev tool (0): one-key preset for testing a single feature in isolation —
+## demobilizes the enemy (freeze_enemy) and makes the player invulnerable
+## (god_mode) together, without freezing larvae/hazards like freeze_others
+## does. Enemy defeat / player death still trigger the live depth-advance /
+## permadeath flow as normal; only the enemy's own AI is frozen, not its
+## ability to receive damage. J and G remain independently toggleable on top
+## of this — it's a convenience preset, not a lock.
+var playtest_mode := false
 
 ## Dev tool (Q, in World): which of the four spider classes the player is
 ## currently testing (design §3). Stored as a plain int (SpiderClassData's

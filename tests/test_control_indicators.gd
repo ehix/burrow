@@ -7,6 +7,7 @@ const IndicatorsScene := preload("res://ui/control_indicators.tscn")
 
 func after_each() -> void:
 	GameState.noclip = false # don't leak into other tests
+	GameState.playtest_mode = false
 
 
 func _make() -> ControlIndicators:
@@ -24,7 +25,7 @@ func _entry_for(indicators: ControlIndicators, text: String) -> ControlIndicator
 
 func test_builds_one_entry_per_tracked_action() -> void:
 	var indicators := _make()
-	assert_eq(indicators._entries.size(), 25 + UpgradeRegistry.ALL.size())
+	assert_eq(indicators._entries.size(), 26 + UpgradeRegistry.ALL.size())
 
 
 func test_held_entry_lights_up_while_its_check_is_true() -> void:
@@ -37,6 +38,20 @@ func test_held_entry_lights_up_while_its_check_is_true() -> void:
 	assert_eq(entry.label.modulate, ControlIndicators.ACTIVE_COLOR)
 
 	GameState.noclip = false
+	indicators._process(0.016)
+	assert_eq(entry.label.modulate, ControlIndicators.IDLE_COLOR)
+
+
+func test_playtest_mode_entry_lights_up_while_active() -> void:
+	var indicators := _make()
+	var entry := _entry_for(indicators, "Playtest Mode (0)")
+	assert_not_null(entry)
+
+	GameState.playtest_mode = true
+	indicators._process(0.016)
+	assert_eq(entry.label.modulate, ControlIndicators.ACTIVE_COLOR)
+
+	GameState.playtest_mode = false
 	indicators._process(0.016)
 	assert_eq(entry.label.modulate, ControlIndicators.IDLE_COLOR)
 
