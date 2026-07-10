@@ -67,6 +67,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_dev_remove_wall()
 	elif event.is_action_pressed("dev_god_mode"):
 		GameState.god_mode = not GameState.god_mode
+	elif event.is_action_pressed("dev_playtest_mode"):
+		_toggle_playtest_mode()
 	# Dev tool (P): flag/clear a pit on the tile ahead — pits have no natural
 	# map-generation source yet, so this is how to get one to test ceiling
 	# traversal against. (H): force a random eligible hazard now, bypassing
@@ -120,6 +122,16 @@ func _dev_reset_map() -> void:
 	GameState.clear_carried_vitals()
 	GameState.run_seed = randi()
 	_replace_level()
+
+
+## Dev tool (0): toggles GameState.playtest_mode and drives freeze_enemy/
+## god_mode from it together. Off restores both to false regardless of
+## whether J/G were separately toggled in between — a one-key preset, not a
+## tracked composition of the other two.
+func _toggle_playtest_mode() -> void:
+	GameState.playtest_mode = not GameState.playtest_mode
+	GameState.freeze_enemy = GameState.playtest_mode
+	GameState.god_mode = GameState.playtest_mode
 
 
 ## Pause (Esc): freezes gameplay (everything but this node and the HUD, both

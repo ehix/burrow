@@ -3,7 +3,7 @@ extends CanvasLayer
 ## Debug overlay: lists every player input action and dev-tool toggle with a
 ## live indicator, so you can visually confirm an input is actually firing.
 ## Held actions (move, fire) and persistent dev state (noclip, freeze, god
-## mode, darkness, pause) stay bright while active; one-shot actions (melee,
+## mode, playtest mode, darkness, pause) stay bright while active; one-shot actions (melee,
 ## place trap, reset map, remove wall) flash briefly the instant they fire.
 
 const ACTIVE_COLOR := Color(0.45, 1.0, 0.45)
@@ -38,6 +38,7 @@ func _ready() -> void:
 	_add_one_shot(root, "Reset Map (R)", "dev_reset_map")
 	_add_one_shot(root, "Remove Wall (X)", "dev_remove_wall")
 	_add_held(root, "God Mode (G)", func() -> bool: return GameState.god_mode)
+	_add_held(root, "Playtest Mode (0)", func() -> bool: return GameState.playtest_mode)
 	_add_one_shot(root, "Toggle Plane (C)", "toggle_plane")
 	_add_one_shot(root, "Toggle Pit (P)", "dev_toggle_pit")
 	_add_one_shot(root, "Trigger Hazard (H)", "dev_trigger_hazard")
