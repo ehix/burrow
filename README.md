@@ -56,8 +56,8 @@
 ## Development (Godot 4.7 rebuild — slice 1)
 
 The playable project lives at the repo root (`project.godot`). The Godot 3.x
-`prototype/` is kept as reference only and is excluded from the project via
-`prototype/.gdignore`.
+prototype has been retired now that the slice 1 and slice 2 rebuild has
+superseded it.
 
 Full design: [`docs/superpowers/specs/2026-07-06-burrow-rebuild-design.md`](docs/superpowers/specs/2026-07-06-burrow-rebuild-design.md).
 
