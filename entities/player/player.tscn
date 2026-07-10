@@ -16,7 +16,7 @@
 [ext_resource type="Script" path="res://entities/skills/sense_skill.gd" id="14_sense"]
 [ext_resource type="Script" path="res://entities/skills/remove_walls_skill.gd" id="15_removewalls"]
 [ext_resource type="Script" path="res://entities/skills/net_hold_skill.gd" id="16_nethold"]
-[ext_resource type="Script" path="res://entities/skills/net_projectile_skill.gd" id="17_netproj"]
+[ext_resource type="Script" path="res://entities/skills/net_shot_skill.gd" id="17_netshot"]
 [ext_resource type="PackedScene" path="res://entities/skills/scenes/net_shot.tscn" id="18_netshot"]
 [ext_resource type="Script" path="res://entities/skills/hatchlings_skill.gd" id="19_hatch"]
 [ext_resource type="PackedScene" path="res://entities/skills/scenes/tiny_spiderling.tscn" id="20_spiderling"]
@@ -121,9 +121,11 @@ hunger_cost = 25.0
 [node name="NetHoldSkill" type="Node" parent="."]
 script = ExtResource("16_nethold")
 
-[node name="NetProjectileSkill" type="Node" parent="."]
-script = ExtResource("17_netproj")
+[node name="NetShotSkill" type="Node" parent="."]
+script = ExtResource("17_netshot")
 net_shot_scene = ExtResource("18_netshot")
+cooldown = 0.0
+hunger_cost = 0.0
 
 [node name="HatchlingsSkill" type="Node" parent="."]
 script = ExtResource("19_hatch")

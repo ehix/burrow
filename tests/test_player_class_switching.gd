@@ -60,3 +60,14 @@ func test_unknown_class_id_is_a_noop() -> void:
 	var before := player.melee_damage
 	player.apply_class(999) # not a real class id
 	assert_eq(player.melee_damage, before, "an unrecognised id leaves the current class untouched")
+
+
+func test_net_shot_is_free_to_fire() -> void:
+	# Net Hold already charges the real "engagement fee" (cost + cooldown) to
+	# arm yourself with a trap. Net Shot is just deciding how to discharge
+	# what you already paid for, so it costs nothing extra — re-arming via
+	# Net Hold is what naturally throttles repeated throws, not a second,
+	# redundant cost on the throw itself.
+	var player := _make_player()
+	assert_eq(player._net_shot.hunger_cost, 0.0, "throwing an already-held trap costs nothing extra")
+	assert_eq(player._net_shot.cooldown, 0.0, "no independent cooldown — re-arming via Net Hold is the real gate")
