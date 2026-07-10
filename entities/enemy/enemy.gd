@@ -607,10 +607,18 @@ func apply_web_hit(push_dir: Vector2i, factor: float, slow_duration: float, stun
 		return
 	if push_dir != Vector2i.ZERO:
 		_mover.knockback(push_dir)
-	if factor < 1.0:
+	if factor < 1.0 and not _is_weaver():
 		_mover.apply_slow(factor, slow_duration)
 	if stun_duration > 0.0:
 		_mover.stun(stun_duration)
+
+
+## Weavers never get slowed by a web (design: playtest correction) — this
+## does not extend to Blockade, which is a hard physical collider that
+## never goes through apply_web_hit() at all.
+func _is_weaver() -> bool:
+	return _active_class_data != null \
+		and _active_class_data.spider_class == SpiderClassData.SpiderClass.WEAVER
 
 
 func _on_died() -> void:

@@ -86,3 +86,24 @@ func test_net_shot_is_free_to_fire() -> void:
 	var player := _make_player()
 	assert_eq(player._net_shot.hunger_cost, 0.0, "throwing an already-held trap costs nothing extra")
 	assert_eq(player._net_shot.cooldown, 0.0, "no independent cooldown — re-arming via Net Hold is the real gate")
+
+
+func test_weaver_takes_no_slow_from_a_web_hit() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WEAVER)
+	player.apply_web_hit(Vector2i.ZERO, 0.5, 1.5, 0.0) # a pure web-crossing slow
+	assert_eq(player._mover.speed_scale, 1.0, "a Weaver never gets slowed by a web")
+
+
+func test_non_weaver_still_gets_slowed_by_a_web_hit() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WOLF)
+	player.apply_web_hit(Vector2i.ZERO, 0.5, 1.5, 0.0)
+	assert_eq(player._mover.speed_scale, 0.5, "every other class is slowed as before")
+
+
+func test_weaver_still_gets_knocked_back_and_stunned_by_a_web_hit() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WEAVER)
+	player.apply_web_hit(Vector2i.RIGHT, 0.5, 1.5, 0.3)
+	assert_true(player._mover.is_stunned(), "immunity is to the slow only, not the stun")

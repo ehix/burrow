@@ -222,3 +222,17 @@ func test_consider_using_a_skill_does_nothing_when_no_skill_qualifies() -> void:
 
 	for skill in enemy._skills:
 		assert_true(skill.can_activate(), "no skill should fire outside its applicable state")
+
+
+func test_weaver_enemy_takes_no_slow_from_a_web_hit() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.WEAVER)
+	enemy.apply_web_hit(Vector2i.ZERO, 0.5, 1.5, 0.0)
+	assert_eq(enemy._mover.speed_scale, 1.0, "a Weaver enemy never gets slowed by a web")
+
+
+func test_non_weaver_enemy_still_gets_slowed_by_a_web_hit() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.WOLF)
+	enemy.apply_web_hit(Vector2i.ZERO, 0.5, 1.5, 0.0)
+	assert_eq(enemy._mover.speed_scale, 0.5, "every other class is slowed as before")
