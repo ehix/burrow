@@ -38,6 +38,15 @@ var freeze_others := false
 ## Scoped to the player only (checked via the "player" group), not other spiders.
 var god_mode := false
 
+## Dev tool (Q, in World): which of the four spider classes the player is
+## currently testing (design §3). Stored as a plain int (SpiderClassData's
+## enum values) rather than the enum type itself, so this file doesn't need
+## to know about SpiderClassData at parse time. Persists across levels and
+## restarts, same as the other dev toggles above — NOT reset by
+## start_new_run(). Player.apply_class() reads this on spawn; World._cycle_class()
+## is the only writer.
+var selected_class: int = 1  # SpiderClassData.SpiderClass.WOLF
+
 ## Round tally: one "round" is one depth, decided by whoever clears it first
 ## (enemy defeated = a player win, player died = an enemy win). A session-long
 ## count, deliberately NOT reset by start_new_run() — permadeath resets the
@@ -53,10 +62,18 @@ var enemy_wins := 0
 var runes: int = 0
 var purchased_upgrades: Array[StringName] = []
 
+## Flat reward for clearing a round — not depth-scaled, so currency growth
+## stays predictable regardless of how fast a run is descending.
+const ROUND_WIN_RUNES := 20
+
 
 func _ready() -> void:
 	EventBus.enemy_defeated.connect(func(_cause: String) -> void: player_wins += 1)
 	EventBus.player_died.connect(func() -> void: enemy_wins += 1)
+	# Runes are earned by play (design §5): a flat bonus for clearing a round,
+	# plus 1 rune per point of hunger overflow from eating past full.
+	EventBus.enemy_defeated.connect(func(_cause: String) -> void: earn_runes(ROUND_WIN_RUNES))
+	EventBus.excess_consumed.connect(func(_by: Node, amount: float) -> void: earn_runes(int(amount)))
 	start_new_run()
 
 

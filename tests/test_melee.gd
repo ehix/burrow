@@ -65,6 +65,28 @@ func test_melee_drains_health_instead_of_hunger_once_starving() -> void:
 		"a landed hit's cost drains health instead of hunger once maxed")
 
 
+func test_melee_hits_a_blockade_in_range() -> void:
+	var player := _make_player()
+	var blockade := Blockade.new()
+	add_child_autofree(blockade)
+	blockade.setup(3)
+	blockade.global_position = Vector2(548, 500) # one tile ahead
+	player._melee()
+	assert_eq(blockade._hits, 1, "the swing landed one hit on the blockade")
+
+
+func test_melee_costs_hunger_when_it_lands_on_a_blockade() -> void:
+	var player := _make_player()
+	var blockade := Blockade.new()
+	add_child_autofree(blockade)
+	blockade.setup(3)
+	blockade.global_position = Vector2(548, 500)
+	var before := player.hunger.current_hunger
+	player._melee()
+	assert_almost_eq(player.hunger.current_hunger, before + player.melee_hunger_cost, 0.001,
+		"a landed hit on a blockade costs hunger like any other landed melee hit")
+
+
 func test_melee_always_spawns_the_slash_regardless_of_hit() -> void:
 	var player := _make_player() # nothing in range: a whiff
 	var holder := Node2D.new()

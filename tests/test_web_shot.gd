@@ -37,3 +37,16 @@ func test_hitting_a_trap_registers_a_web_hit() -> void:
 	add_child_autofree(trap)
 	shot._on_body_entered(trap)
 	assert_eq(trap.web_hits, 1, "the shot lands one destructive hit on the trap")
+
+
+func test_hitting_a_blockade_registers_a_hit() -> void:
+	# Each shot is spent after resolving one hit, so a "third hit destroys it"
+	# check needs three separate shots — mirrors three real projectiles landing.
+	var blockade := Blockade.new()
+	add_child_autofree(blockade)
+	blockade.setup(3)
+	_make_shot()._on_body_entered(blockade)
+	assert_false(blockade.is_queued_for_deletion(), "one hit shouldn't destroy a 3-hit blockade")
+	_make_shot()._on_body_entered(blockade)
+	_make_shot()._on_body_entered(blockade)
+	assert_true(blockade.is_queued_for_deletion(), "the third hit destroys it")

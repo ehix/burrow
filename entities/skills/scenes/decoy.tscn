@@ -1,0 +1,30 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://entities/skills/scenes/decoy.gd" id="1_decoy"]
+[ext_resource type="Script" path="res://components/health_component.gd" id="2_health"]
+[ext_resource type="Script" path="res://components/hurtbox.gd" id="3_hurtbox"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_decoy"]
+radius = 10.0
+
+[node name="Decoy" type="StaticBody2D"]
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("1_decoy")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_decoy")
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+max_health = 20.0
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+script = ExtResource("3_hurtbox")
+health_path = NodePath("../HealthComponent")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("CircleShape2D_decoy")

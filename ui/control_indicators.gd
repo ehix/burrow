@@ -38,7 +38,33 @@ func _ready() -> void:
 	_add_one_shot(root, "Reset Map (R)", "dev_reset_map")
 	_add_one_shot(root, "Remove Wall (X)", "dev_remove_wall")
 	_add_held(root, "God Mode (G)", func() -> bool: return GameState.god_mode)
+	_add_one_shot(root, "Toggle Plane (C)", "toggle_plane")
+	_add_one_shot(root, "Toggle Pit (P)", "dev_toggle_pit")
+	_add_one_shot(root, "Trigger Hazard (H)", "dev_trigger_hazard")
+	_add_one_shot(root, "Camouflage (V)", "camouflage")
+	_add_one_shot(root, "Sense (N)", "sense")
+	_add_one_shot(root, "Remove Walls Skill (M)", "remove_walls_skill")
+	_add_one_shot(root, "Net Hold (B)", "net_hold")
+	_add_one_shot(root, "Net Projectile (T)", "net_projectile")
+	_add_one_shot(root, "Hatchlings (Y)", "hatchlings")
+	_add_one_shot(root, "Egg Mine (U)", "egg_mine")
+	_add_one_shot(root, "Blockade (O)", "blockade")
+	_add_one_shot(root, "Silk Tunnel (I)", "silk_tunnel")
+	_add_one_shot(root, "Decoy (Z)", "decoy")
+	_add_one_shot(root, "Cycle Class (Q)", "cycle_class")
+	_add_upgrade_rows(root)
 	_add_held(root, "Paused (Esc)", func() -> bool: return get_tree().paused)
+
+
+## One row per authored upgrade (design §5), showing its name/cost next to
+## the key that buys it — the only place these are listed, since there's no
+## separate shop UI.
+func _add_upgrade_rows(root: VBoxContainer) -> void:
+	var actions := ["buy_upgrade_1", "buy_upgrade_2", "buy_upgrade_3", "buy_upgrade_4"]
+	for i in UpgradeRegistry.ALL.size():
+		var upgrade := UpgradeRegistry.ALL[i]
+		var text := "Buy %s — %dr (%d)" % [upgrade.display_name, upgrade.rune_cost, i + 1]
+		_add_one_shot(root, text, actions[i])
 
 
 func _add_held(root: VBoxContainer, text: String, check: Callable) -> void:

@@ -36,6 +36,27 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 ## Seconds between the enemy laying web traps while hunting food.
 @export var trap_interval: float = 5.0
 
+## Class kit (design §2/§3): each enemy rolls one of the four classes at
+## spawn — independent per spawn, not persisted across depths like
+## GameState.selected_class is for the player — and scales melee/web stats
+## the same way Player.apply_class() does.
+const NetCasterData: SpiderClassData = preload("res://resources/spiders/net_caster.tres")
+const WolfData: SpiderClassData = preload("res://resources/spiders/wolf.tres")
+const WeaverData: SpiderClassData = preload("res://resources/spiders/weaver.tres")
+const DecoyClassData: SpiderClassData = preload("res://resources/spiders/decoy.tres")
+
+const NetShotScene := preload("res://entities/skills/scenes/net_shot.tscn")
+const TinySpiderlingScene := preload("res://entities/skills/scenes/tiny_spiderling.tscn")
+const CocoonMineScene := preload("res://entities/skills/scenes/cocoon_mine.tscn")
+const BlockadeScene := preload("res://entities/skills/scenes/blockade.tscn")
+const DecoyPropScene := preload("res://entities/skills/scenes/decoy.tscn")
+const WebTrapScene := preload("res://entities/web/web_trap.tscn")
+
+## How often the enemy reconsiders using a skill (design §2/§3) — a skill's
+## own cooldown already prevents spamming once chosen; this only paces the
+## *decision* itself so it isn't re-evaluated every single physics frame.
+const SKILL_DECISION_INTERVAL := 0.75
+
 @onready var health: HealthComponent = $HealthComponent
 @onready var hunger: HungerComponent = $HungerComponent
 @onready var web_emitter: WebEmitter = $WebEmitter
@@ -46,9 +67,15 @@ enum State { PATROL, SEEK_FOOD, CHASE, FLEE }
 var state: State = State.PATROL
 
 var _player: Node2D
+## Whichever spider CHASE is actually pursuing right now — the real player,
+## or a closer visible Decoy (design §3: Decoy diverts aggro). Re-picked by
+## _acquire_target() every _update_state() tick; only meaningful in CHASE —
+## FLEE/_fight_back() always react to the real player specifically, since
+## fleeing from (or striking back at) a harmless decoy prop makes no sense.
+var _current_target: Node2D
 var _level: Node
 var _repath_left := 0.0
-var _facing := Vector2.RIGHT
+var facing := Vector2.RIGHT
 var _dead := false
 var _path: Array[Vector2i] = []
 var _path_i := 0
@@ -60,6 +87,13 @@ var _state_lock_left := 0.0
 ## counter rather than wall-clock time, so it's deterministic and testable.
 var _tile_last_visited: Dictionary = {}
 var _patrol_tick := 0
+var active_class: int = SpiderClassData.SpiderClass.WOLF
+var _class_data_by_id: Dictionary = {}
+var _active_class_data: SpiderClassData
+var _skills: Array[SkillComponent] = []
+var _skill_decision_left := 0.0
+var _base_melee_damage: float
+var _base_web_cooldown: float
 
 
 ## Level calls this right after instancing so the enemy can path on the grid.
@@ -87,6 +121,15 @@ func _ready() -> void:
 	EventBus.health_changed.emit(self, health.current_health, health.max_health)
 	EventBus.hunger_changed.emit(self, hunger.current_hunger, hunger.max_hunger)
 	_player = get_tree().get_first_node_in_group("player") as Node2D
+	_class_data_by_id = {
+		SpiderClassData.SpiderClass.NET_CASTER: NetCasterData,
+		SpiderClassData.SpiderClass.WOLF: WolfData,
+		SpiderClassData.SpiderClass.WEAVER: WeaverData,
+		SpiderClassData.SpiderClass.DECOY: DecoyClassData,
+	}
+	_base_melee_damage = melee_damage
+	_base_web_cooldown = web_emitter.cooldown
+	_apply_class(randi() % 4)
 
 
 func _on_health_changed(value: float, max_value: float) -> void:
@@ -116,6 +159,53 @@ func _apply_type() -> void:
 	health.current_health = health.max_health
 
 
+## Rolls this enemy's class: scales melee/web stats from the base values
+## snapshotted at _ready() and attaches its two skills. Mirrors
+## Player.apply_class() so class differentiation feels consistent across
+## both spiders, but this is a fresh roll every spawn — not a persisted dev
+## preference like GameState.selected_class.
+func _apply_class(spider_class: int) -> void:
+	var data: SpiderClassData = _class_data_by_id.get(spider_class)
+	if data == null:
+		return
+	active_class = spider_class
+	_active_class_data = data
+	melee_damage = _base_melee_damage * data.melee_damage_mult
+	web_emitter.cooldown = _base_web_cooldown / maxf(0.01, data.web_fire_rate_mult)
+	for skill in _skills:
+		skill.queue_free()
+	_skills = _make_skills(spider_class)
+	for skill in _skills:
+		add_child(skill)
+	EventBus.enemy_class_changed.emit(spider_class)
+
+
+## The two skill instances for `spider_class`, with their scene dependencies
+## wired the same way player.tscn wires each one's.
+func _make_skills(spider_class: int) -> Array[SkillComponent]:
+	match spider_class:
+		SpiderClassData.SpiderClass.NET_CASTER:
+			var proj := NetProjectileSkill.new()
+			proj.net_shot_scene = NetShotScene
+			return [NetHoldSkill.new(), proj]
+		SpiderClassData.SpiderClass.WEAVER:
+			var blockade := BlockadeSkill.new()
+			blockade.blockade_scene = BlockadeScene
+			var silk := SilkTunnelSkill.new()
+			silk.trap_scene = WebTrapScene
+			return [blockade, silk]
+		SpiderClassData.SpiderClass.DECOY:
+			var decoy := DecoySkill.new()
+			decoy.decoy_scene = DecoyPropScene
+			return [CamouflageSkill.new(), decoy]
+		_: # WOLF
+			var hatch := HatchlingsSkill.new()
+			hatch.hatchling_scene = TinySpiderlingScene
+			var mine := EggMineSkill.new()
+			mine.mine_scene = CocoonMineScene
+			return [hatch, mine]
+
+
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
@@ -130,6 +220,10 @@ func _physics_process(delta: float) -> void:
 	_melee_left = maxf(0.0, _melee_left - delta)
 	_trap_left = maxf(0.0, _trap_left - delta)
 	_state_lock_left = maxf(0.0, _state_lock_left - delta)
+	_skill_decision_left -= delta
+	if _skill_decision_left <= 0.0:
+		_skill_decision_left = SKILL_DECISION_INTERVAL
+		_consider_using_a_skill()
 	match state:
 		State.CHASE:
 			_do_chase()
@@ -143,13 +237,15 @@ func _physics_process(delta: float) -> void:
 
 func _update_state() -> void:
 	var next := state
+	var target := _acquire_target()
 	if health.fraction() <= flee_health_fraction:
 		next = State.FLEE
-	elif _can_see_player():
+	elif target != null:
+		_current_target = target
 		next = State.CHASE
 	elif state == State.PATROL or state == State.SEEK_FOOD:
 		# Only these two idle states are sticky against each other — a low-health
-		# flee or spotting the player (above) always overrides immediately.
+		# flee or spotting a target (above) always overrides immediately.
 		if _state_lock_left > 0.0:
 			next = state
 		else:
@@ -168,17 +264,17 @@ func _update_state() -> void:
 # --- per-state behaviour ------------------------------------------------------
 
 func _do_chase() -> void:
-	if _player == null:
+	if _current_target == null or not is_instance_valid(_current_target):
 		return
 	if _repath_left <= 0.0:
-		_set_path_to(_tile_of(_player.global_position))
+		_set_path_to(_tile_of(_current_target.global_position))
 		_repath_left = repath_interval
 	_follow_path()
-	var to_player := _player.global_position - global_position
-	if to_player.length() <= melee_range:
-		_melee_player(to_player)
-	elif to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
-		web_emitter.fire(global_position, to_player, self)
+	var to_target := _current_target.global_position - global_position
+	if to_target.length() <= melee_range:
+		_melee_target(_current_target, to_target)
+	elif to_target.length() <= attack_range and _web_enabled() and _has_line_of_sight(_current_target.global_position):
+		web_emitter.fire(global_position, to_target, self)
 
 
 func _do_seek_food() -> void:
@@ -200,20 +296,22 @@ func _do_seek_food() -> void:
 	_follow_path()
 
 
-## Strike the player in close quarters: damage, a shove away, a stun, a flash.
-## Costs hunger to swing (charge_all's max-hunger fail-safe drains health once
-## the enemy is already starving).
-func _melee_player(to_player: Vector2) -> void:
-	if _melee_left > 0.0 or _player == null:
+## Strike `target` (the real player, or a Decoy that diverted CHASE) in close
+## quarters: damage, a shove away, a stun, a flash. Costs hunger to swing
+## (charge_all's max-hunger fail-safe drains health once the enemy is already
+## starving). Works unmodified against a Decoy: it carries the same
+## Hurtbox/apply_web_hit contract every real spider does.
+func _melee_target(target: Node2D, to_target: Vector2) -> void:
+	if _melee_left > 0.0 or target == null:
 		return
 	_melee_left = melee_cooldown
 	HungerComponent.charge_all(get_tree(), melee_hunger_cost)
-	var hurtbox := _player.get_node_or_null("Hurtbox") as Hurtbox
+	var hurtbox := target.get_node_or_null("Hurtbox") as Hurtbox
 	if hurtbox != null:
 		hurtbox.receive_hit(melee_damage, self)
-	if _player.has_method("apply_web_hit"):
-		_player.apply_web_hit(_dominant(to_player), 1.0, 0.0, melee_stun)
-	CombatFx.spawn_slash(get_parent(), _player.global_position, to_player)
+	if target.has_method("apply_web_hit"):
+		target.apply_web_hit(_dominant(to_target), 1.0, 0.0, melee_stun)
+	CombatFx.spawn_slash(get_parent(), target.global_position, to_target)
 
 
 ## Run from the player; if truly cornered (no escape tile at all) turn and
@@ -237,14 +335,77 @@ func _do_flee() -> void:
 
 
 ## No escape route this frame: attack like CHASE would, instead of idling.
+## Always the real player specifically — FLEE is triggered by low health
+## against a genuine threat, so cornered-and-fighting-back never targets a
+## harmless Decoy prop even if CHASE had been diverted to one beforehand.
 func _fight_back() -> void:
 	if _player == null:
 		return
 	var to_player := _player.global_position - global_position
 	if to_player.length() <= melee_range:
-		_melee_player(to_player)
-	elif to_player.length() <= attack_range and _has_line_of_sight(_player.global_position):
+		_melee_target(_player, to_player)
+	elif to_player.length() <= attack_range and _web_enabled() and _has_line_of_sight(_player.global_position):
 		web_emitter.fire(global_position, to_player, self)
+
+
+func _web_enabled() -> bool:
+	return _active_class_data == null or _active_class_data.web_enabled
+
+
+# --- class skills (AI) --------------------------------------------------------
+
+## Utility-scores each owned skill against a "do nothing extra" baseline
+## (design §2/§3): EnemyUtilityAI.best() picks the highest scorer.
+## depth_intel biases willingness upward at deeper levels — never a
+## stat/damage change, just how eagerly the enemy reaches for its kit
+## (guardrail: intelligence scaling alone can't compound into an unfair
+## fight — health/damage stay solely on EnemyType/depth_scale()).
+func _consider_using_a_skill() -> void:
+	if _skills.is_empty():
+		return
+	var intel := EnemyUtilityAI.depth_intel(GameState.depth)
+	var candidates: Array[EnemyUtilityAI.Candidate] = [
+		EnemyUtilityAI.Candidate.new(EnemyUtilityAI.Action.PATROL, 0.35), # baseline: nothing extra
+	]
+	for skill in _skills:
+		if not skill.can_activate():
+			continue
+		var base_score := _score_skill(skill)
+		if base_score <= 0.0:
+			continue
+		candidates.append(EnemyUtilityAI.Candidate.new(
+			EnemyUtilityAI.Action.USE_SKILL, base_score * (0.5 + 0.5 * intel), {"skill": skill}))
+	var winner := EnemyUtilityAI.best(candidates)
+	if winner != null and winner.action == EnemyUtilityAI.Action.USE_SKILL:
+		(winner.context["skill"] as SkillComponent).activate(self)
+
+
+## Simple, class-agnostic heuristics for whether each owned skill is worth
+## using right now, grouped by the state it makes sense in — combat skills
+## during an active CHASE, defensive/escape skills while FLEEing, and
+## NetHold (harvesting) during SEEK_FOOD. Deliberately kept on Enemy, not
+## SkillComponent, so skill scripts stay usable by any spider — player or
+## enemy — without carrying AI-specific concerns.
+func _score_skill(skill: SkillComponent) -> float:
+	if skill is NetHoldSkill:
+		return 0.7 if state == State.SEEK_FOOD and _nearest_caught_trap() != null else 0.0
+	if skill is NetProjectileSkill or skill is HatchlingsSkill \
+			or skill is EggMineSkill or skill is SilkTunnelSkill:
+		return 0.6 if state == State.CHASE and _current_target != null else 0.0
+	if skill is BlockadeSkill or skill is CamouflageSkill or skill is DecoySkill:
+		return 0.6 if state == State.FLEE else 0.0
+	return 0.0
+
+
+## A caught larva within easy reach — worth a Net Hold instead of walking
+## all the way up to the trap and eating normally.
+func _nearest_caught_trap() -> Node:
+	for node in get_tree().get_nodes_in_group("traps"):
+		var trap := node as WebTrap
+		if trap != null and trap.caught_larva != null \
+				and global_position.distance_to(trap.global_position) <= eat_range * 2.0:
+			return trap
+	return null
 
 
 ## Sweeps toward unexplored ground instead of a pure random walk: candidate
@@ -314,9 +475,9 @@ func _dominant(v: Vector2) -> Vector2i:
 func _face(dir: Vector2i) -> void:
 	if dir == Vector2i.ZERO:
 		return
-	_facing = Vector2(dir)
+	facing = Vector2(dir)
 	if facing_visual != null:
-		facing_visual.rotation = _facing.angle()
+		facing_visual.rotation = facing.angle()
 
 
 func _tile_of(world: Vector2) -> Vector2i:
@@ -327,22 +488,79 @@ func _tile_of(world: Vector2) -> Vector2i:
 
 # --- eating -------------------------------------------------------------------
 
+## Uses the larva's own growth-scaled heal_value() (design §2) when it has
+## one — falls back to the flat eat_satiation for a bare test double.
 func _eat_larva(larva: Node) -> void:
 	if not larva.is_in_group("larvae"):
 		return
-	var overflow := hunger.satiate(eat_satiation)
+	var heal_amount: float = larva.heal_value() if larva.has_method("heal_value") else eat_satiation
+	var overflow := hunger.satiate(heal_amount)
 	EventBus.larva_consumed.emit(self, overflow)
 	larva.queue_free()
 
 
 # --- perception ---------------------------------------------------------------
 
+## Whichever of {the real player, any visible Decoy} is nearest right now —
+## the actual "divert aggro" mechanic (design §3): a Decoy placed closer than
+## the player wins the contest even while the player is also visible, not
+## just as a fallback once the player is hidden/camouflaged. Returns null if
+## neither is currently visible. _update_state() stores the result in
+## _current_target for CHASE to act on.
+func _acquire_target() -> Node2D:
+	var best: Node2D = null
+	var best_dist := INF
+	if _can_see_player():
+		best = _player
+		best_dist = global_position.distance_to(_player.global_position)
+	var decoy := _nearest_visible_decoy(best_dist)
+	if decoy != null:
+		best = decoy
+	return best
+
+
+## Nearest node in the "decoys" group within vision_range and line-of-sight,
+## strictly closer than `closer_than` (so a farther decoy never displaces an
+## already-closer player). Returns null if none qualify.
+func _nearest_visible_decoy(closer_than: float = INF) -> Node2D:
+	var best: Node2D = null
+	var best_dist := closer_than
+	for node in get_tree().get_nodes_in_group("decoys"):
+		var decoy := node as Node2D
+		if decoy == null or not is_instance_valid(decoy):
+			continue
+		var d := global_position.distance_to(decoy.global_position)
+		if d >= best_dist or d > vision_range:
+			continue
+		if not _has_line_of_sight(decoy.global_position):
+			continue
+		best = decoy
+		best_dist = d
+	return best
+
+
+## Vision alone decides whether the real player is a CHASE candidate (design
+## §3 guardrail: Camouflage breaks on any attack, but while it holds, it
+## should actually work — a camouflaged player is invisible to this check
+## regardless of range/line-of-sight). A patrolling enemy never enters CHASE
+## against a hidden player in the first place, and an active CHASE drops back
+## to SEEK_FOOD/PATROL the moment camouflage goes up, *unless* a visible
+## Decoy is still around to hold its attention instead (see _acquire_target).
 func _can_see_player() -> bool:
 	if _player == null or not is_instance_valid(_player):
+		return false
+	if _player_is_camouflaged():
 		return false
 	if global_position.distance_to(_player.global_position) > vision_range:
 		return false
 	return _has_line_of_sight(_player.global_position)
+
+
+func _player_is_camouflaged() -> bool:
+	if _player == null:
+		return false
+	var camo := _player.get_node_or_null("CamouflageSkill") as CamouflageSkill
+	return camo != null and camo.active
 
 
 func _has_line_of_sight(target_pos: Vector2) -> bool:

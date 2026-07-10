@@ -4,9 +4,8 @@ extends Node
 ## the Level it's bound to. Depth scales *frequency* only, via
 ## GameState.depth_scale() — each hazard's own severity constants stay fixed,
 ## so a deep run gets hazards more often, never a single hazard that's
-## unfairly more severe (guardrail: no impossible encounters). Not yet
-## instanced by Level/World in this pass — attach as a child of Level and call
-## `bind_level(level)` to wire it in.
+## unfairly more severe (guardrail: no impossible encounters). Instanced by
+## Level.build() and bound to itself.
 
 const WATER_INGRESS_BASE_INTERVAL := 50.0
 const SEISMIC_BASE_INTERVAL := 70.0
@@ -35,3 +34,20 @@ func _process(delta: float) -> void:
 			_timers[i] = _base_intervals[i] / GameState.depth_scale()
 			if GameState.depth >= _hazards[i].min_depth:
 				_hazards[i].trigger(_level)
+
+
+## Fire one random eligible (depth-gated) hazard immediately and reset its
+## schedule — the base intervals (50-120s) are far too slow to exercise
+## interactively otherwise. Dev tool (H), see World._dev_trigger_hazard.
+func trigger_random_now() -> void:
+	if _level == null or _hazards.is_empty():
+		return
+	var eligible: Array[int] = []
+	for i in _hazards.size():
+		if GameState.depth >= _hazards[i].min_depth:
+			eligible.append(i)
+	if eligible.is_empty():
+		return
+	var i: int = eligible[randi() % eligible.size()]
+	_hazards[i].trigger(_level)
+	_timers[i] = _base_intervals[i] / GameState.depth_scale()

@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://entities/skills/scenes/tiny_spiderling.gd" id="1_hatch"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hatch"]
+radius = 6.0
+
+[node name="TinySpiderling" type="CharacterBody2D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_hatch")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_hatch")

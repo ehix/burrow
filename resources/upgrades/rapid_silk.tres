@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UpgradeCatalog" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/upgrade_catalog.gd" id="1_upgrade"]
+
+[resource]
+script = ExtResource("1_upgrade")
+upgrade_id = &"rapid_silk"
+display_name = "Rapid Silk"
+description = "Permanently lowers web-shot cooldown by 0.1s."
+rune_cost = 100
+effect_stat = "web_fire_rate"
+effect_amount = -0.1

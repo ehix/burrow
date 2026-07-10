@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="SpiderClassData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/spider_class_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+spider_class = 1
+display_name = "Wolf Spider"
+melee_damage_mult = 1.0
+web_enabled = true
+web_fire_rate_mult = 1.0
+web_projectile_speed_mult = 1.0

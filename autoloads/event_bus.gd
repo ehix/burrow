@@ -36,6 +36,10 @@ signal depth_changed(depth: int)
 ## GameState.runes changed (earned or spent). Design §5: Economy.
 signal runes_changed(total: int)
 
+## A permanent upgrade (design §5) was successfully purchased via the
+## buy_upgrade_N dev keys. `upgrade_id` matches UpgradeCatalog.upgrade_id.
+signal upgrade_purchased(upgrade_id: StringName)
+
 ## `who` switched between Level.Layer.GROUND and Level.Layer.CEILING (design
 ## §1: Dual-Plane Map Architecture). `plane` is a Level.Layer value.
 signal plane_changed(who: Node, plane: int)
@@ -43,6 +47,15 @@ signal plane_changed(who: Node, plane: int)
 ## A world hazard fired (design §7). `hazard_name` is e.g. "water_ingress",
 ## "seismic_compaction", "centipede_express".
 signal hazard_triggered(hazard_name: String)
+
+## Dev tool (Q): the player's active spider class changed (design §3).
+## `spider_class` is a SpiderClassData.SpiderClass value.
+signal class_changed(spider_class: int)
+
+## A fresh enemy rolled its class for this depth (design §2/§3). Independent
+## of the player's class_changed — a fresh Enemy is spawned every depth, so
+## this fires once per descent, not on any dev toggle.
+signal enemy_class_changed(spider_class: int)
 
 ## A timed status effect (Poison, Speed, Sense, Armor, ...) was applied to or
 ## expired on `who`, via its StatusEffectComponent.

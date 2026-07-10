@@ -15,10 +15,22 @@ const LARVA_SPAWN_INTERVAL := 3.5
 ## One larva per this many open tiles sets the on-board cap (map-size scaled).
 const LARVA_TILES_PER_CAP := 10
 const LARVA_CAP_MAX := 18
+## Pits seeded naturally at build time (design §7), away from both spawns —
+## without these the ceiling plane has nothing to bypass in a normal
+## playthrough short of the Water Ingress hazard or the dev pit-toggle tool.
+const NATURAL_PIT_COUNT := 2
+## World items seeded per depth (design §5): a mix of Fungus Poison/Sense,
+## Seed Pod pickups, and Lure placements.
+const ITEM_SPAWN_COUNT := 3
+## Earthworm obstacles seeded per depth (design §6).
+const EARTHWORM_COUNT := 1
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
 const LarvaScene := preload("res://entities/larva/larva.tscn")
+const EarthwormScene := preload("res://entities/earthworm/earthworm.tscn")
+const WorldItemPickupScene := preload("res://entities/items/world_item_pickup.tscn")
+const LurePulseScene := preload("res://entities/items/lure_pulse.tscn")
 
 ## Fog-of-war ambient when darkness is on. White (no darkening) when off.
 const DARK_MODULATE := Color(0.05, 0.05, 0.07)
@@ -48,6 +60,10 @@ var _spawn_accum := 0.0
 ## Seismic Compaction's collapse pass) can find/free or (re)create the exact
 ## nodes for a tile.
 var _wall_nodes: Dictionary = {}
+## Pit/flood tile -> its visual marker, so MazeData's ground-hazard overlay
+## stays visible in sync — mirrors _wall_nodes.
+var _pit_nodes: Dictionary = {}
+var _hazard_director: HazardDirector
 
 
 func _ready() -> void:
@@ -66,7 +82,13 @@ func build() -> void:
 	_astar = GridNav.build(maze, TILE_SIZE)
 	_larva_cap = mini(LARVA_CAP_MAX, maxi(LARVA_COUNT, maze.open_cells().size() / LARVA_TILES_PER_CAP))
 	_spawn_entities()
+	_seed_natural_pits()
+	_seed_world_items()
+	_seed_earthworms()
 	apply_darkness()
+	_hazard_director = HazardDirector.new()
+	add_child(_hazard_director)
+	_hazard_director.bind_level(self)
 
 
 ## Keep the maze stocked: spawn a larva every interval while under the cap.
@@ -118,6 +140,20 @@ func apply_darkness() -> void:
 		var light := player.get_node_or_null("VisionLight") as PointLight2D
 		if light != null:
 			light.enabled = on
+
+
+## SenseSkill's x-ray (design §4): while active, every wall occluder stops
+## blocking light — the vision light passes through nearby walls instead of
+## stopping at them, revealing structure/critters/hostiles just beyond one
+## within light range. A local x-ray, not the full-map reveal the darkness
+## dev toggle does. Only affects walls that exist right now; a wall carved
+## open/collapsed mid-effect is unaffected either way (its occluder is
+## freed/spawned fresh, defaulting to normally-visible).
+func set_sense_active(active: bool) -> void:
+	for nodes in _wall_nodes.values():
+		var occ = nodes.get("occluder")
+		if occ != null and is_instance_valid(occ):
+			occ.visible = not active
 
 
 func _build_collision_and_occluders() -> void:
@@ -193,11 +229,47 @@ func is_blocked(tile: Vector2i, plane: Layer) -> bool:
 	return maze.is_ground_blocked(tile.x, tile.y)
 
 
+## Flag/clear a ground-hazard tile (pit or flood) and keep its visual marker
+## in sync with MazeData's overlay. The one entry point hazards/skills/dev
+## tools should use instead of poking `maze.set_pit` directly.
+func set_pit_at(tile: Vector2i, value: bool) -> void:
+	if maze == null:
+		return
+	maze.set_pit(tile.x, tile.y, value)
+	if value:
+		if not _pit_nodes.has(tile):
+			_pit_nodes[tile] = _spawn_pit_marker(tile)
+	else:
+		var marker = _pit_nodes.get(tile)
+		if marker != null and is_instance_valid(marker):
+			marker.queue_free()
+		_pit_nodes.erase(tile)
+
+
+func _spawn_pit_marker(tile: Vector2i) -> Node2D:
+	var half := TILE_SIZE * 0.5
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)])
+	poly.color = Color(0.15, 0.08, 0.05, 0.85)
+	poly.position = _tile_centre(tile.x, tile.y)
+	add_child(poly)
+	return poly
+
+
 ## BlockadeSkill: patch a pit tile for ground traversal by placing a blockade
 ## on it. No-op if `tile` isn't currently a pit.
 func patch_pit_at(tile: Vector2i) -> void:
-	if maze != null:
-		maze.set_pit(tile.x, tile.y, false)
+	set_pit_at(tile, false)
+
+
+## Force one eligible hazard to fire right now, bypassing its schedule (dev
+## tool H) — HazardDirector's own base intervals (50-120s) are far too slow to
+## exercise interactively otherwise.
+func trigger_random_hazard_now() -> void:
+	if _hazard_director != null:
+		_hazard_director.trigger_random_now()
 
 
 ## Inverse of dev_remove_wall_at: collapses an open, currently-unoccupied tile
@@ -228,6 +300,8 @@ func _spawn_entities() -> void:
 	player = PlayerScene.instantiate()
 	player.position = _tile_centre(player_cell.x, player_cell.y)
 	_entities.add_child(player)
+	if player.has_method("bind_level"):
+		player.bind_level(self)
 
 	enemy = EnemyScene.instantiate()
 	enemy.position = _tile_centre(enemy_cell.x, enemy_cell.y)
@@ -235,6 +309,85 @@ func _spawn_entities() -> void:
 	_entities.add_child(enemy)
 
 	_spawn_larvae([player_cell, enemy_cell])
+
+
+## Flag a handful of random open, non-spawn tiles as pits so the ceiling
+## plane has something to bypass in a normal playthrough, not just via the
+## Water Ingress hazard or the dev pit-toggle tool.
+func _seed_natural_pits() -> void:
+	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
+	var cells := maze.open_cells()
+	cells.shuffle()
+	var placed := 0
+	for cell in cells:
+		if placed >= NATURAL_PIT_COUNT:
+			break
+		if reserved.has(cell):
+			continue
+		set_pit_at(cell, true)
+		placed += 1
+
+
+## Scatter a mix of Fungus Poison/Sense, Seed Pod pickups, and Lure
+## placements (design §5) across random open, non-spawn tiles.
+func _seed_world_items() -> void:
+	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
+	var cells := maze.open_cells()
+	cells.shuffle()
+	var placed := 0
+	for cell in cells:
+		if placed >= ITEM_SPAWN_COUNT:
+			break
+		if reserved.has(cell):
+			continue
+		_spawn_random_item_at(cell)
+		reserved[cell] = true
+		placed += 1
+
+
+## One of four roughly-equal outcomes: Lure (placed/active immediately) or
+## one of the three WorldItemPickup-wrapped consumables (picked up on
+## contact).
+func _spawn_random_item_at(cell: Vector2i) -> void:
+	var world_pos := _tile_centre(cell.x, cell.y)
+	match randi() % 4:
+		0:
+			var lure := LurePulseScene.instantiate()
+			lure.item = LureItem.new()
+			_entities.add_child(lure)
+			lure.global_position = world_pos
+		1:
+			_spawn_pickup_at(world_pos, FungusPoisonItem.new())
+		2:
+			_spawn_pickup_at(world_pos, FungusSenseItem.new())
+		_:
+			_spawn_pickup_at(world_pos, SeedPodItem.new())
+
+
+func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
+	var pickup := WorldItemPickupScene.instantiate()
+	pickup.item = item
+	_entities.add_child(pickup)
+	pickup.global_position = world_pos
+
+
+## Seed a handful of Earthworm obstacles (design §6) across random open,
+## non-spawn tiles.
+func _seed_earthworms() -> void:
+	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
+	var cells := maze.open_cells()
+	cells.shuffle()
+	var placed := 0
+	for cell in cells:
+		if placed >= EARTHWORM_COUNT:
+			break
+		if reserved.has(cell):
+			continue
+		var worm := EarthwormScene.instantiate()
+		worm.global_position = _tile_centre(cell.x, cell.y)
+		worm.bind_level(self)
+		_entities.add_child(worm)
+		placed += 1
 
 
 func _spawn_larvae(reserved: Array) -> void:

@@ -11,3 +11,9 @@ extends Resource
 @export var display_name: String = ""
 @export var description: String = ""
 @export var rune_cost: int = 100
+## Which of the player's stats this upgrade permanently boosts, and by how
+## much (Player.refresh_upgrades() applies it). A negative amount lowers the
+## stat — used for "smaller is better" ones like hunger_rate/web_fire_rate's
+## underlying cooldown.
+@export_enum("max_health", "melee_damage", "web_fire_rate", "hunger_rate") var effect_stat: String = "max_health"
+@export var effect_amount: float = 10.0

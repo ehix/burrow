@@ -30,7 +30,7 @@ func test_patrol_prefers_the_least_recently_visited_tile() -> void:
 	enemy._tile_last_visited[my_tile + Vector2i.DOWN] = 9
 	enemy._tile_last_visited[my_tile + Vector2i.LEFT] = 8
 	enemy._do_patrol()
-	assert_eq(enemy._facing, Vector2.RIGHT, "patrol steps toward the only unvisited tile")
+	assert_eq(enemy.facing, Vector2.RIGHT, "patrol steps toward the only unvisited tile")
 
 
 func test_do_patrol_marks_its_own_tile_visited() -> void:

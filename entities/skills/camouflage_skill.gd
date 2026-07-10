@@ -3,10 +3,10 @@ extends SkillComponent
 ## Decoy Spider (female): raises the caster's opacity near-invisible for
 ## `duration`. Guardrail (strict state exclusion): camouflage breaks the
 ## instant an attack registers, whether the camouflaged spider lands a hit or
-## takes one — call `break_camouflage()` from both sides of any attack
-## resolution path that can touch a camouflaged spider (Player._melee,
-## WebEmitter.fire/WebShot area_entered, Hurtbox.receive_hit). Not yet wired
-## into those call sites in this pass.
+## takes one. `Hurtbox.receive_hit()` calls `break_if_present()` on both the
+## hurtbox's own owner (the victim) and the hit's `source` (the attacker) —
+## every existing attack path (melee, web shot) already resolves through a
+## Hurtbox, so that single call site covers both sides of every attack.
 
 signal broken
 
@@ -51,3 +51,13 @@ func break_camouflage() -> void:
 
 func _visual_of(source: Node) -> CanvasItem:
 	return source.get_node_or_null("Sprite") as CanvasItem
+
+
+## Break `entity`'s Camouflage if it has one active. No-op if `entity` is
+## null or has no CamouflageSkill child (i.e. almost everything).
+static func break_if_present(entity: Node) -> void:
+	if entity == null:
+		return
+	for child in entity.get_children():
+		if child is CamouflageSkill:
+			child.break_camouflage()

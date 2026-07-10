@@ -10,15 +10,27 @@ const CorpseScene := preload("res://entities/web/web_shot_spent.tscn")
 
 @onready var _mover: GridMover = $GridMover
 @onready var _sprite: Node2D = get_node_or_null("Sprite")
+@onready var growth: LarvaGrowth = $LarvaGrowth
 
 var caught := false
 var _dead := false
 var _last_dir := Vector2i.RIGHT
+var _base_sprite_scale := Vector2.ONE
 
 
 func _ready() -> void:
 	add_to_group("larvae")
 	_mover.step_finished.connect(_on_step_finished)
+	if _sprite != null:
+		_base_sprite_scale = _sprite.scale
+
+
+## Hunger satiated / health restored when this larva is eaten right now
+## (design §2: the longer it's survived, the more it's worth). Duck-typed by
+## WebTrap.try_consume()/Enemy._eat_larva() via has_method() so a bare test
+## double without a LarvaGrowth child still falls back to a flat amount.
+func heal_value() -> float:
+	return growth.heal_value()
 
 
 ## Set initial facing (Level derives this from the spawn tile's type).
@@ -39,6 +51,8 @@ func set_caught(at_position: Vector2) -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	if _sprite != null:
+		_sprite.scale = _base_sprite_scale * growth.size_scale
 	if caught or _dead or _mover.is_moving() or GameState.freeze_others:
 		return
 	_wander_step()
@@ -66,6 +80,23 @@ func _on_step_finished() -> void:
 func _tile_of(world: Vector2) -> Vector2i:
 	var ts := float(_mover.tile_size)
 	return Vector2i(int(floorf(world.x / ts)), int(floorf(world.y / ts)))
+
+
+## Force a single step toward `target_position`, overriding the normal wander
+## choice for this tick — used by LureItem's radial pulse (design §5) to draw
+## nearby larvae toward it. Same guards as _wander_step(); a no-op if blocked
+## or already mid-step.
+func nudge_toward(target_position: Vector2) -> void:
+	if caught or _dead or _mover.is_moving() or GameState.freeze_others:
+		return
+	var to_target := target_position - global_position
+	if to_target.length_squared() < 1.0:
+		return
+	var dir := Vector2i(int(signf(to_target.x)), 0) if absf(to_target.x) >= absf(to_target.y) \
+		else Vector2i(0, int(signf(to_target.y)))
+	if _mover.try_step(dir):
+		_last_dir = dir
+		rotation = Vector2(dir).angle()
 
 
 func _wander_step() -> void:
