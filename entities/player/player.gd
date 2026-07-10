@@ -185,6 +185,7 @@ func apply_class(spider_class: int) -> void:
 	_active_class = spider_class
 	_active_class_data = data
 	refresh_upgrades()
+	_update_sprite_tint()
 
 
 ## Whether `action`'s skill belongs to the currently active class. Sense and
@@ -260,8 +261,19 @@ func _blocked(dir: Vector2i) -> bool:
 
 ## Visual cue for which plane the player currently occupies — a dim,
 ## cool-toned tint on the ceiling, restored to normal on the ground.
-func _on_plane_changed(plane: Level.Layer) -> void:
-	sprite.modulate = Color(0.55, 0.65, 0.85, 0.85) if plane == Level.Layer.CEILING else Color.WHITE
+func _on_plane_changed(_plane_arg: Level.Layer) -> void:
+	_update_sprite_tint()
+
+
+## The sprite's tint is the active class's color, dimmed/cooled by the
+## ceiling tint on top when on the ceiling plane — the two effects compose
+## instead of one clobbering the other.
+func _update_sprite_tint() -> void:
+	var base := _active_class_data.display_color if _active_class_data != null else Color.WHITE
+	if _plane.current_plane == Level.Layer.CEILING:
+		sprite.modulate = base * Color(0.55, 0.65, 0.85, 0.85)
+	else:
+		sprite.modulate = base
 
 
 ## SenseSkill (and FungusSenseItem) both just apply a timed "sense" tag on

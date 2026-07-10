@@ -10,6 +10,9 @@ enum SpiderClass { NET_CASTER, WOLF, WEAVER, DECOY }
 
 @export var spider_class: SpiderClass
 @export var display_name: String = ""
+## Sprite tint while this class is active — Player.apply_class()/
+## Enemy._apply_class() apply it to the spider's sprite.
+@export var display_color: Color = Color.WHITE
 ## Ambush/Melee focus (Net-Caster, Weaver) multiplies this up; Ranged focus
 ## (Decoy) multiplies it down. 1.0 = the slice-1 baseline.
 @export var melee_damage_mult: float = 1.0

@@ -62,6 +62,21 @@ func test_unknown_class_id_is_a_noop() -> void:
 	assert_eq(player.melee_damage, before, "an unrecognised id leaves the current class untouched")
 
 
+func test_apply_class_tints_the_sprite_to_the_class_color() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WEAVER)
+	assert_eq(player.sprite.modulate, Player.WeaverData.display_color)
+
+
+func test_ceiling_tint_composes_with_the_class_color_instead_of_replacing_it() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WEAVER)
+	player._plane.transition() # -> CEILING
+	assert_eq(player.sprite.modulate, Player.WeaverData.display_color * Color(0.55, 0.65, 0.85, 0.85))
+	player._plane.transition() # -> GROUND
+	assert_eq(player.sprite.modulate, Player.WeaverData.display_color, "back to the plain class color on the ground")
+
+
 func test_net_shot_is_free_to_fire() -> void:
 	# Net Hold already charges the real "engagement fee" (cost + cooldown) to
 	# arm yourself with a trap. Net Shot is just deciding how to discharge

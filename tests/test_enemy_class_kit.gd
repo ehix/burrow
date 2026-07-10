@@ -82,6 +82,12 @@ func test_decoy_gets_camouflage_and_decoy() -> void:
 	assert_true(enemy._skills[1] is DecoySkill)
 
 
+func test_apply_class_tints_the_sprite_to_the_class_color() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.DECOY)
+	assert_eq(enemy.facing_visual.modulate, Enemy.DecoyClassData.display_color)
+
+
 func test_switching_classes_frees_the_old_skills() -> void:
 	var enemy := _make_enemy()
 	enemy._apply_class(SpiderClassData.SpiderClass.WOLF)

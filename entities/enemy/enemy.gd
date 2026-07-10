@@ -172,6 +172,8 @@ func _apply_class(spider_class: int) -> void:
 	_active_class_data = data
 	melee_damage = _base_melee_damage * data.melee_damage_mult
 	web_emitter.cooldown = _base_web_cooldown / maxf(0.01, data.web_fire_rate_mult)
+	if facing_visual != null:
+		facing_visual.modulate = data.display_color
 	for skill in _skills:
 		skill.queue_free()
 	_skills = _make_skills(spider_class)
