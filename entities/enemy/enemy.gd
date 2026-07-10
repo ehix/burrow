@@ -390,7 +390,7 @@ func _consider_using_a_skill() -> void:
 ## enemy — without carrying AI-specific concerns.
 func _score_skill(skill: SkillComponent) -> float:
 	if skill is NetHoldSkill:
-		return 0.7 if state == State.SEEK_FOOD and _nearest_own_ready_trap() != null else 0.0
+		return 0.7 if state == State.SEEK_FOOD and _nearest_pickupable_trap() != null else 0.0
 	if skill is NetShotSkill:
 		return 0.6 if state == State.CHASE and _current_target != null \
 				and (skill as NetShotSkill).net_hold.is_holding() else 0.0
@@ -401,13 +401,14 @@ func _score_skill(skill: SkillComponent) -> float:
 	return 0.0
 
 
-## An unspent trap this enemy placed, within easy reach — worth a Net Hold
-## pickup whether or not it's already caught a larva (a pre-loaded trap is
-## auto-eaten on pickup, so there's no special case for that here).
-func _nearest_own_ready_trap() -> WebTrap:
+## An unspent trap within easy reach — laid by anyone, ownership doesn't
+## gate pickup — worth a Net Hold pickup whether or not it's already caught a
+## larva (a pre-loaded trap is auto-eaten on pickup, so there's no special
+## case for that here).
+func _nearest_pickupable_trap() -> WebTrap:
 	for node in get_tree().get_nodes_in_group("traps"):
 		var trap := node as WebTrap
-		if trap != null and not trap.spent and trap.owner_spider == self \
+		if trap != null and not trap.spent \
 				and global_position.distance_to(trap.global_position) <= eat_range * 2.0:
 			return trap
 	return null

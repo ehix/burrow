@@ -134,7 +134,13 @@ func _physics_process(delta: float) -> void:
 		_remove_walls.activate(self)
 	if Input.is_action_just_pressed("camouflage") and _is_active_skill("camouflage"):
 		_camouflage.activate(self)
-	if Input.is_action_just_pressed("net_hold") and _is_active_skill("net_hold"):
+	# Held, not just-pressed: picking up a trap works either by walking onto
+	# it while holding the button, or by pressing the button while already
+	# stopped on it — both need this checked every frame the button is down,
+	# not just on the press edge. NetHoldSkill.activate() itself gates out
+	# the idle case so this never burns cooldown/hunger while nothing's in
+	# reach.
+	if Input.is_action_pressed("net_hold") and _is_active_skill("net_hold"):
 		_net_hold.activate(self)
 	if Input.is_action_just_pressed("net_shot") and _is_active_skill("net_shot"):
 		_net_shot.activate(self)

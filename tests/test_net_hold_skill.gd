@@ -1,9 +1,12 @@
 extends GutTest
-## NetHoldSkill's contract (Net-caster rework, design doc §"Net Hold"): pick
-## up an owned, unspent trap within reach and hold it out ahead of your
-## facing tile; a larva that touches that forward tile is eaten and the trap
-## is spent; a trap that already held a larva is auto-eaten on pickup
-## instead. No manual drop.
+## NetHoldSkill's contract (Net-caster rework, playtest correction): pick up
+## any unspent trap within reach — laid by anyone, ownership doesn't gate
+## pickup — and hold it out ahead of your facing tile; a larva that touches
+## that forward tile is eaten and the trap is spent; a trap that already held
+## a larva is auto-eaten on pickup instead. No manual drop. activate() itself
+## (not just _on_activate()) must gate on trap-availability and on already
+## holding, so continuously holding the input down never burns cooldown/
+## hunger on an idle frame.
 
 class FakeSpider:
 	extends Node2D
@@ -39,22 +42,23 @@ func _make_larva() -> Node2D:
 	return larva
 
 
-func test_pickup_requires_an_owned_trap_within_reach() -> void:
+func test_pickup_succeeds_regardless_of_trap_owner() -> void:
 	var pair := _make_spider()
 	var spider: Node2D = pair[0]
 	var other := Node2D.new()
 	autofree(other)
-	var trap := _make_trap(other) # owned by someone else
+	var trap := _make_trap(other) # laid by someone else entirely
 	trap.global_position = spider.global_position
 
 	var skill := NetHoldSkill.new()
 	add_child_autofree(skill)
 	skill._on_activate(spider)
 
-	assert_false(skill.holding, "can't pick up a trap you didn't place")
+	assert_true(skill.holding, "any trap on the map is eligible, not just ones you placed")
+	assert_true(trap.is_queued_for_deletion())
 
 
-func test_pickup_an_own_trap_within_reach() -> void:
+func test_pickup_a_trap_within_reach() -> void:
 	var pair := _make_spider()
 	var spider: Node2D = pair[0]
 	var trap := _make_trap(spider)
@@ -189,3 +193,37 @@ func test_a_larva_already_caught_elsewhere_is_left_alone_by_the_forward_tile_sca
 	skill._physics_process(0.016)
 
 	assert_true(skill.holding, "an already-caught larva is not stolen by this held trap")
+
+
+func test_activate_returns_false_and_charges_nothing_when_no_trap_in_reach() -> void:
+	var pair := _make_spider()
+	var spider: Node2D = pair[0]
+
+	var skill := NetHoldSkill.new()
+	add_child_autofree(skill)
+
+	var fired := skill.activate(spider)
+
+	assert_false(fired, "nothing to pick up")
+	assert_true(skill.can_activate(), "no cooldown/hunger spent on a no-op — safe to hold the input down")
+
+
+func test_activate_stays_a_noop_while_holding_even_after_cooldown_expires() -> void:
+	var pair := _make_spider()
+	var spider: Node2D = pair[0]
+	var trap := _make_trap(spider)
+	trap.global_position = spider.global_position
+
+	var skill := NetHoldSkill.new()
+	add_child_autofree(skill)
+	assert_true(skill.activate(spider))
+	assert_true(skill.holding)
+	skill._cooldown_left = 0.0 # simulate cooldown having fully expired
+
+	var second_trap := _make_trap(spider)
+	second_trap.global_position = spider.global_position
+
+	var fired_again := skill.activate(spider)
+
+	assert_false(fired_again, "still holding — activate() is a no-op regardless of cooldown")
+	assert_false(second_trap.is_queued_for_deletion(), "second trap untouched while still holding the first")

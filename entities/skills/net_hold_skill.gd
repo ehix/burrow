@@ -1,12 +1,17 @@
 class_name NetHoldSkill
 extends SkillComponent
-## Net-Casting Spider: pick up a placed trap you own and hold it out ahead of
-## you as a mobile hazard (design doc, Net-caster rework). Any larva that
-## steps onto the held trap's forward tile is eaten immediately and the trap
-## is spent. A pre-loaded trap (one that already caught a larva before being
-## picked up) is eaten immediately on pickup instead. No manual drop —
-## holding only ever resolves by eating (here) or by NetShotSkill firing it
-## (spend()).
+## Net-Casting Spider: pick up any placed trap — laid by anyone, ownership
+## doesn't gate pickup — and hold it out ahead of you as a mobile hazard
+## (playtest correction to the Net-caster rework). Any larva that steps onto
+## the held trap's forward tile is eaten immediately and the trap is spent.
+## A pre-loaded trap (one that already caught a larva before being picked
+## up) is eaten immediately on pickup instead. No manual drop — holding only
+## ever resolves by eating (here) or by NetShotSkill firing it (spend()).
+##
+## activate() is overridden (not just _on_activate()) so the caller can hold
+## the input down and call this every physics frame: no cooldown/hunger is
+## spent while already holding or while nothing is in reach — only a real
+## pickup ever costs anything.
 
 @export var reach: float = 48.0
 
@@ -27,6 +32,12 @@ class HeldTrapVisual:
 		draw_colored_polygon(pts, Color(0.75, 0.75, 0.7, 0.85))
 		draw_line(pts[0], pts[2], Color(0.4, 0.4, 0.35), 1.0)
 		draw_line(pts[1], pts[3], Color(0.4, 0.4, 0.35), 1.0)
+
+
+func activate(source: Node) -> bool:
+	if holding or _nearest_ready_trap(source as Node2D) == null:
+		return false
+	return super.activate(source)
 
 
 func _on_activate(source: Node) -> void:
@@ -94,7 +105,7 @@ func _nearest_ready_trap(source: Node2D) -> WebTrap:
 	var best_dist := reach
 	for node in source.get_tree().get_nodes_in_group("traps"):
 		var trap := node as WebTrap
-		if trap == null or trap.spent or trap.owner_spider != source:
+		if trap == null or trap.spent:
 			continue
 		var d := source.global_position.distance_to(trap.global_position)
 		if d <= best_dist:
