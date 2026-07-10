@@ -71,6 +71,37 @@ func test_activate_refuses_when_the_enemy_spider_occupies_the_target_tile() -> v
 	assert_eq(level.get_tree().get_nodes_in_group("blockades").size(), 0, "nothing was placed")
 
 
+func test_activate_refuses_when_the_target_tile_is_already_wall_blocked() -> void:
+	var level := _make_level()
+	var player := level.player as Player
+	var skill := _make_skill()
+	player.facing = Vector2.RIGHT
+	var target_tile := level.tile_of(player.global_position) + Vector2i(1, 0)
+	level.maze.set_wall(target_tile.x, target_tile.y)
+
+	var fired := skill.activate(player)
+
+	assert_false(fired, "can't place a blockade into a wall")
+	assert_eq(level.get_tree().get_nodes_in_group("blockades").size(), 0, "nothing was placed")
+
+
+func test_activate_refuses_when_a_blockade_already_occupies_the_target_tile() -> void:
+	var level := _make_level()
+	var player := level.player as Player
+	var skill := _make_skill()
+	player.facing = Vector2.RIGHT
+	var target_tile := level.tile_of(player.global_position) + Vector2i(1, 0)
+	var existing: Blockade = BlockadeScene.instantiate()
+	add_child_autofree(existing)
+	existing.global_position = level.centre_of(target_tile)
+
+	var fired := skill.activate(player)
+
+	assert_false(fired, "can't stack a second blockade onto an existing one")
+	assert_eq(level.get_tree().get_nodes_in_group("blockades").size(), 1,
+		"only the pre-existing blockade remains — nothing new was added")
+
+
 func test_activate_succeeds_when_the_target_tile_is_clear() -> void:
 	var level := _make_level()
 	var player := level.player as Player
@@ -78,6 +109,9 @@ func test_activate_succeeds_when_the_target_tile_is_clear() -> void:
 	var skill := _make_skill()
 	player.facing = Vector2.RIGHT
 	enemy.global_position = player.global_position + Vector2(1000, 1000) # guaranteed far away — avoids flaking if the maze ever spawns it adjacent
+	var target_tile := level.tile_of(player.global_position) + Vector2i(1, 0)
+	level.maze.set_open(target_tile.x, target_tile.y) # guaranteed open — avoids flaking if the maze ever puts a wall there
+	level.set_pit_at(target_tile, false) # set_open() alone doesn't clear a pre-existing natural pit flag
 
 	var fired := skill.activate(player)
 

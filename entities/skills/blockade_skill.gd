@@ -8,9 +8,10 @@ extends SkillComponent
 ## it for ground traversal, via Level.patch_pit_at — the same mechanism the
 ## ceiling plane already bypasses structurally (see CeilingData).
 ##
-## Can't be placed on top of the enemy spider (activate() refuses outright,
-## charging no cost) — a larva on the target tile is crushed instead and the
-## blockade is placed as normal.
+## Can't be placed on top of the enemy spider, into an already-blocked tile
+## (a wall, a pit, or an existing blockade), or off the edge of the maze
+## (activate() refuses outright, charging no cost) — a larva on the target
+## tile is crushed instead and the blockade is placed as normal.
 ##
 ## `blockade_scene` is a high-durability StaticBody2D — its script must call
 ## `setup(hits_to_destroy)`.
@@ -28,6 +29,8 @@ func activate(source: Node) -> bool:
 		return false
 	var target_tile := _target_tile(origin, level)
 	if _spider_occupies(target_tile, source):
+		return false
+	if level.is_blocked(target_tile, _plane_of(source)):
 		return false
 	return super.activate(source)
 
@@ -71,6 +74,16 @@ func _spider_occupies(tile: Vector2i, source: Node) -> bool:
 		if other_mover != null and other_mover.committed_tile() == tile:
 			return true
 	return false
+
+
+## The plane `source` currently occupies. `Player` tracks this via its
+## PlaneComponent; anything without one (e.g. `Enemy`, which never leaves the
+## ground) is treated as ground-only.
+func _plane_of(source: Node) -> Level.Layer:
+	var plane_component: PlaneComponent = source.get("_plane") if "_plane" in source else null
+	if plane_component != null:
+		return plane_component.current_plane
+	return Level.Layer.GROUND
 
 
 ## A larva standing on the target tile is crushed and killed (not eaten) the
