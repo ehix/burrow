@@ -16,10 +16,12 @@ var caught := false
 var _dead := false
 var _last_dir := Vector2i.RIGHT
 var _base_sprite_scale := Vector2.ONE
+var _base_step_time: float = 0.0
 
 
 func _ready() -> void:
 	add_to_group("larvae")
+	_base_step_time = _mover.step_time
 	_mover.step_finished.connect(_on_step_finished)
 	if _sprite != null:
 		_base_sprite_scale = _sprite.scale
@@ -89,6 +91,7 @@ func _tile_of(world: Vector2) -> Vector2i:
 func nudge_toward(target_position: Vector2) -> void:
 	if caught or _dead or _mover.is_moving() or GameState.freeze_others:
 		return
+	_apply_growth_speed()
 	var to_target := target_position - global_position
 	if to_target.length_squared() < 1.0:
 		return
@@ -99,7 +102,17 @@ func nudge_toward(target_position: Vector2) -> void:
 		rotation = Vector2(dir).angle()
 
 
+## The fatter a larva gets, the slower its max movement speed: layered on
+## GridMover.step_time (never speed_scale, which the temporary web-entangle
+## slow owns exclusively and would otherwise stomp on restore). Only ever
+## called when the mover isn't mid-step (both call sites already guard for
+## that), so this never changes step_time out from under an in-flight lerp.
+func _apply_growth_speed() -> void:
+	_mover.step_time = _base_step_time * growth.size_scale
+
+
 func _wander_step() -> void:
+	_apply_growth_speed()
 	# Prefer any non-reverse direction; fall back to reversing at a dead-end.
 	# A web currently holding a caught larva is a boundary too, like a wall —
 	# even though larvae otherwise pass through webs freely, an occupied web

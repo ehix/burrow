@@ -96,3 +96,31 @@ func test_wander_is_unaffected_by_an_empty_web() -> void:
 	var larva := _make_larva()
 	larva.global_position = Vector2(264, 264) # tile (5,5)
 	assert_false(larva._is_occupied_web(Vector2i(6, 5)), "no trap there at all — not a boundary")
+
+
+func test_step_time_scales_with_growth_at_baseline() -> void:
+	var larva := _make_larva()
+	larva.growth.size_scale = 1.0
+	larva._wander_step()
+	assert_almost_eq(larva._mover.step_time, larva._base_step_time, 0.001)
+
+
+func test_step_time_scales_with_growth_at_a_midpoint() -> void:
+	var larva := _make_larva()
+	larva.growth.size_scale = 1.75
+	larva._wander_step()
+	assert_almost_eq(larva._mover.step_time, larva._base_step_time * 1.75, 0.001)
+
+
+func test_step_time_scales_with_growth_at_the_cap() -> void:
+	var larva := _make_larva()
+	larva.growth.size_scale = 2.5
+	larva._wander_step()
+	assert_almost_eq(larva._mover.step_time, larva._base_step_time * 2.5, 0.001)
+
+
+func test_nudge_toward_also_applies_growth_speed() -> void:
+	var larva := _make_larva()
+	larva.growth.size_scale = 2.0
+	larva.nudge_toward(larva.global_position + Vector2(100, 0))
+	assert_almost_eq(larva._mover.step_time, larva._base_step_time * 2.0, 0.001)
