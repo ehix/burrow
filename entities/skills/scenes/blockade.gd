@@ -46,3 +46,10 @@ func take_hit() -> void:
 	_hits += 1
 	if _hits >= hits_to_destroy:
 		queue_free()
+
+
+## One-shot destruction, bypassing the hits_to_destroy counter entirely —
+## used by RemoveWallsSkill, a single powerful utility action that removes
+## a blockade outright rather than chipping at it like an attack does.
+func destroy() -> void:
+	queue_free()

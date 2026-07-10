@@ -45,3 +45,10 @@ func test_at_tile_returns_null_for_an_empty_tile() -> void:
 	var blockade := _make_blockade()
 	blockade.global_position = Vector2(240, 240) # tile (5,5)
 	assert_null(Blockade.at_tile(get_tree(), Vector2i(9, 9), 48))
+
+
+func test_destroy_frees_the_blockade_regardless_of_hit_count() -> void:
+	var blockade := _make_blockade()
+	blockade.setup(6) # would normally take 6 hits — destroy() bypasses that entirely
+	blockade.destroy()
+	assert_true(blockade.is_queued_for_deletion())
