@@ -49,6 +49,7 @@ func _ready() -> void:
 	EventBus.hazard_triggered.connect(_on_hazard_triggered)
 	EventBus.class_changed.connect(_on_class_changed)
 	EventBus.enemy_class_changed.connect(_on_enemy_class_changed)
+	EventBus.upgrade_purchased.connect(_on_upgrade_purchased)
 	_on_depth_changed(GameState.depth)
 	_update_wins_label()
 	_on_runes_changed(GameState.runes)
@@ -118,8 +119,21 @@ func _on_enemy_class_changed(spider_class: int) -> void:
 ## A world hazard fired (design §7) — a brief toast, same fade pattern as the
 ## round banner.
 func _on_hazard_triggered(hazard_name: String) -> void:
-	hazard_toast_label.text = HAZARD_DISPLAY_NAMES.get(hazard_name, hazard_name)
-	hazard_toast_label.modulate = Color(1, 0.85, 0.4, 1.0)
+	_show_toast(HAZARD_DISPLAY_NAMES.get(hazard_name, hazard_name), Color(1, 0.85, 0.4, 1.0))
+
+
+## A permanent upgrade (design §5) was successfully bought — reuses the same
+## toast the hazards do, since both are brief "something just happened"
+## announcements.
+func _on_upgrade_purchased(upgrade_id: StringName) -> void:
+	var upgrade := UpgradeRegistry.by_id(upgrade_id)
+	var name := upgrade.display_name if upgrade != null else str(upgrade_id)
+	_show_toast("Bought %s!" % name, Color(0.75, 0.9, 1.0, 1.0))
+
+
+func _show_toast(text: String, color: Color) -> void:
+	hazard_toast_label.text = text
+	hazard_toast_label.modulate = color
 	var tween := hazard_toast_label.create_tween()
 	tween.tween_interval(HAZARD_TOAST_HOLD_TIME)
 	tween.tween_property(hazard_toast_label, "modulate:a", 0.0, HAZARD_TOAST_FADE_TIME)

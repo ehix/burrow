@@ -65,6 +65,7 @@ var _active_class: int = SpiderClassData.SpiderClass.WOLF
 var _active_class_data: SpiderClassData
 var _base_melee_damage: float
 var _base_web_cooldown: float
+var _base_hunger_rate: float
 
 
 func _ready() -> void:
@@ -84,7 +85,8 @@ func _ready() -> void:
 	}
 	_base_melee_damage = melee_damage
 	_base_web_cooldown = web_emitter.cooldown
-	apply_class(GameState.selected_class)
+	_base_hunger_rate = hunger.hunger_rate
+	apply_class(GameState.selected_class) # also applies purchased upgrades — see refresh_upgrades()
 	_restore_vitals()
 	health.health_changed.connect(_on_health_changed)
 	health.damaged.connect(func(amount: float) -> void: EventBus.player_damaged.emit(amount))
@@ -145,6 +147,14 @@ func _physics_process(delta: float) -> void:
 		_silk_tunnel.activate(self)
 	if Input.is_action_just_pressed("decoy") and _is_active_skill("decoy"):
 		_decoy.activate(self)
+	if Input.is_action_just_pressed("buy_upgrade_1"):
+		_try_buy_upgrade(0)
+	if Input.is_action_just_pressed("buy_upgrade_2"):
+		_try_buy_upgrade(1)
+	if Input.is_action_just_pressed("buy_upgrade_3"):
+		_try_buy_upgrade(2)
+	if Input.is_action_just_pressed("buy_upgrade_4"):
+		_try_buy_upgrade(3)
 
 
 ## Called by Level right after instancing, mirroring Enemy.bind_level() — lets
@@ -156,19 +166,18 @@ func bind_level(level: Level) -> void:
 
 
 ## Switches which class is active, live (dev tool Q — see World._cycle_class).
-## Recomputes melee/web stats from the base values captured at _ready() so
-## repeated calls (cycling through all four) never compound — each call is
-## relative to the untouched base, not the previous class's already-modified
-## numbers. No-op (falls back to whatever was already active) if `spider_class`
-## isn't a recognised id.
+## Recomputes melee/web/hunger stats via refresh_upgrades() so repeated calls
+## (cycling through all four) never compound — each call is relative to the
+## untouched base, not the previous class's already-modified numbers. No-op
+## (falls back to whatever was already active) if `spider_class` isn't a
+## recognised id.
 func apply_class(spider_class: int) -> void:
 	var data: SpiderClassData = _class_data_by_id.get(spider_class)
 	if data == null:
 		return
 	_active_class = spider_class
 	_active_class_data = data
-	melee_damage = _base_melee_damage * data.melee_damage_mult
-	web_emitter.cooldown = _base_web_cooldown / maxf(0.01, data.web_fire_rate_mult)
+	refresh_upgrades()
 
 
 ## Whether `action`'s skill belongs to the currently active class. Sense and
@@ -176,6 +185,45 @@ func apply_class(spider_class: int) -> void:
 func _is_active_skill(action: String) -> bool:
 	var skills: Array = CLASS_SKILLS.get(_active_class, [])
 	return action in skills
+
+
+## Recomputes melee damage, web cooldown, hunger rate, and max health from
+## their pristine _base_* values plus every purchased upgrade's effect
+## (design §5), then the active class's multipliers on top — idempotent, so
+## calling it again after a live purchase or a class switch never compounds
+## on top of a previous call's result. GameState.purchased_upgrades is
+## session-long, like the rest of GameState's dev-adjacent state.
+func refresh_upgrades() -> void:
+	var mult := _active_class_data.melee_damage_mult if _active_class_data != null else 1.0
+	var fire_mult := _active_class_data.web_fire_rate_mult if _active_class_data != null else 1.0
+	melee_damage = (_base_melee_damage + _upgrade_bonus("melee_damage")) * mult
+	web_emitter.cooldown = maxf(0.05, (_base_web_cooldown + _upgrade_bonus("web_fire_rate")) / maxf(0.01, fire_mult))
+	hunger.hunger_rate = maxf(0.1, _base_hunger_rate + _upgrade_bonus("hunger_rate"))
+	health.set_max_health(GameState.DEFAULT_MAX_HEALTH + _upgrade_bonus("max_health"), false)
+
+
+## `stat` is a plain String, matching UpgradeCatalog.effect_stat's own type
+## exactly (an @export_enum String) — avoids any doubt about String vs.
+## StringName comparison semantics.
+func _upgrade_bonus(stat: String) -> float:
+	var total := 0.0
+	for id in GameState.purchased_upgrades:
+		var upgrade := UpgradeRegistry.by_id(id)
+		if upgrade != null and upgrade.effect_stat == stat:
+			total += upgrade.effect_amount
+	return total
+
+
+## Attempts to buy the Nth authored upgrade (keys 1-4). Charges runes via
+## GameState.buy_upgrade() (the only spend path); on success, refreshes this
+## spider's stats immediately rather than waiting for the next level.
+func _try_buy_upgrade(index: int) -> void:
+	if index < 0 or index >= UpgradeRegistry.ALL.size():
+		return
+	var upgrade := UpgradeRegistry.ALL[index]
+	if GameState.buy_upgrade(upgrade):
+		refresh_upgrades()
+		EventBus.upgrade_purchased.emit(upgrade.upgrade_id)
 
 
 ## Blocking seam for the GridMover: the noclip dev toggle passes through walls.
@@ -321,8 +369,10 @@ func store_vitals() -> void:
 	GameState.store_player_vitals(health.current_health, hunger.current_hunger)
 
 
+## health.max_health is already set by refresh_upgrades() (called via
+## apply_class() earlier in _ready()) — this only restores current
+## health/hunger against that already-upgrade-aware ceiling.
 func _restore_vitals() -> void:
-	health.max_health = GameState.DEFAULT_MAX_HEALTH
 	if GameState.has_carried_vitals():
 		health.current_health = clampf(GameState.carried_health, 0.0, health.max_health)
 		hunger.current_hunger = clampf(GameState.carried_hunger, 0.0, hunger.max_hunger)

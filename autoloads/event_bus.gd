@@ -36,6 +36,10 @@ signal depth_changed(depth: int)
 ## GameState.runes changed (earned or spent). Design §5: Economy.
 signal runes_changed(total: int)
 
+## A permanent upgrade (design §5) was successfully purchased via the
+## buy_upgrade_N dev keys. `upgrade_id` matches UpgradeCatalog.upgrade_id.
+signal upgrade_purchased(upgrade_id: StringName)
+
 ## `who` switched between Level.Layer.GROUND and Level.Layer.CEILING (design
 ## §1: Dual-Plane Map Architecture). `plane` is a Level.Layer value.
 signal plane_changed(who: Node, plane: int)

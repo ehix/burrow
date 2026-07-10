@@ -52,7 +52,19 @@ func _ready() -> void:
 	_add_one_shot(root, "Silk Tunnel (I)", "silk_tunnel")
 	_add_one_shot(root, "Decoy (Z)", "decoy")
 	_add_one_shot(root, "Cycle Class (Q)", "cycle_class")
+	_add_upgrade_rows(root)
 	_add_held(root, "Paused (Esc)", func() -> bool: return get_tree().paused)
+
+
+## One row per authored upgrade (design §5), showing its name/cost next to
+## the key that buys it — the only place these are listed, since there's no
+## separate shop UI.
+func _add_upgrade_rows(root: VBoxContainer) -> void:
+	var actions := ["buy_upgrade_1", "buy_upgrade_2", "buy_upgrade_3", "buy_upgrade_4"]
+	for i in UpgradeRegistry.ALL.size():
+		var upgrade := UpgradeRegistry.ALL[i]
+		var text := "Buy %s — %dr (%d)" % [upgrade.display_name, upgrade.rune_cost, i + 1]
+		_add_one_shot(root, text, actions[i])
 
 
 func _add_held(root: VBoxContainer, text: String, check: Callable) -> void:
