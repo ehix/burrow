@@ -424,6 +424,7 @@ func _spawn_larva_at(cell: Vector2i) -> void:
 	var larva := LarvaScene.instantiate()
 	larva.position = _tile_centre(cell.x, cell.y)
 	_entities.add_child(larva)
+	larva.bind_level(self)
 	if larva.has_method("set_facing"):
 		larva.set_facing(TileTypes.default_facing(maze.classify(cell.x, cell.y)))
 
