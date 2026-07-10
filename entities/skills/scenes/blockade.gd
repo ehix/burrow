@@ -42,8 +42,14 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(-half, -half), Vector2(half, half) * 2.0), Color(0.35, 0.25, 0.15, 0.95))
 
 
-func take_hit() -> void:
+## `hit_direction` nudges the blockade a few pixels that way and slides it
+## back (CombatFx.shunt) — the same "bump" idiom Player/Larva use elsewhere —
+## so a hit visibly registers even though the blockade doesn't otherwise
+## react. Defaults to no direction (no visible nudge) for callers that don't
+## have one to hand.
+func take_hit(hit_direction: Vector2 = Vector2.ZERO) -> void:
 	_hits += 1
+	CombatFx.shunt(self, hit_direction * 5.0)
 	if _hits >= hits_to_destroy:
 		queue_free()
 
