@@ -10,6 +10,11 @@ class FakeSpider:
 	var facing := Vector2.RIGHT
 
 
+class FakeCaughtLarva:
+	extends Node2D
+	var caught := true
+
+
 func _make_spider(hunger_value: float = 50.0) -> Array:
 	var spider := FakeSpider.new()
 	add_child_autofree(spider)
@@ -163,3 +168,24 @@ func test_cannot_pick_up_a_second_trap_while_already_holding() -> void:
 	skill._on_activate(spider)
 
 	assert_false(second_trap.is_queued_for_deletion(), "already holding — the second trap stays on the ground")
+
+
+func test_a_larva_already_caught_elsewhere_is_left_alone_by_the_forward_tile_scan() -> void:
+	var pair := _make_spider()
+	var spider: Node2D = pair[0]
+	var trap := _make_trap(spider)
+	trap.global_position = spider.global_position
+
+	var skill := NetHoldSkill.new()
+	add_child_autofree(skill)
+	skill._on_activate(spider)
+	assert_true(skill.holding)
+
+	var larva := FakeCaughtLarva.new()
+	larva.add_to_group("larvae")
+	add_child_autofree(larva)
+	larva.global_position = spider.global_position + Vector2.RIGHT * 48.0
+
+	skill._physics_process(0.016)
+
+	assert_true(skill.holding, "an already-caught larva is not stolen by this held trap")

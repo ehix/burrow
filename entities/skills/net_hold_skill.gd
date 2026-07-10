@@ -65,6 +65,8 @@ func _physics_process(_delta: float) -> void:
 		var larva := node as Node2D
 		if larva == null:
 			continue
+		if "caught" in larva and larva.caught:
+			continue
 		if larva.global_position.distance_to(forward) <= catch_radius:
 			_eat(larva, _holder)
 			holding = false
