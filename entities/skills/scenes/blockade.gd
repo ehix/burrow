@@ -18,6 +18,21 @@ func setup(hits: int) -> void:
 	hits_to_destroy = hits
 
 
+## The live Blockade sitting on `tile`, or null. Returns the node (not just a
+## bool) so a caller that needs to act on it (RemoveWallsSkill destroying it,
+## Task 3) doesn't have to re-scan the group a second time.
+static func at_tile(tree: SceneTree, tile: Vector2i, tile_size: int) -> Blockade:
+	var ts := float(tile_size)
+	for node in tree.get_nodes_in_group("blockades"):
+		var blockade := node as Blockade
+		if blockade == null:
+			continue
+		var blockade_tile := Vector2i(int(floorf(blockade.global_position.x / ts)), int(floorf(blockade.global_position.y / ts)))
+		if blockade_tile == tile:
+			return blockade
+	return null
+
+
 func _ready() -> void:
 	add_to_group("blockades")
 
@@ -27,7 +42,20 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(-half, -half), Vector2(half, half) * 2.0), Color(0.35, 0.25, 0.15, 0.95))
 
 
-func take_hit() -> void:
+## `hit_direction` nudges the blockade a few pixels that way and slides it
+## back (CombatFx.shunt) — the same "bump" idiom Player/Larva use elsewhere —
+## so a hit visibly registers even though the blockade doesn't otherwise
+## react. Defaults to no direction (no visible nudge) for callers that don't
+## have one to hand.
+func take_hit(hit_direction: Vector2 = Vector2.ZERO) -> void:
 	_hits += 1
+	CombatFx.shunt(self, hit_direction * 5.0)
 	if _hits >= hits_to_destroy:
 		queue_free()
+
+
+## One-shot destruction, bypassing the hits_to_destroy counter entirely —
+## used by RemoveWallsSkill, a single powerful utility action that removes
+## a blockade outright rather than chipping at it like an attack does.
+func destroy() -> void:
+	queue_free()

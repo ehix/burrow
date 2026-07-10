@@ -118,7 +118,9 @@ func _physics_process(delta: float) -> void:
 		_mover.cancel_buffer()
 
 	if Input.is_action_pressed("fire") and _active_class_data != null and _active_class_data.web_enabled:
-		web_emitter.fire(global_position, facing, self)
+		var shot := web_emitter.fire(global_position, facing, self, _active_class_data.web_projectile_speed_mult)
+		if shot != null and _active_class_data.web_fire_health_cost > 0.0:
+			health.take_damage(_active_class_data.web_fire_health_cost)
 	if Input.is_action_just_pressed("place_trap"):
 		trap_placer.place(global_position, self)
 	if Input.is_action_just_pressed("melee"):
@@ -185,6 +187,7 @@ func apply_class(spider_class: int) -> void:
 	_active_class = spider_class
 	_active_class_data = data
 	refresh_upgrades()
+	_update_sprite_tint()
 
 
 ## Whether `action`'s skill belongs to the currently active class. Sense and
@@ -260,8 +263,19 @@ func _blocked(dir: Vector2i) -> bool:
 
 ## Visual cue for which plane the player currently occupies — a dim,
 ## cool-toned tint on the ceiling, restored to normal on the ground.
-func _on_plane_changed(plane: Level.Layer) -> void:
-	sprite.modulate = Color(0.55, 0.65, 0.85, 0.85) if plane == Level.Layer.CEILING else Color.WHITE
+func _on_plane_changed(_plane_arg: Level.Layer) -> void:
+	_update_sprite_tint()
+
+
+## The sprite's tint is the active class's color, dimmed/cooled by the
+## ceiling tint on top when on the ceiling plane — the two effects compose
+## instead of one clobbering the other.
+func _update_sprite_tint() -> void:
+	var base := _active_class_data.display_color if _active_class_data != null else Color.WHITE
+	if _plane.current_plane == Level.Layer.CEILING:
+		sprite.modulate = base * Color(0.55, 0.65, 0.85, 0.85)
+	else:
+		sprite.modulate = base
 
 
 ## SenseSkill (and FungusSenseItem) both just apply a timed "sense" tag on
@@ -311,12 +325,15 @@ func _melee() -> void:
 			larva.web_kill()
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
-	for node in get_tree().get_nodes_in_group("blockades"):
-		var blockade := node as Node2D
-		if blockade == null or blockade.global_position.distance_to(target) > melee_range:
-			continue
-		if blockade.has_method("take_hit"):
-			blockade.take_hit()
+	# Exact-tile lookup, not a distance threshold: melee_range (60px) also
+	# reaches an orthogonally-adjacent tile (48px away), so with two
+	# blockades placed side by side the old distance check matched both and
+	# hit whichever the group happened to enumerate first — not necessarily
+	# the one actually being swung at.
+	var target_tile := _mover.committed_tile() + Vector2i(int(facing.x), int(facing.y))
+	var blockade := Blockade.at_tile(get_tree(), target_tile, _mover.tile_size)
+	if blockade != null:
+		blockade.take_hit(facing)
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
 	for node in get_tree().get_nodes_in_group("earthworms"):
@@ -365,10 +382,18 @@ func apply_web_hit(push_dir: Vector2i, factor: float, slow_duration: float, stun
 		return
 	if push_dir != Vector2i.ZERO:
 		_mover.knockback(push_dir)
-	if factor < 1.0:
+	if factor < 1.0 and not _is_weaver():
 		_mover.apply_slow(factor, slow_duration)
 	if stun_duration > 0.0:
 		_mover.stun(stun_duration)
+
+
+## Weavers never get slowed by a web (design: playtest correction) — this
+## does not extend to Blockade, which is a hard physical collider that
+## never goes through apply_web_hit() at all.
+func _is_weaver() -> bool:
+	return _active_class_data != null \
+		and _active_class_data.spider_class == SpiderClassData.SpiderClass.WEAVER
 
 
 ## Snapshot vitals into GameState before the level is freed on descent.

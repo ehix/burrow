@@ -6,6 +6,7 @@
 script = ExtResource("1_data")
 spider_class = 1
 display_name = "Wolf Spider"
+display_color = Color(0.85, 0.4, 0.25, 1.0)
 melee_damage_mult = 1.0
 web_enabled = true
 web_fire_rate_mult = 1.0

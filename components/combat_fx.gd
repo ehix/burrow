@@ -33,13 +33,16 @@ class SlashVisual:
 		draw_arc(Vector2.ZERO, radius, angle - spread, angle + spread, 8, SLASH_COLOR, 3.0)
 
 
-## Pulse `sprite` red, then fade back to white. No-op if it can't tween yet.
+## Pulse `sprite` red, then fade back to whatever tint it actually had before
+## the flash (a class color, possibly ceiling-dimmed) — never a hardcoded
+## white, or per-class sprite tinting would visibly break on every hit.
 static func flash(sprite: CanvasItem) -> void:
 	if sprite == null or not sprite.is_inside_tree():
 		return
+	var restore := sprite.modulate
 	sprite.modulate = FLASH_COLOR
 	var tween := sprite.create_tween()
-	tween.tween_property(sprite, "modulate", Color.WHITE, FLASH_TIME)
+	tween.tween_property(sprite, "modulate", restore, FLASH_TIME)
 
 
 ## Nudge `sprite` by `offset` pixels (in its parent's space) and slide it back

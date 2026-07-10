@@ -33,3 +33,40 @@ func test_destroyed_on_the_nth_hit() -> void:
 func test_is_on_the_world_collision_layer_so_it_blocks_like_a_wall() -> void:
 	var blockade := _make_blockade()
 	assert_eq(blockade.collision_layer, 1)
+
+
+func test_at_tile_finds_a_blockade_on_the_given_tile() -> void:
+	var blockade := _make_blockade()
+	blockade.global_position = Vector2(240, 240) # tile (5,5)
+	assert_eq(Blockade.at_tile(get_tree(), Vector2i(5, 5), 48), blockade)
+
+
+func test_at_tile_returns_null_for_an_empty_tile() -> void:
+	var blockade := _make_blockade()
+	blockade.global_position = Vector2(240, 240) # tile (5,5)
+	assert_null(Blockade.at_tile(get_tree(), Vector2i(9, 9), 48))
+
+
+func test_destroy_frees_the_blockade_regardless_of_hit_count() -> void:
+	var blockade := _make_blockade()
+	blockade.setup(6) # would normally take 6 hits — destroy() bypasses that entirely
+	blockade.destroy()
+	assert_true(blockade.is_queued_for_deletion())
+
+
+func test_take_hit_bumps_the_blockade_in_the_hit_direction() -> void:
+	var blockade := _make_blockade()
+	blockade.setup(6)
+	var rest := blockade.position
+	blockade.take_hit(Vector2.RIGHT)
+	assert_eq(blockade.position, rest + Vector2.RIGHT * 5.0,
+		"nudges immediately in the hit direction — visual confirmation of the hit landing")
+
+
+func test_take_hit_bump_settles_back_to_rest_after_a_moment() -> void:
+	var blockade := _make_blockade()
+	blockade.setup(6)
+	var rest := blockade.position
+	blockade.take_hit(Vector2.RIGHT)
+	await get_tree().create_timer(CombatFx.SHUNT_TIME + 0.05).timeout
+	assert_eq(blockade.position, rest, "settles back to its rest position after the bump")

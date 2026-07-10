@@ -13,8 +13,9 @@ func _make_player() -> Player:
 
 func test_apply_web_hit_alone_does_not_flash() -> void:
 	var player := _make_player()
+	var before := player.sprite.modulate
 	player.apply_web_hit(Vector2i.ZERO, 0.5, 1.5, 0.0) # a pure web-crossing slow
-	assert_eq(player.sprite.modulate, Color.WHITE, "a status effect alone must not flash")
+	assert_eq(player.sprite.modulate, before, "a status effect alone must not flash")
 
 
 func test_actual_damage_still_flashes() -> void:

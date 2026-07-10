@@ -6,7 +6,9 @@
 script = ExtResource("1_data")
 spider_class = 3
 display_name = "Decoy"
+display_color = Color(0.65, 0.45, 0.85, 1.0)
 melee_damage_mult = 0.6
 web_enabled = true
 web_fire_rate_mult = 1.5
 web_projectile_speed_mult = 1.4
+web_fire_health_cost = 4.0

@@ -10,6 +10,9 @@ enum SpiderClass { NET_CASTER, WOLF, WEAVER, DECOY }
 
 @export var spider_class: SpiderClass
 @export var display_name: String = ""
+## Sprite tint while this class is active — Player.apply_class()/
+## Enemy._apply_class() apply it to the spider's sprite.
+@export var display_color: Color = Color.WHITE
 ## Ambush/Melee focus (Net-Caster, Weaver) multiplies this up; Ranged focus
 ## (Decoy) multiplies it down. 1.0 = the slice-1 baseline.
 @export var melee_damage_mult: float = 1.0
@@ -18,6 +21,9 @@ enum SpiderClass { NET_CASTER, WOLF, WEAVER, DECOY }
 @export var web_enabled: bool = true
 @export var web_fire_rate_mult: float = 1.0
 @export var web_projectile_speed_mult: float = 1.0
+## Direct health cost to the shooter on a successful fire (0.0 = free, the
+## default for every class but Decoy).
+@export var web_fire_health_cost: float = 0.0
 ## Skill scenes this class can activate, in kit order. Each scene's root
 ## script must extend SkillComponent.
 @export var skill_scenes: Array[PackedScene] = []

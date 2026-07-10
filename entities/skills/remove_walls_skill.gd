@@ -17,6 +17,10 @@ func _on_activate(source: Node) -> void:
 		return
 	var facing: Vector2 = source.get("facing") if "facing" in source else Vector2.RIGHT
 	var target := level.tile_of(mover.global_position + facing * float(Level.TILE_SIZE))
+	var blockade := Blockade.at_tile(source.get_tree(), target, Level.TILE_SIZE)
+	if blockade != null:
+		blockade.destroy()
+		return
 	if level.is_boundary(target):
 		return  # guardrail: the outer wall can never be destroyed this way
 	level.dev_remove_wall_at(target)  # same carve mechanism, boundary-gated here

@@ -6,6 +6,7 @@
 script = ExtResource("1_data")
 spider_class = 0
 display_name = "Net-Caster"
+display_color = Color(0.85, 0.75, 0.35, 1.0)
 melee_damage_mult = 1.6
 web_enabled = false
 web_fire_rate_mult = 1.0

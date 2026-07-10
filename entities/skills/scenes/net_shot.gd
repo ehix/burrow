@@ -56,7 +56,7 @@ func _on_body_entered(body: Node2D) -> void:
 	if body is WebTrap:
 		(body as WebTrap).take_web_hit()
 	elif body is Blockade:
-		(body as Blockade).take_hit()
+		(body as Blockade).take_hit(_velocity.normalized())
 	elif body.is_in_group("larvae"):
 		if _skill != null:
 			_skill.resolve_larva_hit(_source, body, global_position)

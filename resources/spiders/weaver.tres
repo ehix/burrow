@@ -6,6 +6,7 @@
 script = ExtResource("1_data")
 spider_class = 2
 display_name = "Weaver"
+display_color = Color(0.4, 0.75, 0.45, 1.0)
 melee_damage_mult = 1.2
 web_enabled = true
 web_fire_rate_mult = 0.8
