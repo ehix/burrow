@@ -30,7 +30,7 @@ extends CharacterBody2D
 ## not yet wired onto Player/Enemy for real class selection), just a kitchen
 ## -sink loadout so each skill can actually be exercised in a running game.
 @onready var _net_hold: NetHoldSkill = $NetHoldSkill
-@onready var _net_projectile: NetProjectileSkill = $NetProjectileSkill
+@onready var _net_shot: NetShotSkill = $NetShotSkill
 @onready var _hatchlings: HatchlingsSkill = $HatchlingsSkill
 @onready var _egg_mine: EggMineSkill = $EggMineSkill
 @onready var _blockade: BlockadeSkill = $BlockadeSkill
@@ -50,7 +50,7 @@ const DecoyData: SpiderClassData = preload("res://resources/spiders/decoy.tres")
 ## Remove Walls are general utilities (design §4), not class-locked, so they
 ## aren't in this map at all and always respond regardless of active class.
 const CLASS_SKILLS := {
-	0: ["net_hold", "net_projectile"],     # SpiderClassData.SpiderClass.NET_CASTER
+	0: ["net_hold", "net_shot"],           # SpiderClassData.SpiderClass.NET_CASTER
 	1: ["hatchlings", "egg_mine"],         # .WOLF
 	2: ["blockade", "silk_tunnel"],        # .WEAVER
 	3: ["camouflage", "decoy"],            # .DECOY
@@ -77,6 +77,7 @@ func _ready() -> void:
 	_plane.plane_changed.connect(_on_plane_changed)
 	_status.effect_applied.connect(_on_effect_applied)
 	_status.effect_expired.connect(_on_effect_expired)
+	_net_shot.net_hold = _net_hold
 	_class_data_by_id = {
 		SpiderClassData.SpiderClass.NET_CASTER: NetCasterData,
 		SpiderClassData.SpiderClass.WOLF: WolfData,
@@ -135,8 +136,8 @@ func _physics_process(delta: float) -> void:
 		_camouflage.activate(self)
 	if Input.is_action_just_pressed("net_hold") and _is_active_skill("net_hold"):
 		_net_hold.activate(self)
-	if Input.is_action_just_pressed("net_projectile") and _is_active_skill("net_projectile"):
-		_net_projectile.activate(self)
+	if Input.is_action_just_pressed("net_shot") and _is_active_skill("net_shot"):
+		_net_shot.activate(self)
 	if Input.is_action_just_pressed("hatchlings") and _is_active_skill("hatchlings"):
 		_hatchlings.activate(self)
 	if Input.is_action_just_pressed("egg_mine") and _is_active_skill("egg_mine"):
