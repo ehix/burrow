@@ -17,14 +17,37 @@ var _dead := false
 var _last_dir := Vector2i.RIGHT
 var _base_sprite_scale := Vector2.ONE
 var _base_step_time: float = 0.0
+var _level: Level
 
 
 func _ready() -> void:
 	add_to_group("larvae")
 	_base_step_time = _mover.step_time
 	_mover.step_finished.connect(_on_step_finished)
+	_mover.block_check = _blocked
 	if _sprite != null:
 		_base_sprite_scale = _sprite.scale
+
+
+## Called by Level right after instancing, mirroring Player/Enemy/Earthworm's
+## own bind_level() — lets the larva's blocking check resolve pit/water
+## hazards without the maze data being handed to it directly.
+func bind_level(level: Level) -> void:
+	_level = level
+
+
+## Blocking seam for GridMover: a pit or flood tile stops a larva exactly
+## like a wall does (Player._blocked()'s ground-plane check, unchanged and
+## reused here) — larvae have no plane/noclip/spider-contest concerns, so
+## this is the ground-only branch of that same pattern. Falls through to
+## the physical test_move check when _level is null (a bare Larva never
+## bound to a level, as some tests construct it).
+func _blocked(dir: Vector2i) -> bool:
+	if _level != null:
+		var target := _level.tile_of(global_position) + dir
+		if _level.is_blocked(target, Level.Layer.GROUND):
+			return true
+	return test_move(global_transform, Vector2(dir) * float(_mover.tile_size))
 
 
 ## Hunger satiated / health restored when this larva is eaten right now
