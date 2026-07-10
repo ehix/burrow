@@ -18,6 +18,21 @@ func setup(hits: int) -> void:
 	hits_to_destroy = hits
 
 
+## The live Blockade sitting on `tile`, or null. Returns the node (not just a
+## bool) so a caller that needs to act on it (RemoveWallsSkill destroying it,
+## Task 3) doesn't have to re-scan the group a second time.
+static func at_tile(tree: SceneTree, tile: Vector2i, tile_size: int) -> Blockade:
+	var ts := float(tile_size)
+	for node in tree.get_nodes_in_group("blockades"):
+		var blockade := node as Blockade
+		if blockade == null:
+			continue
+		var blockade_tile := Vector2i(int(floorf(blockade.global_position.x / ts)), int(floorf(blockade.global_position.y / ts)))
+		if blockade_tile == tile:
+			return blockade
+	return null
+
+
 func _ready() -> void:
 	add_to_group("blockades")
 

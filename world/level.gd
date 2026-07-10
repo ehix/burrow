@@ -224,6 +224,8 @@ func is_boundary(tile: Vector2i) -> bool:
 func is_blocked(tile: Vector2i, plane: Layer) -> bool:
 	if maze == null:
 		return true
+	if Blockade.at_tile(get_tree(), tile, TILE_SIZE) != null:
+		return true
 	if plane == Layer.CEILING:
 		return ceiling.is_blocked(tile.x, tile.y)
 	return maze.is_ground_blocked(tile.x, tile.y)

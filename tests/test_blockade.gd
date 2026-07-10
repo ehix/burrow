@@ -33,3 +33,15 @@ func test_destroyed_on_the_nth_hit() -> void:
 func test_is_on_the_world_collision_layer_so_it_blocks_like_a_wall() -> void:
 	var blockade := _make_blockade()
 	assert_eq(blockade.collision_layer, 1)
+
+
+func test_at_tile_finds_a_blockade_on_the_given_tile() -> void:
+	var blockade := _make_blockade()
+	blockade.global_position = Vector2(240, 240) # tile (5,5)
+	assert_eq(Blockade.at_tile(get_tree(), Vector2i(5, 5), 48), blockade)
+
+
+func test_at_tile_returns_null_for_an_empty_tile() -> void:
+	var blockade := _make_blockade()
+	blockade.global_position = Vector2(240, 240) # tile (5,5)
+	assert_null(Blockade.at_tile(get_tree(), Vector2i(9, 9), 48))
