@@ -87,6 +87,30 @@ func test_melee_costs_hunger_when_it_lands_on_a_blockade() -> void:
 		"a landed hit on a blockade costs hunger like any other landed melee hit")
 
 
+func test_melee_hits_only_the_intended_blockade_not_an_adjacent_one() -> void:
+	# Playtest bug: with two blockades on adjacent tiles, meleeing the near
+	# one could instead land on the far one — melee_range (60px) also covers
+	# an orthogonally-adjacent tile (48px away), so the old distance-based
+	# check matched both and picked whichever the group enumerated first.
+	# far_blockade is created first so it enumerates first, reproducing the
+	# bug against the old code (the actual placement order in the reported
+	# scenario doesn't matter — this just forces the ambiguous case).
+	var player := _make_player()
+	var far_blockade := Blockade.new()
+	add_child_autofree(far_blockade)
+	far_blockade.setup(3)
+	far_blockade.global_position = Vector2(596, 500) # two tiles ahead
+	var near_blockade := Blockade.new()
+	add_child_autofree(near_blockade)
+	near_blockade.setup(3)
+	near_blockade.global_position = Vector2(548, 500) # one tile ahead — the actual target
+
+	player._melee()
+
+	assert_eq(near_blockade._hits, 1, "the intended, targeted blockade takes the hit")
+	assert_eq(far_blockade._hits, 0, "an adjacent blockade one tile further is untouched")
+
+
 func test_melee_always_spawns_the_slash_regardless_of_hit() -> void:
 	var player := _make_player() # nothing in range: a whiff
 	var holder := Node2D.new()

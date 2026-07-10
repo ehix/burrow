@@ -325,12 +325,15 @@ func _melee() -> void:
 			larva.web_kill()
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
-	for node in get_tree().get_nodes_in_group("blockades"):
-		var blockade := node as Node2D
-		if blockade == null or blockade.global_position.distance_to(target) > melee_range:
-			continue
-		if blockade.has_method("take_hit"):
-			blockade.take_hit(facing)
+	# Exact-tile lookup, not a distance threshold: melee_range (60px) also
+	# reaches an orthogonally-adjacent tile (48px away), so with two
+	# blockades placed side by side the old distance check matched both and
+	# hit whichever the group happened to enumerate first — not necessarily
+	# the one actually being swung at.
+	var target_tile := _mover.committed_tile() + Vector2i(int(facing.x), int(facing.y))
+	var blockade := Blockade.at_tile(get_tree(), target_tile, _mover.tile_size)
+	if blockade != null:
+		blockade.take_hit(facing)
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
 	for node in get_tree().get_nodes_in_group("earthworms"):
