@@ -34,10 +34,12 @@ var noclip := false
 var freeze_others := false
 
 ## Narrower than freeze_others: halts only the enemy's own AI decisions
-## (movement, chasing, attacking, skill use). Larvae and hazards are
-## untouched, so catch-system testing (Playtest Mode, below) sees them
-## behaving exactly as in live play. Set by playtest_mode, below; not bound
-## to its own key.
+## (movement, chasing, attacking, skill use) and its hunger (no growth, no
+## starvation drain, exempt from the metabolic action-cost tax other spiders'
+## actions charge it — see HungerComponent._is_enemy_owned()). Larvae and
+## hazards are untouched, so catch-system testing (Playtest Mode, below)
+## sees them behaving exactly as in live play. Set by playtest_mode, below;
+## not bound to its own key.
 var freeze_enemy := false
 
 ## Dev tool (G): freezes the player's health and hunger — no incoming damage,

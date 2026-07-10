@@ -62,5 +62,20 @@ not a lock. A player can still hand-tune with J/G after enabling it.
   aren't stopped by `freeze_others`) is **not** touched here — it's
   irrelevant to Playtest Mode (which doesn't set `freeze_others`) and touching
   it would be an unrelated fix outside this request.
-- No changes to `HealthComponent`/`HungerComponent` — `god_mode` already
-  covers full invulnerability + no hunger for the player.
+- No changes to `HealthComponent` — the enemy's ability to *receive* damage
+  stays live (see "explicitly not suppressed" above); only its own hunger and
+  AI are paused.
+
+## Follow-up (same day)
+
+First playtest of the above surfaced a gap: `freeze_enemy` halted the
+enemy's AI but not its `HungerComponent`, a sibling node ticking on its own
+`_process` — so a frozen enemy's hunger kept rising (and could still starve
+it to death, firing a live `enemy_defeated`) while "frozen." Fixed by scoping
+`HungerComponent.tick()`/`add()` to `freeze_enemy` the same way they're
+already scoped to `god_mode` for the player: a new `_is_enemy_owned()` check
+(mirrors `_is_player_owned()`, keyed off the `"enemy"` group). Also closed a
+second path to the same bug: `HungerComponent.charge_all`'s starving
+fail-safe drains health directly rather than going through `add()`, so it
+needed its own `freeze_enemy` exemption in the loop rather than inheriting
+`add()`'s guard for free.

@@ -47,6 +47,8 @@ func _process(delta: float) -> void:
 func tick(delta: float) -> void:
 	if GameState.god_mode and _is_player_owned():
 		return
+	if GameState.freeze_enemy and _is_enemy_owned():
+		return
 	if current_hunger < max_hunger:
 		current_hunger = minf(max_hunger, current_hunger + hunger_rate * delta)
 		hunger_changed.emit(current_hunger, max_hunger)
@@ -84,6 +86,8 @@ func add(amount: float) -> void:
 		return
 	if GameState.god_mode and _is_player_owned():
 		return
+	if GameState.freeze_enemy and _is_enemy_owned():
+		return
 	current_hunger = minf(max_hunger, current_hunger + amount)
 	hunger_changed.emit(current_hunger, max_hunger)
 
@@ -97,6 +101,11 @@ static func charge_all(tree: SceneTree, amount: float) -> void:
 	if tree == null or amount <= 0.0:
 		return
 	for spider in tree.get_nodes_in_group("spiders"):
+		# A frozen enemy (Playtest Mode) is exempt even here: charge_all's
+		# starving fail-safe drains health directly, bypassing add()'s own
+		# freeze_enemy guard below, so it needs its own check.
+		if GameState.freeze_enemy and spider.is_in_group("enemy"):
+			continue
 		var hunger: HungerComponent = null
 		var health: HealthComponent = null
 		for child in spider.get_children():
@@ -125,6 +134,14 @@ func fraction() -> float:
 func _is_player_owned() -> bool:
 	var parent := get_parent()
 	return parent != null and parent.is_in_group("player")
+
+
+## Playtest Mode's freeze_enemy (0) is scoped to the enemy the same way
+## god_mode is scoped to the player: check the owner's group, so a future
+## second enemy (if ever added) isn't accidentally caught by a broad flag.
+func _is_enemy_owned() -> bool:
+	var parent := get_parent()
+	return parent != null and parent.is_in_group("enemy")
 
 
 func _find_sibling_health() -> HealthComponent:
