@@ -69,7 +69,7 @@ func test_set_caught_stops_a_mid_flight_step_from_dragging_it_off_centre() -> vo
 	var larva := _make_larva()
 	larva.global_position = Vector2(500, 500)
 	larva._mover.try_step(Vector2i.RIGHT)
-	larva._mover.tick(0.05) # partway through the 0.34s step
+	larva._mover.tick(0.05) # partway through the 0.5s step
 	larva.set_caught(Vector2(700, 700)) # a trap snaps it to its centre mid-step
 	larva._mover.tick(0.1) # further frames must not drag it back off that position
 	assert_eq(larva.global_position, Vector2(700, 700),
