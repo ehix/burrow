@@ -23,3 +23,6 @@ mono_crash.*.json
 # OS / editor cruft
 .DS_Store
 Thumbs.db
+
+# Claude Code local session/tooling state (worktrees, job scratch dirs, local settings)
+.claude/
