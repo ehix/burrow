@@ -272,6 +272,17 @@ func _update_state() -> void:
 
 # --- per-state behaviour ------------------------------------------------------
 
+## Fires along `direction` with the active class's projectile-speed
+## multiplier, then charges its fire-health-cost (Decoy) if any — shared by
+## both _do_chase() and _fight_back() so the class-multiplier/health-cost
+## logic lives in exactly one place.
+func _fire_web(direction: Vector2) -> void:
+	var speed_mult := _active_class_data.web_projectile_speed_mult if _active_class_data != null else 1.0
+	var shot := web_emitter.fire(global_position, direction, self, speed_mult)
+	if shot != null and _active_class_data != null and _active_class_data.web_fire_health_cost > 0.0:
+		health.take_damage(_active_class_data.web_fire_health_cost)
+
+
 func _do_chase() -> void:
 	if _current_target == null or not is_instance_valid(_current_target):
 		return
@@ -283,7 +294,7 @@ func _do_chase() -> void:
 	if to_target.length() <= melee_range:
 		_melee_target(_current_target, to_target)
 	elif to_target.length() <= attack_range and _web_enabled() and _has_line_of_sight(_current_target.global_position):
-		web_emitter.fire(global_position, to_target, self)
+		_fire_web(to_target)
 
 
 func _do_seek_food() -> void:
@@ -354,7 +365,7 @@ func _fight_back() -> void:
 	if to_player.length() <= melee_range:
 		_melee_target(_player, to_player)
 	elif to_player.length() <= attack_range and _web_enabled() and _has_line_of_sight(_player.global_position):
-		web_emitter.fire(global_position, to_player, self)
+		_fire_web(to_player)
 
 
 func _web_enabled() -> bool:

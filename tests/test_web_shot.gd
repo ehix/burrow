@@ -23,6 +23,18 @@ func test_reduced_damage_default() -> void:
 	assert_almost_eq(_make_shot().damage, 8.0, 0.001, "web damage lowered from 20 to 8")
 
 
+func test_launch_default_speed_mult_leaves_velocity_unchanged() -> void:
+	var shot := _make_shot()
+	shot.launch(Vector2.RIGHT, null)
+	assert_almost_eq(shot._velocity.length(), shot.speed, 0.001)
+
+
+func test_launch_scales_velocity_by_speed_mult() -> void:
+	var shot := _make_shot()
+	shot.launch(Vector2.RIGHT, null, 1.4)
+	assert_almost_eq(shot._velocity.length(), shot.speed * 1.4, 0.001)
+
+
 func test_hitting_a_larva_web_kills_it() -> void:
 	var shot := _make_shot()
 	var larva := _make_larva()

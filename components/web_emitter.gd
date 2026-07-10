@@ -25,8 +25,9 @@ func can_fire() -> bool:
 
 
 ## Fire along `direction`. Returns the spawned shot, or null if on cooldown /
-## unconfigured / no direction.
-func fire(from_position: Vector2, direction: Vector2, source: Node) -> Node:
+## unconfigured / no direction. speed_mult is passed straight through to the
+## shot's launch() (1.0 = unchanged).
+func fire(from_position: Vector2, direction: Vector2, source: Node, speed_mult: float = 1.0) -> Node:
 	var dir := direction.normalized()
 	if not can_fire() or dir == Vector2.ZERO:
 		return null
@@ -35,7 +36,7 @@ func fire(from_position: Vector2, direction: Vector2, source: Node) -> Node:
 	_spawn_parent(source).add_child(shot)
 	shot.global_position = from_position + dir * muzzle_offset
 	if shot.has_method("launch"):
-		shot.launch(dir, source)
+		shot.launch(dir, source, speed_mult)
 	HungerComponent.charge_all(source.get_tree(), hunger_cost)
 	return shot
 

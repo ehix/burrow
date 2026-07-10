@@ -236,3 +236,12 @@ func test_non_weaver_enemy_still_gets_slowed_by_a_web_hit() -> void:
 	enemy._apply_class(SpiderClassData.SpiderClass.WOLF)
 	enemy.apply_web_hit(Vector2i.ZERO, 0.5, 1.5, 0.0)
 	assert_eq(enemy._mover.speed_scale, 0.5, "every other class is slowed as before")
+
+
+func test_decoy_has_a_nonzero_fire_health_cost() -> void:
+	assert_gt(Enemy.DecoyClassData.web_fire_health_cost, 0.0)
+
+
+func test_other_classes_have_no_fire_health_cost() -> void:
+	for data in [Enemy.NetCasterData, Enemy.WolfData, Enemy.WeaverData]:
+		assert_almost_eq(data.web_fire_health_cost, 0.0, 0.001)

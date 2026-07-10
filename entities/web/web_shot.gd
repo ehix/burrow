@@ -31,10 +31,11 @@ func _ready() -> void:
 	area_entered.connect(_on_area_entered)
 
 
-## Called by WebEmitter right after spawn.
-func launch(direction: Vector2, source: Node) -> void:
+## Called by WebEmitter right after spawn. speed_mult is the shooter's
+## active class's web_projectile_speed_mult (1.0 = unchanged).
+func launch(direction: Vector2, source: Node, speed_mult: float = 1.0) -> void:
 	var dir := direction.normalized()
-	_velocity = dir * speed
+	_velocity = dir * speed * speed_mult
 	_source = source
 	rotation = dir.angle()
 

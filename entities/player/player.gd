@@ -118,7 +118,9 @@ func _physics_process(delta: float) -> void:
 		_mover.cancel_buffer()
 
 	if Input.is_action_pressed("fire") and _active_class_data != null and _active_class_data.web_enabled:
-		web_emitter.fire(global_position, facing, self)
+		var shot := web_emitter.fire(global_position, facing, self, _active_class_data.web_projectile_speed_mult)
+		if shot != null and _active_class_data.web_fire_health_cost > 0.0:
+			health.take_damage(_active_class_data.web_fire_health_cost)
 	if Input.is_action_just_pressed("place_trap"):
 		trap_placer.place(global_position, self)
 	if Input.is_action_just_pressed("melee"):
