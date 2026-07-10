@@ -55,9 +55,17 @@ func _on_activate(source: Node) -> void:
 
 
 ## The tile directly ahead of `origin`, in its current facing direction.
+## Uses GridMover.committed_tile() rather than origin's raw, interpolated
+## global_position — mid-step, committed_tile() deterministically reports the
+## destination tile for the step's whole duration, whereas floor-dividing the
+## interpolated position flips partway through the animation. Using the raw
+## position let a blockade spawn on the very tile the caster was stepping
+## into (playtest bug: appeared "on top of" a moving player).
 func _target_tile(origin: Node2D, level: Level) -> Vector2i:
 	var facing: Vector2 = origin.get("facing") if "facing" in origin else Vector2.RIGHT
-	return level.tile_of(origin.global_position) + Vector2i(int(facing.x), int(facing.y))
+	var mover := origin.get_node_or_null("GridMover") as GridMover
+	var base_tile := mover.committed_tile() if mover != null else level.tile_of(origin.global_position)
+	return base_tile + Vector2i(int(facing.x), int(facing.y))
 
 
 ## True if another spider (not `source`) is already committed to `tile` —

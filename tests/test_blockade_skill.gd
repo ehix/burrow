@@ -56,6 +56,30 @@ func test_places_the_blockade_ahead_of_the_caster_not_at_their_own_tile() -> voi
 		"never placed on the caster's own tile — that's the bug being fixed")
 
 
+func test_places_beyond_the_tile_a_mid_step_caster_is_stepping_into_not_on_it() -> void:
+	# Playtest bug: computing the target tile from the caster's raw,
+	# interpolated global_position (instead of GridMover.committed_tile())
+	# meant that for roughly the first half of an in-flight step, the target
+	# tile resolved to the very tile the caster was stepping into — spawning
+	# a solid blockade right where the caster was about to arrive.
+	var level := _make_level()
+	var player := level.player as Player
+	var skill := _make_skill()
+	var mover := player.get_node_or_null("GridMover") as GridMover
+	mover.set_process(false) # drive the step manually, no competing auto-tick this frame
+	mover.block_check = func(_dir: Vector2i) -> bool: return false # force the step to begin regardless of physical/logical wall state — isolates this test to target-tile computation
+	var start_tile := level.tile_of(player.global_position)
+	player.facing = Vector2.RIGHT # away from the maze's top-left spawn corner — keeps all tiles below non-negative (Level.tile_of() truncates rather than floors, so a negative tile would round-trip incorrectly here regardless of this fix)
+	mover.try_step(Vector2i.RIGHT) # begin stepping toward start_tile + (1, 0); still mid-flight, position unmoved
+
+	skill._on_activate(player)
+
+	var blockade := level.get_tree().get_first_node_in_group("blockades") as Blockade
+	assert_not_null(blockade, "a blockade was placed")
+	assert_eq(level.tile_of(blockade.global_position), start_tile + Vector2i(2, 0),
+		"placed beyond the tile the caster is stepping into (committed_tile() + facing), not on the tile the caster is about to occupy")
+
+
 func test_activate_refuses_when_the_enemy_spider_occupies_the_target_tile() -> void:
 	var level := _make_level()
 	var player := level.player as Player
