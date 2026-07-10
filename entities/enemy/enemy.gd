@@ -185,9 +185,11 @@ func _apply_class(spider_class: int) -> void:
 func _make_skills(spider_class: int) -> Array[SkillComponent]:
 	match spider_class:
 		SpiderClassData.SpiderClass.NET_CASTER:
-			var proj := NetProjectileSkill.new()
-			proj.net_shot_scene = NetShotScene
-			return [NetHoldSkill.new(), proj]
+			var hold := NetHoldSkill.new()
+			var shot := NetShotSkill.new()
+			shot.net_shot_scene = NetShotScene
+			shot.net_hold = hold
+			return [hold, shot]
 		SpiderClassData.SpiderClass.WEAVER:
 			var blockade := BlockadeSkill.new()
 			blockade.blockade_scene = BlockadeScene
@@ -388,21 +390,24 @@ func _consider_using_a_skill() -> void:
 ## enemy — without carrying AI-specific concerns.
 func _score_skill(skill: SkillComponent) -> float:
 	if skill is NetHoldSkill:
-		return 0.7 if state == State.SEEK_FOOD and _nearest_caught_trap() != null else 0.0
-	if skill is NetProjectileSkill or skill is HatchlingsSkill \
-			or skill is EggMineSkill or skill is SilkTunnelSkill:
+		return 0.7 if state == State.SEEK_FOOD and _nearest_own_ready_trap() != null else 0.0
+	if skill is NetShotSkill:
+		return 0.6 if state == State.CHASE and _current_target != null \
+				and (skill as NetShotSkill).net_hold.is_holding() else 0.0
+	if skill is HatchlingsSkill or skill is EggMineSkill or skill is SilkTunnelSkill:
 		return 0.6 if state == State.CHASE and _current_target != null else 0.0
 	if skill is BlockadeSkill or skill is CamouflageSkill or skill is DecoySkill:
 		return 0.6 if state == State.FLEE else 0.0
 	return 0.0
 
 
-## A caught larva within easy reach — worth a Net Hold instead of walking
-## all the way up to the trap and eating normally.
-func _nearest_caught_trap() -> Node:
+## An unspent trap this enemy placed, within easy reach — worth a Net Hold
+## pickup whether or not it's already caught a larva (a pre-loaded trap is
+## auto-eaten on pickup, so there's no special case for that here).
+func _nearest_own_ready_trap() -> WebTrap:
 	for node in get_tree().get_nodes_in_group("traps"):
 		var trap := node as WebTrap
-		if trap != null and trap.caught_larva != null \
+		if trap != null and not trap.spent and trap.owner_spider == self \
 				and global_position.distance_to(trap.global_position) <= eat_range * 2.0:
 			return trap
 	return null

@@ -46,12 +46,19 @@ func test_other_classes_keep_web_firing_enabled() -> void:
 		assert_true(enemy._web_enabled())
 
 
-func test_net_caster_gets_net_hold_and_net_projectile() -> void:
+func test_net_caster_gets_net_hold_and_net_shot() -> void:
 	var enemy := _make_enemy()
 	enemy._apply_class(SpiderClassData.SpiderClass.NET_CASTER)
 	assert_eq(enemy._skills.size(), 2)
 	assert_true(enemy._skills[0] is NetHoldSkill)
-	assert_true(enemy._skills[1] is NetProjectileSkill)
+	assert_true(enemy._skills[1] is NetShotSkill)
+
+
+func test_net_shot_is_wired_to_its_sibling_net_hold() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.NET_CASTER)
+	var shot: NetShotSkill = enemy._skills[1]
+	assert_eq(shot.net_hold, enemy._skills[0])
 
 
 func test_wolf_gets_hatchlings_and_egg_mine() -> void:
@@ -118,24 +125,40 @@ func test_score_skill_favors_defensive_skills_while_fleeing() -> void:
 		assert_gt(enemy._score_skill(skill), 0.0)
 
 
-func test_nearest_caught_trap_finds_a_trap_within_range() -> void:
+func test_score_skill_net_shot_only_scores_while_holding_a_trap() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.NET_CASTER)
+	enemy.state = Enemy.State.CHASE
+	enemy._current_target = Node2D.new()
+	add_child_autofree(enemy._current_target)
+	var shot: NetShotSkill = enemy._skills[1]
+
+	assert_eq(enemy._score_skill(shot), 0.0, "not holding — nothing to fire")
+
+	shot.net_hold.holding = true
+	assert_gt(enemy._score_skill(shot), 0.0, "holding — worth firing")
+
+
+func test_nearest_own_ready_trap_finds_an_owned_trap_within_range() -> void:
 	var enemy := _make_enemy()
 	var trap := WebTrap.new()
 	add_child_autofree(trap)
+	trap.setup(enemy)
 	trap.global_position = enemy.global_position
-	trap.caught_larva = Node2D.new()
-	add_child_autofree(trap.caught_larva)
 
-	assert_eq(enemy._nearest_caught_trap(), trap)
+	assert_eq(enemy._nearest_own_ready_trap(), trap, "found even though nothing's caught in it yet")
 
 
-func test_nearest_caught_trap_ignores_an_empty_trap() -> void:
+func test_nearest_own_ready_trap_ignores_a_trap_owned_by_someone_else() -> void:
 	var enemy := _make_enemy()
+	var other := Node2D.new()
+	add_child_autofree(other)
 	var trap := WebTrap.new()
 	add_child_autofree(trap)
+	trap.setup(other)
 	trap.global_position = enemy.global_position
 
-	assert_null(enemy._nearest_caught_trap())
+	assert_null(enemy._nearest_own_ready_trap())
 
 
 func test_consider_using_a_skill_activates_the_tied_winner_deterministically() -> void:
