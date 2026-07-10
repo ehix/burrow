@@ -26,6 +26,19 @@ instances, `Player`, `Enemy`, `WebEmitter`, and `WebShot`.
   untouched by `_apply_class()` (`entities/enemy/enemy.gd:167-180`). Enemy
   has no plane/ceiling concept at all, so it has no equivalent conflict to
   design around.
+- `CombatFx.flash()` (`components/combat_fx.gd`) — used by `Player`
+  (`entities/player/player.gd:96`, on `health.damaged`), `Enemy`
+  (`entities/enemy/enemy.gd:116`, same signal), and `Larva`
+  (`entities/larva/larva.gd:88`, distress flash) — hardcodes its
+  tween-back target to `Color.WHITE`. Once a spider's sprite carries a
+  class tint (or a class tint composed with the ceiling tint), any hit
+  would flash red and then incorrectly snap back to plain white instead of
+  restoring the color it actually had. This must be fixed as part of this
+  slice, or per-class color visibly breaks the first time a spider takes
+  damage — the single most common moment to see it. `Larva` is unaffected
+  by the fix either way: its sprite's `modulate` is never set anywhere
+  else, so it's always `Color.WHITE` at the moment of a flash regardless
+  of which color `flash()` restores to.
 - `Player.apply_web_hit()` (`entities/player/player.gd:363-371`) and
   `Enemy.apply_web_hit()` (`entities/enemy/enemy.gd:603-611`) are
   byte-identical: `if factor < 1.0: _mover.apply_slow(factor,
@@ -98,6 +111,25 @@ one clobbering the other.
 
 `Enemy._apply_class()` gets one line: `facing_visual.modulate =
 data.display_color` (no plane concept to compose with).
+
+`components/combat_fx.gd`'s `flash()` changes from restoring a hardcoded
+`Color.WHITE` to restoring whatever `modulate` the sprite actually had the
+moment the flash began:
+
+```gdscript
+static func flash(sprite: CanvasItem) -> void:
+	if sprite == null or not sprite.is_inside_tree():
+		return
+	var restore := sprite.modulate
+	sprite.modulate = FLASH_COLOR
+	var tween := sprite.create_tween()
+	tween.tween_property(sprite, "modulate", restore, FLASH_TIME)
+```
+
+This is a general fix, not one special-cased to `Player`/`Enemy`: `Larva`'s
+own `flash_distress()` call gets the exact same behavior as before (its
+sprite's `modulate` is never anything but `Color.WHITE` at flash time), so
+this doesn't need its own separate code path.
 
 ### 2. Weaver immune to web slowdown (not Blockade)
 
@@ -214,6 +246,20 @@ both apply.
   test_enemy_class_kit.gd` for the established `_make_enemy()` +
   `_apply_class()` convention) asserting `facing_visual.modulate` matches
   each class's `display_color`.
+- `CombatFx.flash()` restoring to the sprite's actual pre-flash `modulate`
+  (a non-white color) rather than hardcoded white — a new test, since none
+  of the existing flash tests exercise a non-default color.
+- `tests/test_distress_flash.gd:14-17`
+  (`test_apply_web_hit_alone_does_not_flash`) currently hardcodes the
+  post-call assertion to `Color.WHITE` — this only happened to hold because
+  `Player` defaults to Wolf and nothing ever tinted its sprite before this
+  slice. Once Wolf has its own `display_color`, this assertion breaks (not
+  a regression in the code under test, a now-invalid assumption in the
+  test itself). Fix by capturing `sprite.modulate` *before* the call and
+  asserting it's unchanged after, instead of comparing to a hardcoded
+  color — preserves the test's actual intent ("a status effect alone must
+  not change the tint") independent of which class's color happens to be
+  active.
 - `Player`/`Enemy` `apply_web_hit()`: instantiate the real scene (matching
   `tests/test_distress_flash.gd`'s existing `_make_player()` +
   `player.apply_web_hit(Vector2i.ZERO, 0.5, 1.5, 0.0)` pattern), switch to
