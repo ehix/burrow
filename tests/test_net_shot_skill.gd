@@ -90,7 +90,7 @@ func test_activate_spends_the_held_trap() -> void:
 	skill.net_hold = hold
 	hold.holding = true # simulate an already-held trap without a full pickup
 	var shooter := Node2D.new()
-	autofree(shooter)
+	add_child_autofree(shooter)
 
 	skill.activate(shooter)
 
