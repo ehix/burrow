@@ -124,6 +124,8 @@ script = ExtResource("16_nethold")
 [node name="NetShotSkill" type="Node" parent="."]
 script = ExtResource("17_netshot")
 net_shot_scene = ExtResource("18_netshot")
+cooldown = 0.0
+hunger_cost = 0.0
 
 [node name="HatchlingsSkill" type="Node" parent="."]
 script = ExtResource("19_hatch")

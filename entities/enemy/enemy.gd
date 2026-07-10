@@ -189,6 +189,11 @@ func _make_skills(spider_class: int) -> Array[SkillComponent]:
 			var shot := NetShotSkill.new()
 			shot.net_shot_scene = NetShotScene
 			shot.net_hold = hold
+			# Free to fire, same as Player's NetShotSkill (player.tscn): Net
+			# Hold already charges the real engagement fee to arm a trap;
+			# discharging it costs nothing extra.
+			shot.cooldown = 0.0
+			shot.hunger_cost = 0.0
 			return [hold, shot]
 		SpiderClassData.SpiderClass.WEAVER:
 			var blockade := BlockadeSkill.new()

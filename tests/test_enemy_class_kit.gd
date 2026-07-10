@@ -139,6 +139,19 @@ func test_score_skill_net_shot_only_scores_while_holding_a_trap() -> void:
 	assert_gt(enemy._score_skill(shot), 0.0, "holding — worth firing")
 
 
+func test_net_shot_is_free_to_fire() -> void:
+	# Net Hold already charges the real "engagement fee" to arm a trap; Net
+	# Shot is just discharging what's already held, so it costs nothing
+	# extra — re-arming via Net Hold is the natural throttle, not a second
+	# cost on the throw itself.
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.NET_CASTER)
+	var shot: NetShotSkill = enemy._skills[1]
+
+	assert_eq(shot.hunger_cost, 0.0, "throwing an already-held trap costs nothing extra")
+	assert_eq(shot.cooldown, 0.0, "no independent cooldown — re-arming via Net Hold is the real gate")
+
+
 func test_nearest_pickupable_trap_finds_a_trap_within_range() -> void:
 	var enemy := _make_enemy()
 	var trap := WebTrap.new()
