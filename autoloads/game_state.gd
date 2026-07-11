@@ -22,6 +22,10 @@ var depth: int = STARTING_DEPTH
 var carried_health: float = NAN
 var carried_hunger: float = NAN
 
+## Player's held item (item/inventory rework), carried between levels the
+## same way vitals are. null = nothing held (also the reset state).
+var carried_item: ConsumableItem = null
+
 ## Debug/display flag: when false the fog-of-war darkness is removed so the lit
 ## map is fully visible. Toggled at runtime (L); persists across levels and
 ## restarts, so it is deliberately NOT reset by start_new_run().
@@ -104,11 +108,13 @@ func start_new_run(seed_value: int = -1) -> void:
 	EventBus.depth_changed.emit(depth)
 
 
-## Drop any carried vitals so the next spawn uses the component defaults (full
-## health, no hunger) instead of continuing a previous run's state.
+## Drop any carried vitals/held item so the next spawn uses the component
+## defaults (full health, no hunger, empty inventory) instead of continuing
+## a previous run's state.
 func clear_carried_vitals() -> void:
 	carried_health = NAN
 	carried_hunger = NAN
+	carried_item = null
 
 
 ## Descend to the next, harder maze. Player vitals are expected to already be
@@ -132,6 +138,12 @@ func depth_scale() -> float:
 func store_player_vitals(health: float, hunger: float) -> void:
 	carried_health = health
 	carried_hunger = hunger
+
+
+## Snapshot the player's held item before freeing a level on descent —
+## called alongside store_player_vitals() from Player.store_vitals().
+func store_carried_item(item: ConsumableItem) -> void:
+	carried_item = item
 
 
 ## True once vitals have been carried at least once this run.
