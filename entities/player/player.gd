@@ -301,11 +301,13 @@ func _draw() -> void:
 func _on_effect_applied(id: StringName, _magnitude: float, _duration: float) -> void:
 	if id == &"sense" and _level != null:
 		_level.set_sense_active(true)
+		_level.set_sense_outline(true)
 
 
 func _on_effect_expired(id: StringName) -> void:
 	if id == &"sense" and _level != null:
 		_level.set_sense_active(false)
+		_level.set_sense_outline(false)
 
 
 ## Strike one tile ahead: light damage + shove + stun on a spider, or an

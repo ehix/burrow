@@ -13,6 +13,8 @@ signal broken
 @export var target_alpha: float = 0.15
 @export var duration: float = 5.0
 
+const OUTLINE_COLOR := Color(0.6, 0.75, 1.0, 0.9)
+
 var active: bool = false
 
 var _visual: CanvasItem
@@ -26,6 +28,7 @@ func _on_activate(source: Node) -> void:
 	active = true
 	_time_left = duration
 	_visual.modulate.a = target_alpha
+	OutlineFx.set_outline(_visual, true, OUTLINE_COLOR)
 
 
 func _process(delta: float) -> void:
@@ -46,6 +49,7 @@ func break_camouflage() -> void:
 	active = false
 	if _visual != null:
 		_visual.modulate.a = 1.0
+		OutlineFx.set_outline(_visual, false, OUTLINE_COLOR)
 	broken.emit()
 
 

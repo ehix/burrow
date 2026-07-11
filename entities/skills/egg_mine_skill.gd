@@ -21,7 +21,15 @@ func _on_activate(source: Node) -> void:
 	_spawn_parent(source).add_child(mine)
 	mine.global_position = origin.global_position
 	if mine.has_method("arm"):
-		mine.arm(source, burst_count)
+		mine.arm(source, burst_count, _plane_of(source))
+
+
+## Mirrors BlockadeSkill._plane_of(): the plane `source` currently occupies.
+func _plane_of(source: Node) -> Level.Layer:
+	var plane_component: PlaneComponent = source.get("_plane") if "_plane" in source else null
+	if plane_component != null:
+		return plane_component.current_plane
+	return Level.Layer.GROUND
 
 
 func _spawn_parent(source: Node) -> Node:

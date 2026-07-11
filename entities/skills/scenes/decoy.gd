@@ -5,14 +5,14 @@ extends StaticBody2D
 ## spider uses, so the existing melee/web-shot attack code already resolves
 ## against it with zero special-casing (Player._melee's "spiders" group loop
 ## and WebShot's generic Hurtbox check both already work against it as-is)
-## — it "dies" and frees itself exactly like a real spider would. On the
-## enemy(4) collision layer so it's a physical obstacle like a real spider,
-## not a walk-through prop. Placeholder visual: a dim silhouette, no art
-## asset yet.
+## — it "dies" and frees itself exactly like a real spider would. Placeholder
+## visual: a dim silhouette, no art asset yet.
 ##
-## NOTE: joining "spiders" doesn't yet actually redirect Enemy's targeting —
-## Enemy._player is a single hardcoded reference, not "nearest spider"; that
-## retargeting change is a separate, not-yet-made edit to Enemy's AI.
+## Retargeting is already wired: Enemy._acquire_target() prefers a nearer
+## visible decoy over the real player (see tests/test_enemy_decoy_diversion.gd).
+## No physical collision (skill fixes bundle) — a decoy is dropped on the
+## caster's own tile, and being a solid obstacle there trapped the caster
+## against its own decoy the instant it was placed.
 
 @onready var _health: HealthComponent = $HealthComponent
 

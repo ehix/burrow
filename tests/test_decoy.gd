@@ -19,6 +19,11 @@ func test_joins_the_spiders_and_decoys_groups() -> void:
 	assert_true(decoy.is_in_group("decoys"), "so real combat logic can tell it apart from a threat")
 
 
+func test_has_no_physical_collision() -> void:
+	var decoy := _make_decoy()
+	assert_eq(decoy.collision_layer, 0, "a decoy never traps its own caster on placement")
+
+
 func test_dies_like_a_real_spider_when_its_health_reaches_zero() -> void:
 	var decoy := _make_decoy()
 	decoy.setup(30.0)
