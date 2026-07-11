@@ -1,8 +1,9 @@
 class_name WorldItemPickup
 extends Area2D
 ## A world-placed pickup wrapping any ConsumableItem resource (design §5:
-## Fungus Poison, Fungus Sense, Seed Pod). On a spider entering, calls
-## `item.apply()` then frees itself. Placeholder visual: a coloured dot keyed
+## Fungus Poison, Fungus Sense, Seed Pod). On a spider entering, routes
+## through InventoryComponent.try_pickup() and frees itself only if the pickup
+## succeeds (inventory had space). Placeholder visual: a coloured dot keyed
 ## by item_id, no art asset yet.
 ##
 ## Lure does NOT go through this path — see LurePulse. A Lure is active the
