@@ -6,9 +6,9 @@ extends Area2D
 ## succeeds (inventory had space). Placeholder visual: a coloured dot keyed
 ## by item_id, no art asset yet.
 ##
-## Lure does NOT go through this path — see LurePulse. A Lure is active the
-## moment it's placed, not picked up and consumed, so it isn't a
-## WorldItemPickup at all.
+## Lure goes through this same path now (item/inventory rework) — picked up
+## like every other item, it only becomes an active LurePulse when
+## InventoryComponent.use() deploys it, not at pickup time.
 ##
 ## collision_mask = player(2) | enemy(4) = 6 — only spiders trigger it,
 ## larvae pass through untouched.

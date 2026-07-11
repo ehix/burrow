@@ -64,6 +64,8 @@ func test_world_items_never_land_on_a_pit_tile() -> void:
 
 func test_seeded_items_are_always_pickups_not_bare_lure_pulses() -> void:
 	var level := _make_level()
-	for item in level.get_tree().get_nodes_in_group("world_items"):
+	var items := level.get_tree().get_nodes_in_group("world_items")
+	assert_gt(items.size(), 0, "sanity: seeding actually produced items")
+	for item in items:
 		assert_true(item is WorldItemPickup,
 			"Lure is now picked up like every other item, never spawned pre-active as a bare LurePulse")

@@ -9,7 +9,9 @@ extends Node
 const LurePulseScene := preload("res://entities/items/lure_pulse.tscn")
 
 ## Enemy sets this true (it has no button-press input to hook a "use"
-## decision into); Player leaves it false.
+## decision into); Player leaves it false. Side effect, accepted as intended:
+## an auto_use holder that picks up a Lure deploys it at its own position,
+## pulling larvae toward itself rather than the player — not an oversight.
 @export var auto_use: bool = false
 
 var held_item: ConsumableItem = null

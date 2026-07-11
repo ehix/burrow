@@ -20,7 +20,7 @@ const LARVA_CAP_MAX := 18
 ## playthrough short of the Water Ingress hazard or the dev pit-toggle tool.
 const NATURAL_PIT_COUNT := 2
 ## World items seeded per depth (design §5): a mix of Fungus Poison/Sense,
-## Seed Pod pickups, and Lure placements.
+## Seed Pod, and Lure pickups — all picked up the same way now.
 const ITEM_SPAWN_COUNT := 3
 ## Earthworm obstacles seeded per depth (design §6).
 const EARTHWORM_COUNT := 1

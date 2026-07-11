@@ -129,9 +129,10 @@ func _physics_process(delta: float) -> void:
 		_melee()
 	if Input.is_action_just_pressed("toggle_plane"):
 		_plane.transition()
-	# Sense and Remove Walls are general utilities — always available,
-	# regardless of active class. Everything below is class-gated: pressing
-	# a key for a skill that isn't part of the current class silently no-ops.
+	# Sense, Remove Walls, and item use are general utilities — always
+	# available, regardless of active class. Everything below is
+	# class-gated: pressing a key for a skill that isn't part of the
+	# current class silently no-ops.
 	if Input.is_action_just_pressed("sense"):
 		_sense.activate(self)
 	if Input.is_action_just_pressed("remove_walls_skill"):
@@ -430,6 +431,7 @@ func _restore_vitals() -> void:
 		health.current_health = health.max_health
 		hunger.current_hunger = 0.0
 	inventory.held_item = GameState.carried_item
+	inventory.item_held_changed.emit(inventory.held_item)
 
 
 func _on_health_changed(value: float, max_value: float) -> void:

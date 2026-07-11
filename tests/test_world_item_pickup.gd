@@ -84,3 +84,14 @@ func test_without_an_item_assigned_is_a_noop() -> void:
 	pickup._on_body_entered(spider) # must not error
 
 	assert_false(pickup.is_queued_for_deletion())
+
+
+func test_spider_with_no_inventory_component_is_a_noop() -> void:
+	var pickup := _make_pickup(FungusSenseItem.new())
+	var spider := Node2D.new()
+	spider.add_to_group("spiders")
+	add_child_autofree(spider)
+
+	pickup._on_body_entered(spider) # must not error
+
+	assert_false(pickup.is_queued_for_deletion(), "no InventoryComponent -- safe no-op, item stays in the world")
