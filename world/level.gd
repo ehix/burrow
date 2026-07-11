@@ -33,6 +33,7 @@ const WorldItemPickupScene := preload("res://entities/items/world_item_pickup.ts
 
 ## Fog-of-war ambient when darkness is on. White (no darkening) when off.
 const DARK_MODULATE := Color(0.05, 0.05, 0.07)
+const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
 ## Dual-Plane Map Architecture (design §1): the ground floor and the inverted
 ## ceiling floor directly above it. A spider's PlaneComponent tracks which one
@@ -153,6 +154,18 @@ func set_sense_active(active: bool) -> void:
 		var occ = nodes.get("occluder")
 		if occ != null and is_instance_valid(occ):
 			occ.visible = not active
+
+
+## SenseSkill's outline cue (skill fixes bundle): every living spider/larva
+## gets the shared outline shader while sense is active, alongside the
+## existing wall-occluder x-ray. A blanket effect, not per-entity occlusion —
+## consistent with set_sense_active()'s own blanket wall treatment.
+func set_sense_outline(active: bool) -> void:
+	for group in ["spiders", "larvae"]:
+		for node in get_tree().get_nodes_in_group(group):
+			var sprite := (node as Node).get_node_or_null("Sprite") as CanvasItem
+			if sprite != null:
+				OutlineFx.set_outline(sprite, active, SENSE_OUTLINE_COLOR)
 
 
 func _build_collision_and_occluders() -> void:

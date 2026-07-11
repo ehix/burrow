@@ -24,6 +24,24 @@ func test_set_sense_active_hides_wall_occluders() -> void:
 	assert_true(any_occluder.visible, "occluders are restored once sense ends")
 
 
+func test_set_sense_outline_toggles_the_shader_on_every_spider_and_larva() -> void:
+	var level := _make_level()
+	var player_sprite := level.player.get_node("Sprite") as CanvasItem
+	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
+
+	level.set_sense_outline(true)
+	var player_mat := player_sprite.material as ShaderMaterial
+	var enemy_mat := enemy_sprite.material as ShaderMaterial
+	assert_not_null(player_mat)
+	assert_true(player_mat.get_shader_parameter("outline_enabled"))
+	assert_not_null(enemy_mat)
+	assert_true(enemy_mat.get_shader_parameter("outline_enabled"))
+
+	level.set_sense_outline(false)
+	assert_false(player_mat.get_shader_parameter("outline_enabled"))
+	assert_false(enemy_mat.get_shader_parameter("outline_enabled"))
+
+
 func test_build_seeds_natural_pits_away_from_both_spawns() -> void:
 	var level := _make_level()
 	var pit_count := 0
