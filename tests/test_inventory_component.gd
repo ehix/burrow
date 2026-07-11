@@ -27,7 +27,9 @@ func test_try_pickup_fills_an_empty_slot() -> void:
 	var inventory := _make_inventory()
 	var item := FungusSenseItem.new()
 
-	var picked_up := inventory.try_pickup(item, Node2D.new())
+	var consumer := Node2D.new()
+	add_child_autofree(consumer)
+	var picked_up := inventory.try_pickup(item, consumer)
 
 	assert_true(picked_up)
 	assert_eq(inventory.held_item, item)
@@ -36,9 +38,13 @@ func test_try_pickup_fills_an_empty_slot() -> void:
 func test_try_pickup_refuses_when_the_slot_is_occupied() -> void:
 	var inventory := _make_inventory()
 	var first := FungusSenseItem.new()
-	inventory.try_pickup(first, Node2D.new())
+	var consumer := Node2D.new()
+	add_child_autofree(consumer)
+	inventory.try_pickup(first, consumer)
 
-	var picked_up := inventory.try_pickup(SeedPodItem.new(), Node2D.new())
+	var consumer2 := Node2D.new()
+	add_child_autofree(consumer2)
+	var picked_up := inventory.try_pickup(SeedPodItem.new(), consumer2)
 
 	assert_false(picked_up)
 	assert_eq(inventory.held_item, first, "the second item is refused, first stays held")
@@ -50,7 +56,9 @@ func test_try_pickup_emits_item_held_changed() -> void:
 	var received: Array = []
 	inventory.item_held_changed.connect(func(held: ConsumableItem) -> void: received.append(held))
 
-	inventory.try_pickup(item, Node2D.new())
+	var consumer := Node2D.new()
+	add_child_autofree(consumer)
+	inventory.try_pickup(item, consumer)
 
 	assert_eq(received, [item])
 
@@ -101,6 +109,7 @@ func test_use_on_a_held_lure_spawns_a_lure_pulse_with_its_duration() -> void:
 	var pulses := get_tree().get_nodes_in_group("world_items")
 	assert_eq(pulses.size(), 1)
 	var pulse := pulses[0] as LurePulse
+	autofree(pulse)
 	assert_eq(pulse.item.duration, 60.0)
 	assert_eq(pulse.global_position, consumer.global_position)
 
