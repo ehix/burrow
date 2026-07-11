@@ -84,3 +84,87 @@ func test_attack_respects_its_own_cooldown() -> void:
 	var after_first := health.current_health
 	spiderling._physics_process(0.016) # still on cooldown
 	assert_eq(health.current_health, after_first, "no second hit before the cooldown elapses")
+
+
+func _make_wall(at: Vector2) -> StaticBody2D:
+	var wall := StaticBody2D.new()
+	wall.collision_layer = 1
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(48, 48)
+	shape.shape = rect
+	wall.add_child(shape)
+	add_child_autofree(wall)
+	wall.global_position = at
+	return wall
+
+
+func test_default_move_speed_is_180() -> void:
+	var spiderling := _make_spiderling()
+	assert_eq(spiderling.move_speed, 180.0)
+
+
+func test_escorts_toward_the_owner_plus_offset_when_no_enemy_is_near() -> void:
+	var spiderling := _make_spiderling()
+	var owner_spider := _make_target()
+	owner_spider.global_position = Vector2(600, 600)
+	spiderling.global_position = Vector2(0, 0)
+	spiderling.setup(owner_spider, 5.0, Vector2(20, 0))
+	var target_point := owner_spider.global_position + Vector2(20, 0)
+	var before := spiderling.global_position.distance_to(target_point)
+
+	for i in 10:
+		spiderling._physics_process(0.05)
+
+	var after := spiderling.global_position.distance_to(target_point)
+	assert_lt(after, before, "the hatchling steps toward its owner's escort point")
+
+
+func test_switches_to_chase_when_an_enemy_enters_aggro_radius_and_los() -> void:
+	var spiderling := _make_spiderling()
+	var owner_spider := _make_target()
+	owner_spider.global_position = Vector2(2000, 2000) # far away, irrelevant
+	var enemy := _make_target()
+	spiderling.global_position = Vector2(0, 0)
+	enemy.global_position = Vector2(50, 0) # within aggro_radius(180), beyond attack_range(20)
+	spiderling.setup(owner_spider, 5.0)
+
+	spiderling._physics_process(0.016)
+
+	assert_gt(spiderling.velocity.length(), 0.0, "the hatchling moves toward the visible enemy instead of escorting")
+
+
+func test_never_targets_an_enemy_blocked_by_a_wall() -> void:
+	var spiderling := _make_spiderling()
+	var enemy := _make_target()
+	spiderling.global_position = Vector2(0, 0)
+	enemy.global_position = Vector2(100, 0)
+	_make_wall(Vector2(50, 0))
+	spiderling.setup(null, 5.0) # no owner -> escort() with no owner holds still
+
+	spiderling._physics_process(0.016)
+
+	assert_eq(spiderling.velocity, Vector2.ZERO, "a wall-blocked enemy is never targeted")
+
+
+func test_reverts_to_escort_once_the_target_leaves_aggro_radius() -> void:
+	var spiderling := _make_spiderling()
+	var owner_spider := _make_target()
+	owner_spider.global_position = Vector2(0, 0)
+	var enemy := _make_target()
+	spiderling.global_position = Vector2(0, 0)
+	enemy.global_position = Vector2(50, 0)
+	spiderling.setup(owner_spider, 5.0)
+	spiderling._physics_process(0.016)
+	assert_gt(spiderling.velocity.length(), 0.0, "starts chasing")
+
+	enemy.global_position = Vector2(5000, 5000) # far outside aggro_radius
+	# Converge over several ticks rather than asserting on one exact instant
+	# right after the switch — move_and_slide() uses the engine's own
+	# physics delta, not the value passed here, so a single-tick distance
+	# check would be too tightly coupled to that exact timing.
+	for i in 20:
+		spiderling._physics_process(0.05)
+
+	assert_lt(spiderling.global_position.distance_to(owner_spider.global_position), 1.0,
+		"settles back at the owner's position once escort resumes (no target, escort_offset defaults to zero)")

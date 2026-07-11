@@ -25,7 +25,7 @@ func _on_activate(source: Node) -> void:
 		var offset := Vector2(spawn_radius, 0).rotated(TAU * float(i) / float(spawn_count))
 		hatchling.global_position = origin.global_position + offset
 		if hatchling.has_method("setup"):
-			hatchling.setup(source, lifetime)
+			hatchling.setup(source, lifetime, offset)
 
 
 func _spawn_parent(source: Node) -> Node:
