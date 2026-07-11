@@ -127,3 +127,35 @@ func test_non_decoy_fire_costs_no_extra_health() -> void:
 	var before := player.health.current_health
 	assert_almost_eq(Player.WolfData.web_fire_health_cost, 0.0, 0.001, "no class but Decoy costs health to fire")
 	assert_almost_eq(player.health.current_health, before, 0.001)
+
+
+func test_active_skills_returns_the_current_classs_two_skills_in_order() -> void:
+	var player := _make_player() # defaults to Wolf -> hatchlings, egg_mine
+
+	var skills := player.active_skills()
+
+	assert_eq(skills.keys(), ["hatchlings", "egg_mine"])
+	assert_eq(skills["hatchlings"], player._hatchlings)
+	assert_eq(skills["egg_mine"], player._egg_mine)
+
+
+func test_active_skills_updates_after_switching_class() -> void:
+	var player := _make_player()
+
+	player.apply_class(SpiderClassData.SpiderClass.DECOY)
+	var skills := player.active_skills()
+
+	assert_eq(skills.keys(), ["camouflage", "decoy"])
+	assert_eq(skills["camouflage"], player._camouflage)
+	assert_eq(skills["decoy"], player._decoy)
+
+
+func test_each_class_skill_has_display_name_and_description_authored() -> void:
+	var player := _make_player()
+	var all_skills := [
+		player._net_hold, player._net_shot, player._hatchlings, player._egg_mine,
+		player._blockade, player._silk_tunnel, player._camouflage, player._decoy,
+	]
+	for skill in all_skills:
+		assert_ne(skill.display_name, "", "%s needs a display_name" % skill)
+		assert_ne(skill.description, "", "%s needs a description" % skill)
