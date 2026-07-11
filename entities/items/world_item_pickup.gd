@@ -30,6 +30,15 @@ func _draw() -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if _spent or item == null or not body.is_in_group("spiders"):
 		return
+	var inventory := _inventory_of(body)
+	if inventory == null or not inventory.try_pickup(item, body):
+		return
 	_spent = true
-	item.apply(body)
 	queue_free()
+
+
+func _inventory_of(entity: Node) -> InventoryComponent:
+	for child in entity.get_children():
+		if child is InventoryComponent:
+			return child
+	return null
