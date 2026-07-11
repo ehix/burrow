@@ -35,6 +35,26 @@ func test_activate_makes_the_sprite_nearly_transparent() -> void:
 	assert_almost_eq((entity.get_node("Sprite") as Sprite2D).modulate.a, camo.target_alpha, 0.001)
 
 
+func test_activate_applies_the_outline_shader() -> void:
+	var setup := _make_camouflaged()
+	var entity: Node2D = setup["entity"]
+
+	var mat := (entity.get_node("Sprite") as CanvasItem).material as ShaderMaterial
+	assert_not_null(mat)
+	assert_true(mat.get_shader_parameter("outline_enabled"))
+
+
+func test_break_camouflage_disables_the_outline_shader() -> void:
+	var setup := _make_camouflaged()
+	var camo: CamouflageSkill = setup["camo"]
+	var entity: Node2D = setup["entity"]
+
+	camo.break_camouflage()
+
+	var mat := (entity.get_node("Sprite") as CanvasItem).material as ShaderMaterial
+	assert_false(mat.get_shader_parameter("outline_enabled"))
+
+
 func test_camouflage_breaks_when_the_camouflaged_spider_is_the_victim() -> void:
 	var setup := _make_camouflaged()
 	var camo: CamouflageSkill = setup["camo"]
