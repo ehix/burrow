@@ -4,10 +4,11 @@ extends GutTest
 
 ## PlayerScene is preloaded before MineScene deliberately: cocoon_mine.gd's
 ## Level.Layer typing pulls in level.gd, which itself preloads player.tscn
-## (an ext_resource of cocoon_mine.tscn) — loading MineScene first re-enters
-## cocoon_mine.tscn's own in-flight load and Godot reports it as "referenced
-## non-existent resource". Player-first lets that self-reference resolve via
-## the normal (harmless) recursive-load path production code already takes.
+## (which references cocoon_mine.tscn as an ext_resource, via EggMineSkill's
+## mine_scene export) — loading MineScene first re-enters cocoon_mine.tscn's
+## own in-flight load and Godot reports it as "referenced non-existent
+## resource". Player-first lets that self-reference resolve via the normal
+## (harmless) recursive-load path production code already takes.
 const PlayerScene := preload("res://entities/player/player.tscn")
 const MineScene := preload("res://entities/skills/scenes/cocoon_mine.tscn")
 

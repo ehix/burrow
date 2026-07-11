@@ -7,7 +7,7 @@ radius = 24.0
 
 [node name="CocoonMine" type="Area2D"]
 collision_layer = 0
-collision_mask = 14
+collision_mask = 6
 script = ExtResource("1_mine")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]

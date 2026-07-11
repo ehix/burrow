@@ -6,10 +6,11 @@ extends GutTest
 
 ## PlayerScene is preloaded before MineScene deliberately: cocoon_mine.gd's
 ## Level.Layer typing pulls in level.gd, which itself preloads player.tscn
-## (an ext_resource of cocoon_mine.tscn) — loading MineScene first re-enters
-## cocoon_mine.tscn's own in-flight load and Godot reports it as "referenced
-## non-existent resource". Player-first lets that self-reference resolve via
-## the normal (harmless) recursive-load path production code already takes.
+## (which references cocoon_mine.tscn as an ext_resource, via EggMineSkill's
+## mine_scene export) — loading MineScene first re-enters cocoon_mine.tscn's
+## own in-flight load and Godot reports it as "referenced non-existent
+## resource". Player-first lets that self-reference resolve via the normal
+## (harmless) recursive-load path production code already takes.
 const PlayerScene := preload("res://entities/player/player.tscn")
 const MineScene := preload("res://entities/skills/scenes/cocoon_mine.tscn")
 
@@ -50,7 +51,13 @@ func test_body_entered_by_a_spider_deals_direct_damage_and_bursts_cosmetically()
 	var hurtbox := intruder.get_node("Hurtbox") as Hurtbox
 	assert_eq(hurtbox.health.current_health, hurtbox.health.max_health - mine.burst_damage)
 	assert_true(mine.is_queued_for_deletion(), "the mine consumes itself on detonation")
-	assert_eq(get_tree().get_nodes_in_group("mine_spiderlings").size(), before_count + 3)
+	var spiderlings := get_tree().get_nodes_in_group("mine_spiderlings")
+	assert_eq(spiderlings.size(), before_count + 3)
+	# The MineSpiderlings free themselves via a 0.3s explode_after timer in
+	# _physics_process, which never ticks during synchronous test execution —
+	# register them for GUT cleanup so this test doesn't leak orphans.
+	for spiderling in spiderlings.slice(before_count):
+		autofree(spiderling)
 
 
 func test_ignores_a_larva_crossing_it() -> void:
@@ -106,6 +113,7 @@ func test_ignores_a_body_on_a_different_plane_than_it_was_armed_on() -> void:
 
 
 func test_detonates_for_a_body_on_the_same_plane_it_was_armed_on() -> void:
+	var before_count := get_tree().get_nodes_in_group("mine_spiderlings").size()
 	var mine := _make_mine()
 	mine.arm(null, 1, Level.Layer.CEILING)
 	var player: Player = PlayerScene.instantiate()
@@ -115,6 +123,11 @@ func test_detonates_for_a_body_on_the_same_plane_it_was_armed_on() -> void:
 	mine._on_body_entered(player)
 
 	assert_true(mine.is_queued_for_deletion())
+	# See the explode_after comment in the first test above: register the
+	# spawned MineSpiderling for cleanup so it doesn't leak as an orphan.
+	var spiderlings := get_tree().get_nodes_in_group("mine_spiderlings")
+	for spiderling in spiderlings.slice(before_count):
+		autofree(spiderling)
 
 
 func test_joins_the_traps_group() -> void:
