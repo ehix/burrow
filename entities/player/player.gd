@@ -36,6 +36,7 @@ extends CharacterBody2D
 @onready var _blockade: BlockadeSkill = $BlockadeSkill
 @onready var _silk_tunnel: SilkTunnelSkill = $SilkTunnelSkill
 @onready var _decoy: DecoySkill = $DecoySkill
+@onready var inventory: InventoryComponent = $InventoryComponent
 
 ## The four class archetypes (design §3), each authored as a .tres — the same
 ## "author a Resource, don't fork the scene" pattern EnemyType established.
@@ -77,6 +78,7 @@ func _ready() -> void:
 	_plane.plane_changed.connect(_on_plane_changed)
 	_status.effect_applied.connect(_on_effect_applied)
 	_status.effect_expired.connect(_on_effect_expired)
+	inventory.item_held_changed.connect(func(_item: ConsumableItem) -> void: queue_redraw())
 	_net_shot.net_hold = _net_hold
 	_class_data_by_id = {
 		SpiderClassData.SpiderClass.NET_CASTER: NetCasterData,
@@ -127,13 +129,16 @@ func _physics_process(delta: float) -> void:
 		_melee()
 	if Input.is_action_just_pressed("toggle_plane"):
 		_plane.transition()
-	# Sense and Remove Walls are general utilities — always available,
-	# regardless of active class. Everything below is class-gated: pressing
-	# a key for a skill that isn't part of the current class silently no-ops.
+	# Sense, Remove Walls, and item use are general utilities — always
+	# available, regardless of active class. Everything below is
+	# class-gated: pressing a key for a skill that isn't part of the
+	# current class silently no-ops.
 	if Input.is_action_just_pressed("sense"):
 		_sense.activate(self)
 	if Input.is_action_just_pressed("remove_walls_skill"):
 		_remove_walls.activate(self)
+	if Input.is_action_just_pressed("use_item"):
+		inventory.use(self)
 	if Input.is_action_just_pressed("camouflage") and _is_active_skill("camouflage"):
 		_camouflage.activate(self)
 	# Held, not just-pressed: picking up a trap works either by walking onto
@@ -278,6 +283,16 @@ func _update_sprite_tint() -> void:
 		sprite.modulate = base
 
 
+## Placeholder held-item indicator — a colored dot above the sprite, keyed
+## by item_id via ConsumableItem.ITEM_COLORS. Sub-project I replaces this
+## with real inventory UI.
+func _draw() -> void:
+	if inventory.held_item == null:
+		return
+	var color: Color = ConsumableItem.ITEM_COLORS.get(inventory.held_item.item_id, Color.WHITE)
+	draw_circle(Vector2(0, -22), 5.0, color)
+
+
 ## SenseSkill (and FungusSenseItem) both just apply a timed "sense" tag on
 ## this component — this is where that tag actually does something: the
 ## Level's wall occluders stop blocking the player's vision light, so nearby
@@ -396,14 +411,18 @@ func _is_weaver() -> bool:
 		and _active_class_data.spider_class == SpiderClassData.SpiderClass.WEAVER
 
 
-## Snapshot vitals into GameState before the level is freed on descent.
+## Snapshot vitals and the held item into GameState before the level is
+## freed on descent.
 func store_vitals() -> void:
 	GameState.store_player_vitals(health.current_health, hunger.current_hunger)
+	GameState.store_carried_item(inventory.held_item)
 
 
 ## health.max_health is already set by refresh_upgrades() (called via
 ## apply_class() earlier in _ready()) — this only restores current
-## health/hunger against that already-upgrade-aware ceiling.
+## health/hunger against that already-upgrade-aware ceiling. The held item
+## restores unconditionally (null is a valid, harmless "nothing held" value
+## on a first spawn, unlike vitals' NAN-gated has_carried_vitals() check).
 func _restore_vitals() -> void:
 	if GameState.has_carried_vitals():
 		health.current_health = clampf(GameState.carried_health, 0.0, health.max_health)
@@ -411,6 +430,8 @@ func _restore_vitals() -> void:
 	else:
 		health.current_health = health.max_health
 		hunger.current_hunger = 0.0
+	inventory.held_item = GameState.carried_item
+	inventory.item_held_changed.emit(inventory.held_item)
 
 
 func _on_health_changed(value: float, max_value: float) -> void:

@@ -9,7 +9,7 @@ extends ConsumableItem
 ## `Larva._wander_step()` has no pathfinding-toward-a-point seam yet.
 
 @export var pulse_radius: float = 200.0
-@export var duration: float = 8.0
+@export var duration: float = 60.0
 
 
 func _init() -> void:

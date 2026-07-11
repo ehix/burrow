@@ -23,6 +23,18 @@ func test_start_new_run_clears_carried_vitals() -> void:
 	assert_false(GameState.has_carried_vitals())
 
 
+func test_clear_carried_vitals_also_clears_the_carried_item() -> void:
+	GameState.carried_item = FungusSenseItem.new()
+	GameState.clear_carried_vitals()
+	assert_null(GameState.carried_item)
+
+
+func test_store_carried_item_sets_it() -> void:
+	var item := SeedPodItem.new()
+	GameState.store_carried_item(item)
+	assert_eq(GameState.carried_item, item)
+
+
 func test_enemy_defeated_increments_player_wins() -> void:
 	EventBus.enemy_defeated.emit("killed")
 	assert_eq(GameState.player_wins, 1)

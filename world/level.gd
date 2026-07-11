@@ -20,7 +20,7 @@ const LARVA_CAP_MAX := 18
 ## playthrough short of the Water Ingress hazard or the dev pit-toggle tool.
 const NATURAL_PIT_COUNT := 2
 ## World items seeded per depth (design §5): a mix of Fungus Poison/Sense,
-## Seed Pod pickups, and Lure placements.
+## Seed Pod, and Lure pickups — all picked up the same way now.
 const ITEM_SPAWN_COUNT := 3
 ## Earthworm obstacles seeded per depth (design §6).
 const EARTHWORM_COUNT := 1
@@ -30,7 +30,6 @@ const EnemyScene := preload("res://entities/enemy/enemy.tscn")
 const LarvaScene := preload("res://entities/larva/larva.tscn")
 const EarthwormScene := preload("res://entities/earthworm/earthworm.tscn")
 const WorldItemPickupScene := preload("res://entities/items/world_item_pickup.tscn")
-const LurePulseScene := preload("res://entities/items/lure_pulse.tscn")
 
 ## Fog-of-war ambient when darkness is on. White (no darkening) when off.
 const DARK_MODULATE := Color(0.05, 0.05, 0.07)
@@ -330,8 +329,9 @@ func _seed_natural_pits() -> void:
 		placed += 1
 
 
-## Scatter a mix of Fungus Poison/Sense, Seed Pod pickups, and Lure
-## placements (design §5) across random open, non-spawn tiles.
+## Scatter a mix of Fungus Poison/Sense, Seed Pod, and Lure pickups (design
+## §5) across random open, non-spawn, non-pit tiles — a pit-tile spawn would
+## be permanently unreachable, since pits block all ground-plane movement.
 func _seed_world_items() -> void:
 	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
 	var cells := maze.open_cells()
@@ -340,24 +340,22 @@ func _seed_world_items() -> void:
 	for cell in cells:
 		if placed >= ITEM_SPAWN_COUNT:
 			break
-		if reserved.has(cell):
+		if reserved.has(cell) or maze.is_pit(cell.x, cell.y):
 			continue
 		_spawn_random_item_at(cell)
 		reserved[cell] = true
 		placed += 1
 
 
-## One of four roughly-equal outcomes: Lure (placed/active immediately) or
-## one of the three WorldItemPickup-wrapped consumables (picked up on
-## contact).
+## One of four roughly-equal outcomes — Lure, Fungus Poison, Fungus Sense,
+## or Seed Pod — all picked up the same way now (item/inventory rework).
+## Deployment/consumption happens on InventoryComponent.use(), not on
+## pickup; a picked-up Lure deploys a LurePulse wherever it's used.
 func _spawn_random_item_at(cell: Vector2i) -> void:
 	var world_pos := _tile_centre(cell.x, cell.y)
 	match randi() % 4:
 		0:
-			var lure := LurePulseScene.instantiate()
-			lure.item = LureItem.new()
-			_entities.add_child(lure)
-			lure.global_position = world_pos
+			_spawn_pickup_at(world_pos, LureItem.new())
 		1:
 			_spawn_pickup_at(world_pos, FungusPoisonItem.new())
 		2:

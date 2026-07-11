@@ -1,4 +1,4 @@
-[gd_scene load_steps=31 format=3]
+[gd_scene load_steps=33 format=3]
 
 [ext_resource type="Script" path="res://entities/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://components/grid_mover.gd" id="10_mover"]
@@ -27,6 +27,7 @@
 [ext_resource type="Script" path="res://entities/skills/silk_tunnel_skill.gd" id="25_silk"]
 [ext_resource type="Script" path="res://entities/skills/decoy_skill.gd" id="26_decoyskill"]
 [ext_resource type="PackedScene" path="res://entities/skills/scenes/decoy.tscn" id="27_decoy"]
+[ext_resource type="Script" path="res://components/inventory_component.gd" id="28_inventory"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 10.0
@@ -146,3 +147,6 @@ trap_scene = ExtResource("8_trap")
 [node name="DecoySkill" type="Node" parent="."]
 script = ExtResource("26_decoyskill")
 decoy_scene = ExtResource("27_decoy")
+
+[node name="InventoryComponent" type="Node" parent="."]
+script = ExtResource("28_inventory")
