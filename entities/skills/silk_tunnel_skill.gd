@@ -10,7 +10,7 @@ extends SkillComponent
 ## instead of fighting over the same field (design guardrail §3).
 
 @export var trap_scene: PackedScene
-@export var tile_count: int = 4
+@export var tile_count: int = 6
 @export var self_speed_bonus: float = 0.3
 @export var self_buff_duration: float = 6.0
 
