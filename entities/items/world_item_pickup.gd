@@ -12,12 +12,6 @@ extends Area2D
 ## collision_mask = player(2) | enemy(4) = 6 — only spiders trigger it,
 ## larvae pass through untouched.
 
-const ITEM_COLORS := {
-	&"fungus_poison": Color(0.55, 0.25, 0.65, 0.9),
-	&"fungus_sense": Color(0.3, 0.75, 0.55, 0.9),
-	&"seed_pod": Color(0.85, 0.7, 0.25, 0.9),
-}
-
 @export var item: ConsumableItem
 
 var _spent := false
@@ -30,7 +24,7 @@ func _ready() -> void:
 
 func _draw() -> void:
 	var id: StringName = item.item_id if item != null else &""
-	draw_circle(Vector2.ZERO, 7.0, ITEM_COLORS.get(id, Color.WHITE))
+	draw_circle(Vector2.ZERO, 7.0, ConsumableItem.ITEM_COLORS.get(id, Color.WHITE))
 
 
 func _on_body_entered(body: Node2D) -> void:
