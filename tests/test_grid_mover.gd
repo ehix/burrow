@@ -181,3 +181,21 @@ func test_cancel_buffer_drops_a_queued_step() -> void:
 	mover.tick(0.1) # finishes RIGHT; must NOT auto-start the cancelled DOWN
 	assert_false(mover.is_moving(), "no buffered step should fire after cancel")
 	assert_almost_eq(parent.global_position, Vector2(48, 0), Vector2(0.001, 0.001))
+
+
+func test_spider_tile_contested_ignores_a_node_on_a_different_plane() -> void:
+	var enemy_pair := _make_spider(Vector2(288, 240)) # tile (6,5)
+	var enemy_mover: GridMover = enemy_pair[1]
+	var enemy_node: Node2D = enemy_pair[0]
+	var enemy_plane := PlaneComponent.new()
+	enemy_plane.name = "PlaneComponent" # runtime nodes aren't auto-named after class_name
+	enemy_node.add_child(enemy_plane)
+	enemy_plane.current_plane = Level.Layer.CEILING # the "other" spider is on the ceiling
+	var player_pair := _make_spider(Vector2(192, 240)) # tile (4,5), stays GROUND (no PlaneComponent)
+	var player_mover: GridMover = player_pair[1]
+
+	assert_true(enemy_mover.try_step(Vector2i.LEFT), "starts clear, toward the empty tile (5,5)")
+	enemy_mover.tick(0.03) # partway through the step, not yet landed
+
+	assert_false(GridMover.spider_tile_contested(player_mover, player_pair[0], Vector2i.RIGHT),
+		"the enemy committed to (5,5), but it's on a different plane — never contests")

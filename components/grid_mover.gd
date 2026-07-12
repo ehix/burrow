@@ -63,6 +63,9 @@ func committed_tile() -> Vector2i:
 ## True if stepping `dir` from `self_node` would land on a tile another spider
 ## already owns — occupied now, or already committed to via an in-flight step.
 ## Shared by Player and Enemy so spiders can't land on each other's tile.
+## Ceiling/plane mechanics rework: only contests against a node on the same
+## plane — a ground spider and a ceiling spider physically occupy different
+## layers and never block each other's tile.
 static func spider_tile_contested(mover: GridMover, self_node: Node2D, dir: Vector2i) -> bool:
 	var target_pos := self_node.global_position + Vector2(dir) * float(mover.tile_size)
 	var ts := float(mover.tile_size)
@@ -71,7 +74,7 @@ static func spider_tile_contested(mover: GridMover, self_node: Node2D, dir: Vect
 		if node == self_node:
 			continue
 		var other := node as Node2D
-		if other == null:
+		if other == null or not PlaneComponent.same_plane(self_node, other):
 			continue
 		var other_mover := other.get_node_or_null("GridMover") as GridMover
 		if other_mover != null and other_mover.committed_tile() == target_tile:
