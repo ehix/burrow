@@ -27,7 +27,7 @@ func _on_activate(source: Node) -> void:
 		return
 	active = true
 	_time_left = duration
-	_visual.modulate.a = target_alpha
+	OutlineFx.set_body_alpha(_visual, target_alpha)
 	OutlineFx.set_outline(_visual, true, OUTLINE_COLOR)
 
 
@@ -48,7 +48,7 @@ func break_camouflage() -> void:
 		return
 	active = false
 	if _visual != null:
-		_visual.modulate.a = 1.0
+		OutlineFx.set_body_alpha(_visual, 1.0)
 		OutlineFx.set_outline(_visual, false, OUTLINE_COLOR)
 	broken.emit()
 
