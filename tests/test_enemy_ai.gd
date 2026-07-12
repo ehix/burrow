@@ -100,3 +100,13 @@ func test_freeze_enemy_halts_physics_process() -> void:
 	var repath_before := enemy._repath_left
 	enemy._physics_process(1.0)
 	assert_eq(enemy._repath_left, repath_before, "a demobilized enemy takes no physics step")
+
+
+# --- Ceiling/plane mechanics rework -----------------------------------------------
+
+func test_enemy_has_a_plane_component_defaulting_to_ground() -> void:
+	var enemy := _make_enemy() # use this file's existing enemy-construction helper
+	var plane := enemy.get_node_or_null("PlaneComponent") as PlaneComponent
+
+	assert_not_null(plane, "Enemy gains a PlaneComponent (ceiling/plane mechanics rework)")
+	assert_eq(plane.current_plane, Level.Layer.GROUND)

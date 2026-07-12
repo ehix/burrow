@@ -524,8 +524,12 @@ func _spawn_entities() -> void:
 
 	enemy = EnemyScene.instantiate()
 	enemy.position = _tile_centre(enemy_cell.x, enemy_cell.y)
-	enemy.bind_level(self)
+	# Add to the tree before bind_level (mirroring the player above): Enemy's
+	# PlaneComponent is an @onready var, so bind_level's `_plane.level = level`
+	# needs _ready() to have already run — calling bind_level first left
+	# _plane null (ceiling/plane mechanics rework surfaced this).
 	_entities.add_child(enemy)
+	enemy.bind_level(self)
 
 	_spawn_larvae([player_cell, enemy_cell])
 
