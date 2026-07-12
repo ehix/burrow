@@ -60,7 +60,7 @@ func test_set_sense_outline_false_clears_everything() -> void:
 	assert_false((player_sprite.material as ShaderMaterial).get_shader_parameter("outline_enabled"))
 
 
-func test_set_sense_outline_highlights_wall_tiles_within_radius() -> void:
+func test_set_sense_outline_traces_wall_boundary_within_radius() -> void:
 	var level := _make_level()
 	var wall_tile: Vector2i = level._wall_nodes.keys()[0]
 	var wall_pos := level.centre_of(wall_tile)
@@ -68,10 +68,62 @@ func test_set_sense_outline_highlights_wall_tiles_within_radius() -> void:
 
 	level.set_sense_outline(true, 10.0)
 
-	assert_true(level._sense_wall_highlights.has(wall_tile))
+	assert_true(level._sense_structure_outline.wall_tiles.has(wall_tile))
 
 	level.set_sense_outline(false)
-	assert_false(level._sense_wall_highlights.has(wall_tile))
+	assert_true(level._sense_structure_outline.wall_tiles.is_empty())
+
+
+func test_set_sense_outline_traces_pit_boundary_within_radius() -> void:
+	var level := _make_level()
+	var pit_tile := Vector2i(4, 4)
+	while not level.maze.is_open(pit_tile.x, pit_tile.y): # find an open tile near the centre
+		pit_tile += Vector2i(1, 0)
+	level.set_pit_at(pit_tile, true)
+	level.player.global_position = level.centre_of(pit_tile)
+
+	level.set_sense_outline(true, 10.0)
+
+	assert_true(level._sense_structure_outline.pit_tiles.has(pit_tile))
+
+
+func test_set_sense_outline_boxes_a_nearby_world_item() -> void:
+	var level := _make_level()
+	var pickup: WorldItemPickup = preload("res://entities/items/world_item_pickup.tscn").instantiate()
+	level.add_child(pickup)
+	pickup.global_position = level.player.global_position
+
+	level.set_sense_outline(true, 50.0)
+
+	assert_true(level._sense_point_highlights.has(pickup))
+
+	level.set_sense_outline(false)
+	assert_false(level._sense_point_highlights.has(pickup))
+
+
+func test_set_sense_outline_boxes_a_nearby_earthworm() -> void:
+	var level := _make_level()
+	var worm: Earthworm = preload("res://entities/earthworm/earthworm.tscn").instantiate()
+	level.add_child(worm)
+	worm.global_position = level.player.global_position
+
+	level.set_sense_outline(true, 50.0)
+
+	assert_true(level._sense_point_highlights.has(worm))
+
+
+func test_set_sense_outline_outlines_a_nearby_trap() -> void:
+	var level := _make_level()
+	var trap: WebTrap = preload("res://entities/web/web_trap.tscn").instantiate()
+	level.add_child(trap)
+	trap.global_position = level.player.global_position
+	var trap_visual := trap.get_node("Visual") as CanvasItem
+
+	level.set_sense_outline(true, 50.0)
+
+	var mat := trap_visual.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_true(mat.get_shader_parameter("outline_enabled"))
 
 
 func test_build_seeds_natural_pits_away_from_both_spawns() -> void:
