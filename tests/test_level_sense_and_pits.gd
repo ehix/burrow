@@ -1,5 +1,5 @@
 extends GutTest
-## Level's SenseSkill x-ray hook and natural pit seeding (design §4 and §7).
+## Level's SenseSkill outline reveal and natural pit seeding (design §4 and §7).
 
 
 func _make_level() -> Level:

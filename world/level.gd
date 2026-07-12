@@ -217,7 +217,7 @@ func _update_sense_wall_highlights() -> void:
 		return
 	var still_in_range: Dictionary = {}
 	for tile in _wall_nodes.keys():
-		var centre := _tile_centre(tile.x, tile.y)
+		var centre := centre_of(tile)
 		if centre.distance_to(player.global_position) > _sense_radius:
 			continue
 		still_in_range[tile] = true
@@ -238,7 +238,7 @@ func _spawn_sense_wall_highlight(tile: Vector2i) -> Node2D:
 		Vector2(-half, -half), Vector2(half, -half),
 		Vector2(half, half), Vector2(-half, half)])
 	poly.color = SENSE_WALL_HIGHLIGHT_COLOR
-	poly.position = _tile_centre(tile.x, tile.y)
+	poly.position = centre_of(tile)
 	add_child(poly)
 	return poly
 

@@ -1,6 +1,6 @@
 extends GutTest
 ## TinySpiderling (design §3): chases the nearest non-owner spider and
-## attacks on contact until its lifetime elapses. Spawned by HatchlingsSkill
+## attacks on contact, persisting until killed. Spawned by HatchlingsSkill
 ## (scouting) or CocoonMine's burst (ambush) — this only tests the shared
 ## entity, not either caller.
 

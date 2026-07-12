@@ -1,12 +1,9 @@
 class_name SenseSkill
 extends SkillComponent
-## General utility (design §4): grants temporary x-ray vision through walls
-## (structural layout, critters, hostile entities) for `duration`. Rendering
-## (a full-map reveal pass over Renderer/Occluder visibility) isn't
-## implemented here — this just owns the timed "sense" status tag; the
-## fog/occluder layer would read `status.has(&"sense")` to decide whether to
-## ignore LightOccluder2D this frame (extension point on MazeRenderer /
-## Level.apply_darkness).
+## General utility (design §4): grants temporary `"sense"` status for
+## `duration`. The reveal itself (radius-limited outline on nearby spiders/
+## larvae, translucent wall highlights) is managed by Level.set_sense_outline()
+## called via Player._on_effect_applied/expired.
 
 @export var duration: float = 5.0
 ## How far from the player (in pixels) the outline reveal reaches — spiders/
