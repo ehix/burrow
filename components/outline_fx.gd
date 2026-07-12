@@ -54,6 +54,17 @@ static func set_outline(sprite: CanvasItem, enabled: bool, color: Color = Color.
 	mat.set_shader_parameter("outline_color", color)
 
 
+## Sets the shader's body_alpha uniform directly — no ref-counting (unlike
+## set_outline()'s on/off toggle, there's only ever one "true" opacity value
+## at a time; the last caller wins, same as the old `modulate.a` assignment
+## this replaces in CamouflageSkill).
+static func set_body_alpha(sprite: CanvasItem, alpha: float) -> void:
+	if sprite == null:
+		return
+	var mat := _material_of(sprite)
+	mat.set_shader_parameter("body_alpha", alpha)
+
+
 static func _material_of(sprite: CanvasItem) -> ShaderMaterial:
 	var mat := sprite.material as ShaderMaterial
 	if mat == null or mat.shader != OutlineShader:
