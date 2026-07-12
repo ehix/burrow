@@ -24,6 +24,8 @@ var _time_left: Dictionary = {} # StringName -> float
 ## Bind to `spider`. Safe to call again on a fresh spider instance (e.g.
 ## after a depth descent) — the EventBus connections only attach once.
 func bind_spider(spider: Node) -> void:
+	for id in _badges.keys().duplicate():
+		_remove_badge(id)
 	_bound_spider = spider
 	if not EventBus.status_effect_applied.is_connected(_on_status_effect_applied):
 		EventBus.status_effect_applied.connect(_on_status_effect_applied)

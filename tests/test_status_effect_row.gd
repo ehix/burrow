@@ -81,3 +81,16 @@ func test_real_event_bus_emission_reaches_the_bound_spider() -> void:
 	EventBus.status_effect_applied.emit(spider, &"poison", 2.0, 3.0)
 
 	assert_true(row._badges.has(&"poison"))
+
+
+func test_rebinding_to_a_new_spider_clears_stale_badges_from_the_old_one() -> void:
+	var row := _make_row()
+	var spider_a := _make_spider()
+	var spider_b := _make_spider()
+	row.bind_spider(spider_a)
+	row._on_status_effect_applied(spider_a, &"poison", 2.0, 3.0)
+
+	row.bind_spider(spider_b)
+
+	assert_eq(row._badges.size(), 0)
+	assert_false(row._badges.has(&"poison"))
