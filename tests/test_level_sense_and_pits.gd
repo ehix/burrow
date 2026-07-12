@@ -9,37 +9,69 @@ func _make_level() -> Level:
 	return level
 
 
-func test_set_sense_active_hides_wall_occluders() -> void:
+func test_set_sense_outline_outlines_entities_within_radius() -> void:
 	var level := _make_level()
-	var any_occluder: Node = null
-	for nodes in level._wall_nodes.values():
-		any_occluder = nodes.get("occluder")
-		break
-	assert_not_null(any_occluder, "the freshly-built level should have at least one wall")
-
-	level.set_sense_active(true)
-	assert_false(any_occluder.visible, "wall occluders stop blocking light while sense is active")
-
-	level.set_sense_active(false)
-	assert_true(any_occluder.visible, "occluders are restored once sense ends")
-
-
-func test_set_sense_outline_toggles_the_shader_on_every_spider_and_larva() -> void:
-	var level := _make_level()
+	level.player.global_position = Vector2(100, 100)
 	var player_sprite := level.player.get_node("Sprite") as CanvasItem
+
+	level.set_sense_outline(true, 50.0)
+
+	var player_mat := player_sprite.material as ShaderMaterial
+	assert_not_null(player_mat)
+	assert_true(player_mat.get_shader_parameter("outline_enabled"), "the player is always within its own sense radius")
+
+
+func test_set_sense_outline_skips_entities_outside_radius() -> void:
+	var level := _make_level()
+	level.player.global_position = Vector2(0, 0)
+	level.enemy.global_position = Vector2(1000, 1000) # far outside any reasonable radius
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 
-	level.set_sense_outline(true)
-	var player_mat := player_sprite.material as ShaderMaterial
-	var enemy_mat := enemy_sprite.material as ShaderMaterial
-	assert_not_null(player_mat)
-	assert_true(player_mat.get_shader_parameter("outline_enabled"))
-	assert_not_null(enemy_mat)
-	assert_true(enemy_mat.get_shader_parameter("outline_enabled"))
+	level.set_sense_outline(true, 50.0)
+
+	var mat := enemy_sprite.material as ShaderMaterial
+	assert_true(mat == null or not mat.get_shader_parameter("outline_enabled"),
+		"an entity far outside the radius never gets outlined")
+
+
+func test_set_sense_outline_updates_as_the_player_moves_closer() -> void:
+	var level := _make_level()
+	level.player.global_position = Vector2(0, 0)
+	level.enemy.global_position = Vector2(1000, 1000)
+	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
+	level.set_sense_outline(true, 50.0)
+
+	level.player.global_position = Vector2(990, 990) # now within radius of the enemy
+	level._process(0.016)
+
+	var mat := enemy_sprite.material as ShaderMaterial
+	assert_true(mat.get_shader_parameter("outline_enabled"), "entering radius turns the outline on")
+
+
+func test_set_sense_outline_false_clears_everything() -> void:
+	var level := _make_level()
+	level.player.global_position = Vector2(0, 0)
+	var player_sprite := level.player.get_node("Sprite") as CanvasItem
+	level.set_sense_outline(true, 500.0)
+	assert_true((player_sprite.material as ShaderMaterial).get_shader_parameter("outline_enabled"))
 
 	level.set_sense_outline(false)
-	assert_false(player_mat.get_shader_parameter("outline_enabled"))
-	assert_false(enemy_mat.get_shader_parameter("outline_enabled"))
+
+	assert_false((player_sprite.material as ShaderMaterial).get_shader_parameter("outline_enabled"))
+
+
+func test_set_sense_outline_highlights_wall_tiles_within_radius() -> void:
+	var level := _make_level()
+	var wall_tile: Vector2i = level._wall_nodes.keys()[0]
+	var wall_pos := level.centre_of(wall_tile)
+	level.player.global_position = wall_pos # right on top of a wall tile's centre
+
+	level.set_sense_outline(true, 10.0)
+
+	assert_true(level._sense_wall_highlights.has(wall_tile))
+
+	level.set_sense_outline(false)
+	assert_false(level._sense_wall_highlights.has(wall_tile))
 
 
 func test_build_seeds_natural_pits_away_from_both_spawns() -> void:

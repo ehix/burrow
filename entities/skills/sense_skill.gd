@@ -9,6 +9,9 @@ extends SkillComponent
 ## Level.apply_darkness).
 
 @export var duration: float = 5.0
+## How far from the player (in pixels) the outline reveal reaches — spiders/
+## larvae and wall tiles beyond this are untouched.
+@export var radius: float = 240.0
 
 
 func _on_activate(source: Node) -> void:

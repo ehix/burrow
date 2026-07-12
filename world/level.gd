@@ -34,6 +34,14 @@ const WorldItemPickupScene := preload("res://entities/items/world_item_pickup.ts
 ## Fog-of-war ambient when darkness is on. White (no darkening) when off.
 const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
+## Translucent fill for a wall tile within Sense's radius (design round 2):
+## walls have no per-tile sprite to shader-outline the way spiders/larvae
+## do (the whole maze is one batched MazeRenderer draw), and using an
+## alpha-edge shader on that renderer would only work while floor tiles
+## stay transparent — future map art will make floor opaque too. This
+## overlay is art-agnostic instead: it only needs "is this tile coordinate
+## a wall within radius", never anything about what's actually drawn there.
+const SENSE_WALL_HIGHLIGHT_COLOR := Color(0.75, 0.9, 1.0, 0.25)
 
 ## Dual-Plane Map Architecture (design §1): the ground floor and the inverted
 ## ceiling floor directly above it. A spider's PlaneComponent tracks which one
@@ -64,6 +72,13 @@ var _wall_nodes: Dictionary = {}
 ## stays visible in sync — mirrors _wall_nodes.
 var _pit_nodes: Dictionary = {}
 var _hazard_director: HazardDirector
+var _sense_active: bool = false
+var _sense_radius: float = 0.0
+## Node currently outlined via Sense -> true, so entry/exit toggles the
+## refcounted OutlineFx on/off exactly once each, not every frame.
+var _sense_outlined: Dictionary = {}
+## Wall tile currently highlighted via Sense -> its highlight node.
+var _sense_wall_highlights: Dictionary = {}
 
 
 func _ready() -> void:
@@ -91,16 +106,18 @@ func build() -> void:
 	_hazard_director.bind_level(self)
 
 
-## Keep the maze stocked: spawn a larva every interval while under the cap.
+## Keep the maze stocked (larva spawns), and while Sense is active, keep its
+## outline in sync with the player's live position every frame.
 func _process(delta: float) -> void:
 	if maze == null:
 		return
 	_spawn_accum += delta
-	if _spawn_accum < LARVA_SPAWN_INTERVAL:
-		return
-	_spawn_accum = 0.0
-	if get_tree().get_nodes_in_group("larvae").size() < _larva_cap:
-		_spawn_larva_at_random()
+	if _spawn_accum >= LARVA_SPAWN_INTERVAL:
+		_spawn_accum = 0.0
+		if get_tree().get_nodes_in_group("larvae").size() < _larva_cap:
+			_spawn_larva_at_random()
+	if _sense_active:
+		_update_sense_outlines()
 
 
 func get_player() -> Node2D:
@@ -142,30 +159,95 @@ func apply_darkness() -> void:
 			light.enabled = on
 
 
-## SenseSkill's x-ray (design §4): while active, every wall occluder stops
-## blocking light — the vision light passes through nearby walls instead of
-## stopping at them, revealing structure/critters/hostiles just beyond one
-## within light range. A local x-ray, not the full-map reveal the darkness
-## dev toggle does. Only affects walls that exist right now; a wall carved
-## open/collapsed mid-effect is unaffected either way (its occluder is
-## freed/spawned fresh, defaulting to normally-visible).
-func set_sense_active(active: bool) -> void:
-	for nodes in _wall_nodes.values():
-		var occ = nodes.get("occluder")
-		if occ != null and is_instance_valid(occ):
-			occ.visible = not active
+## SenseSkill's outline cue (Hatchlings/VFX/input round): every living
+## spider/larva within `radius` of the player gets the shared outline
+## shader, and nearby wall tiles get a translucent highlight — no more
+## light-through-walls (the old set_sense_active()). Continuous while
+## active: _process() re-syncs every frame as the player moves, so entering/
+## leaving the radius toggles the effect on/off in real time. `radius` is
+## ignored when `active` is false.
+func set_sense_outline(active: bool, radius: float = 0.0) -> void:
+	_sense_active = active
+	_sense_radius = radius
+	if active:
+		_update_sense_outlines()
+		return
+	for node in _sense_outlined.keys():
+		if is_instance_valid(node):
+			var sprite := (node as Node2D).get_node_or_null("Sprite") as CanvasItem
+			if sprite != null:
+				OutlineFx.set_outline(sprite, false, SENSE_OUTLINE_COLOR)
+	_sense_outlined.clear()
+	_clear_sense_wall_highlights()
 
 
-## SenseSkill's outline cue (skill fixes bundle): every living spider/larva
-## gets the shared outline shader while sense is active, alongside the
-## existing wall-occluder x-ray. A blanket effect, not per-entity occlusion —
-## consistent with set_sense_active()'s own blanket wall treatment.
-func set_sense_outline(active: bool) -> void:
+## Re-scans which spiders/larvae and wall tiles are currently within
+## _sense_radius of the player, toggling OutlineFx/highlights only on
+## entry/exit (via the _sense_outlined/_sense_wall_highlights "currently on"
+## sets) rather than redundantly every frame regardless of change.
+func _update_sense_outlines() -> void:
+	if player == null:
+		return
+	var still_in_range: Dictionary = {}
 	for group in ["spiders", "larvae"]:
 		for node in get_tree().get_nodes_in_group(group):
-			var sprite := (node as Node).get_node_or_null("Sprite") as CanvasItem
-			if sprite != null:
-				OutlineFx.set_outline(sprite, active, SENSE_OUTLINE_COLOR)
+			var n2d := node as Node2D
+			if n2d == null or not is_instance_valid(n2d):
+				continue
+			if n2d.global_position.distance_to(player.global_position) > _sense_radius:
+				continue
+			still_in_range[n2d] = true
+			if not _sense_outlined.has(n2d):
+				var sprite := n2d.get_node_or_null("Sprite") as CanvasItem
+				if sprite != null:
+					OutlineFx.set_outline(sprite, true, SENSE_OUTLINE_COLOR)
+					_sense_outlined[n2d] = true
+	for node in _sense_outlined.keys().duplicate():
+		if not still_in_range.has(node):
+			if is_instance_valid(node):
+				var sprite := (node as Node2D).get_node_or_null("Sprite") as CanvasItem
+				if sprite != null:
+					OutlineFx.set_outline(sprite, false, SENSE_OUTLINE_COLOR)
+			_sense_outlined.erase(node)
+	_update_sense_wall_highlights()
+
+
+func _update_sense_wall_highlights() -> void:
+	if player == null:
+		return
+	var still_in_range: Dictionary = {}
+	for tile in _wall_nodes.keys():
+		var centre := _tile_centre(tile.x, tile.y)
+		if centre.distance_to(player.global_position) > _sense_radius:
+			continue
+		still_in_range[tile] = true
+		if not _sense_wall_highlights.has(tile):
+			_sense_wall_highlights[tile] = _spawn_sense_wall_highlight(tile)
+	for tile in _sense_wall_highlights.keys().duplicate():
+		if not still_in_range.has(tile):
+			var highlight = _sense_wall_highlights[tile]
+			if highlight != null and is_instance_valid(highlight):
+				highlight.queue_free()
+			_sense_wall_highlights.erase(tile)
+
+
+func _spawn_sense_wall_highlight(tile: Vector2i) -> Node2D:
+	var half := TILE_SIZE * 0.5
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)])
+	poly.color = SENSE_WALL_HIGHLIGHT_COLOR
+	poly.position = _tile_centre(tile.x, tile.y)
+	add_child(poly)
+	return poly
+
+
+func _clear_sense_wall_highlights() -> void:
+	for highlight in _sense_wall_highlights.values():
+		if highlight != null and is_instance_valid(highlight):
+			highlight.queue_free()
+	_sense_wall_highlights.clear()
 
 
 func _build_collision_and_occluders() -> void:

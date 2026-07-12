@@ -317,19 +317,19 @@ func _draw() -> void:
 
 
 ## SenseSkill (and FungusSenseItem) both just apply a timed "sense" tag on
-## this component — this is where that tag actually does something: the
-## Level's wall occluders stop blocking the player's vision light, so nearby
-## structure/critters/hostiles show through a wall within light range (a
-## local x-ray, not a full-map reveal — that's the separate darkness toggle).
+## this component — this is where that tag actually does something: nearby
+## spiders/larvae and wall tiles within SenseSkill.radius get a shared
+## outline/highlight treatment (Level.set_sense_outline()), continuously
+## tracking the player's position while active. No more light-through-walls
+## — that approach read as "illuminating the map" rather than a readable
+## reveal.
 func _on_effect_applied(id: StringName, _magnitude: float, _duration: float) -> void:
 	if id == &"sense" and _level != null:
-		_level.set_sense_active(true)
-		_level.set_sense_outline(true)
+		_level.set_sense_outline(true, _sense.radius)
 
 
 func _on_effect_expired(id: StringName) -> void:
 	if id == &"sense" and _level != null:
-		_level.set_sense_active(false)
 		_level.set_sense_outline(false)
 
 
