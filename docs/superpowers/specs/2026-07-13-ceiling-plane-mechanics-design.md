@@ -251,6 +251,23 @@ hoc sprite reference, none currently wired to the shared outline shader) for
 an unsupervised overnight round. Called out explicitly as **out of scope**
 below rather than silently skipped.
 
+**Judgment call — `body_alpha` conflicts with Camouflage.** `OutlineFx
+.set_body_alpha()` is explicitly *not* reference-counted (unlike
+`set_outline()`) — "last caller wins," by design, from when it shipped for
+Camouflage. Plane-focus dimming and Camouflage both now want to drive the
+same uniform on the same Player sprite (a Decoy-class player can be
+camouflaged and change planes independently), so a naive implementation
+would let a plane-change event silently overwrite Camouflage's
+near-invisible `0.15` back to `1.0`/`0.35` mid-Camouflage. Fixed at the
+narrowest point: `Level._refresh_plane_focus()` skips a node whose
+`CamouflageSkill` is currently `active`, leaving Camouflage in sole control
+of that node's `body_alpha` until it breaks. One known, accepted gap this
+leaves: if the player was actually off-plane from the enemy at the moment
+Camouflage breaks, `break_camouflage()`'s own unconditional reset to `1.0`
+briefly shows full brightness until the *next* `plane_changed` event
+resyncs it — narrow window, cosmetic only, not worth a cross-system
+refactor (e.g. real compositing of the two effects) for this round.
+
 `Player._on_plane_changed()`/`_update_sprite_tint()` — the old tint hack —
 is deleted outright. The class's own `display_color` is the sprite's
 `modulate` on both planes now, full stop.
