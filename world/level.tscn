@@ -19,3 +19,7 @@ collision_mask = 0
 [node name="Occluders" type="Node2D" parent="."]
 
 [node name="Entities" type="Node2D" parent="."]
+
+[node name="SenseLayer" type="CanvasLayer" parent="."]
+follow_viewport_enabled = true
+layer = 1

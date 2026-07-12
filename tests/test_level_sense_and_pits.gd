@@ -9,55 +9,66 @@ func _make_level() -> Level:
 	return level
 
 
-func test_set_sense_outline_outlines_entities_within_radius() -> void:
+func test_set_sense_outline_ghosts_entities_within_radius() -> void:
 	var level := _make_level()
 	level.player.global_position = Vector2(100, 100)
-	var player_sprite := level.player.get_node("Sprite") as CanvasItem
+	var player_sprite := level.player.get_node("Sprite") as Sprite2D
 
 	level.set_sense_outline(true, 50.0)
 
-	var player_mat := player_sprite.material as ShaderMaterial
-	assert_not_null(player_mat)
-	assert_true(player_mat.get_shader_parameter("outline_enabled"), "the player is always within its own sense radius")
+	var ghost: Sprite2D = level._sense_outlined.get(level.player)
+	assert_not_null(ghost, "the player is always within its own sense radius")
+	assert_eq(ghost.get_parent(), level._sense_layer, "ghosts live on the un-darkened layer, not under the real entity")
+	assert_eq(ghost.texture, player_sprite.texture, "the ghost mirrors the real sprite's texture")
+	var mat := ghost.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_true(mat.get_shader_parameter("outline_enabled"))
+	assert_eq(mat.get_shader_parameter("body_alpha"), 0.0, "only the silhouette shows — the real body stays hidden")
 
 
 func test_set_sense_outline_skips_entities_outside_radius() -> void:
 	var level := _make_level()
 	level.player.global_position = Vector2(0, 0)
 	level.enemy.global_position = Vector2(1000, 1000) # far outside any reasonable radius
-	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 
 	level.set_sense_outline(true, 50.0)
 
-	var mat := enemy_sprite.material as ShaderMaterial
-	assert_true(mat == null or not mat.get_shader_parameter("outline_enabled"),
-		"an entity far outside the radius never gets outlined")
+	assert_false(level._sense_outlined.has(level.enemy), "an entity far outside the radius never gets a ghost")
 
 
 func test_set_sense_outline_updates_as_the_player_moves_closer() -> void:
 	var level := _make_level()
 	level.player.global_position = Vector2(0, 0)
 	level.enemy.global_position = Vector2(1000, 1000)
-	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 	level.set_sense_outline(true, 50.0)
 
 	level.player.global_position = Vector2(990, 990) # now within radius of the enemy
 	level._process(0.016)
 
-	var mat := enemy_sprite.material as ShaderMaterial
-	assert_true(mat.get_shader_parameter("outline_enabled"), "entering radius turns the outline on")
+	assert_true(level._sense_outlined.has(level.enemy), "entering radius spawns a ghost")
+
+
+func test_set_sense_outline_ghost_tracks_the_real_entitys_movement() -> void:
+	var level := _make_level()
+	level.player.global_position = Vector2(0, 0)
+	level.set_sense_outline(true, 500.0)
+	var ghost: Sprite2D = level._sense_outlined[level.player]
+
+	level.player.global_position = Vector2(200, 150)
+	level._process(0.016)
+
+	assert_eq(ghost.global_position, level.player.get_node("Sprite").global_position)
 
 
 func test_set_sense_outline_false_clears_everything() -> void:
 	var level := _make_level()
 	level.player.global_position = Vector2(0, 0)
-	var player_sprite := level.player.get_node("Sprite") as CanvasItem
 	level.set_sense_outline(true, 500.0)
-	assert_true((player_sprite.material as ShaderMaterial).get_shader_parameter("outline_enabled"))
+	assert_true(level._sense_outlined.has(level.player))
 
 	level.set_sense_outline(false)
 
-	assert_false((player_sprite.material as ShaderMaterial).get_shader_parameter("outline_enabled"))
+	assert_true(level._sense_outlined.is_empty())
 
 
 func test_set_sense_outline_traces_wall_boundary_within_radius() -> void:
@@ -96,6 +107,8 @@ func test_set_sense_outline_boxes_a_nearby_world_item() -> void:
 	level.set_sense_outline(true, 50.0)
 
 	assert_true(level._sense_point_highlights.has(pickup))
+	var outline: Node2D = level._sense_point_highlights[pickup]
+	assert_eq(outline.get_parent(), level._sense_layer, "outlines live on the un-darkened layer, not under the entity")
 
 	level.set_sense_outline(false)
 	assert_false(level._sense_point_highlights.has(pickup))
@@ -117,13 +130,21 @@ func test_set_sense_outline_outlines_a_nearby_trap() -> void:
 	var trap: WebTrap = preload("res://entities/web/web_trap.tscn").instantiate()
 	level.add_child(trap)
 	trap.global_position = level.player.global_position
-	var trap_visual := trap.get_node("Visual") as CanvasItem
 
 	level.set_sense_outline(true, 50.0)
 
-	var mat := trap_visual.material as ShaderMaterial
+	var ghost: Sprite2D = level._sense_outlined.get(trap)
+	assert_not_null(ghost, "WebTrap's sprite is named Visual, not Sprite — must still be found")
+	var mat := ghost.material as ShaderMaterial
 	assert_not_null(mat)
 	assert_true(mat.get_shader_parameter("outline_enabled"))
+
+
+func test_sense_layer_is_not_affected_by_canvas_modulate() -> void:
+	var level := _make_level()
+	assert_true(level._sense_layer is CanvasLayer)
+	assert_true(level._sense_layer.follow_viewport_enabled,
+		"must track the camera/world position, not sit fixed on screen like a HUD")
 
 
 func test_build_seeds_natural_pits_away_from_both_spawns() -> void:
