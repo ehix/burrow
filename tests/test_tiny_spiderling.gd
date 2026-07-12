@@ -38,21 +38,12 @@ func test_joins_the_hatchlings_group() -> void:
 	assert_true(spiderling.is_in_group("hatchlings"))
 
 
-func test_expires_after_its_lifetime() -> void:
-	var spiderling := _make_spiderling()
-	spiderling.setup(null, 1.0)
-	spiderling._physics_process(0.6)
-	assert_false(spiderling.is_queued_for_deletion())
-	spiderling._physics_process(0.5)
-	assert_true(spiderling.is_queued_for_deletion())
-
-
 func test_attacks_the_nearest_non_owner_spider_on_contact() -> void:
 	var spiderling := _make_spiderling()
 	var owner_spider := _make_target()
 	var target := _make_target()
 	target.global_position = spiderling.global_position + Vector2(5, 0) # within attack_range
-	spiderling.setup(owner_spider, 5.0)
+	spiderling.setup(owner_spider)
 
 	spiderling._physics_process(0.016)
 
@@ -64,7 +55,7 @@ func test_never_targets_its_own_owner() -> void:
 	var spiderling := _make_spiderling()
 	var owner_spider := _make_target()
 	owner_spider.global_position = spiderling.global_position # in contact range
-	spiderling.setup(owner_spider, 5.0)
+	spiderling.setup(owner_spider)
 
 	spiderling._physics_process(0.016)
 
@@ -76,7 +67,7 @@ func test_attack_respects_its_own_cooldown() -> void:
 	var spiderling := _make_spiderling()
 	var target := _make_target()
 	target.global_position = spiderling.global_position
-	spiderling.setup(null, 5.0)
+	spiderling.setup(null)
 	spiderling.attack_cooldown = 1.0
 
 	spiderling._physics_process(0.016)
@@ -109,7 +100,7 @@ func test_escorts_toward_the_owner_plus_offset_when_no_enemy_is_near() -> void:
 	var owner_spider := _make_target()
 	owner_spider.global_position = Vector2(600, 600)
 	spiderling.global_position = Vector2(0, 0)
-	spiderling.setup(owner_spider, 5.0, Vector2(20, 0))
+	spiderling.setup(owner_spider, Vector2(20, 0))
 	var target_point := owner_spider.global_position + Vector2(20, 0)
 	var before := spiderling.global_position.distance_to(target_point)
 
@@ -127,7 +118,7 @@ func test_switches_to_chase_when_an_enemy_enters_aggro_radius_and_los() -> void:
 	var enemy := _make_target()
 	spiderling.global_position = Vector2(0, 0)
 	enemy.global_position = Vector2(50, 0) # within aggro_radius(180), beyond attack_range(20)
-	spiderling.setup(owner_spider, 5.0)
+	spiderling.setup(owner_spider)
 
 	spiderling._physics_process(0.016)
 
@@ -140,7 +131,7 @@ func test_never_targets_an_enemy_blocked_by_a_wall() -> void:
 	spiderling.global_position = Vector2(0, 0)
 	enemy.global_position = Vector2(100, 0)
 	_make_wall(Vector2(50, 0))
-	spiderling.setup(null, 5.0) # no owner -> escort() with no owner holds still
+	spiderling.setup(null) # no owner -> escort() with no owner holds still
 
 	spiderling._physics_process(0.016)
 
@@ -154,7 +145,7 @@ func test_reverts_to_escort_once_the_target_leaves_aggro_radius() -> void:
 	var enemy := _make_target()
 	spiderling.global_position = Vector2(0, 0)
 	enemy.global_position = Vector2(50, 0)
-	spiderling.setup(owner_spider, 5.0)
+	spiderling.setup(owner_spider)
 	spiderling._physics_process(0.016)
 	assert_gt(spiderling.velocity.length(), 0.0, "starts chasing")
 
@@ -168,3 +159,42 @@ func test_reverts_to_escort_once_the_target_leaves_aggro_radius() -> void:
 
 	assert_lt(spiderling.global_position.distance_to(owner_spider.global_position), 1.0,
 		"settles back at the owner's position once escort resumes (no target, escort_offset defaults to zero)")
+
+
+func test_snaps_to_the_escort_point_once_it_falls_beyond_leash_distance() -> void:
+	var spiderling := _make_spiderling()
+	var owner_spider := _make_target()
+	owner_spider.global_position = Vector2(0, 0)
+	spiderling.global_position = Vector2(1000, 0) # far beyond leash_distance (200)
+	spiderling.setup(owner_spider, Vector2(20, 0))
+
+	spiderling._physics_process(0.016)
+
+	assert_eq(spiderling.global_position, Vector2(20, 0),
+		"snaps directly to the escort point instead of continuing to path when the gap is too large")
+
+
+func test_walks_normally_toward_escort_point_when_within_leash_distance() -> void:
+	var spiderling := _make_spiderling()
+	var owner_spider := _make_target()
+	owner_spider.global_position = Vector2(100, 0)
+	spiderling.global_position = Vector2(0, 0) # 100px away, well under leash_distance (200)
+	spiderling.setup(owner_spider)
+	var target_point := owner_spider.global_position
+	var before := spiderling.global_position.distance_to(target_point)
+
+	for i in 10:
+		spiderling._physics_process(0.05)
+
+	var after := spiderling.global_position.distance_to(target_point)
+	assert_lt(after, before, "steps toward the escort point rather than snapping when within leash_distance")
+	assert_gt(after, 0.0, "hasn't teleported all the way there in one frame")
+
+
+func test_dies_in_one_hit_via_its_hurtbox() -> void:
+	var spiderling := _make_spiderling()
+	var hurtbox := spiderling.get_node("Hurtbox") as Hurtbox
+
+	hurtbox.receive_hit(1.0, null)
+
+	assert_true(spiderling.is_queued_for_deletion(), "any hit through the standard Hurtbox pipeline kills it")

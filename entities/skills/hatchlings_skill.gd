@@ -1,14 +1,12 @@
 class_name HatchlingsSkill
 extends SkillComponent
 ## Wolf Spider (female): spawns `spawn_count` temporary hatchling scouts that
-## hunt independently for `lifetime` seconds, then despawn. `hatchling_scene`
-## is a small CharacterBody2D (own GridMover + a light Hitbox) — not yet
-## authored as a `.tscn` (needs an editor pass for its collision/visual), but
-## its script contract (`setup(owner, lifetime)`) is fixed here.
+## hunt independently until killed — no fixed lifetime, they persist until
+## a hit lands. `hatchling_scene`'s script contract is `setup(owner,
+## escort_offset)`.
 
 @export var hatchling_scene: PackedScene
 @export var spawn_count: int = 3
-@export var lifetime: float = 8.0
 @export var spawn_radius: float = 24.0
 
 
@@ -25,7 +23,7 @@ func _on_activate(source: Node) -> void:
 		var offset := Vector2(spawn_radius, 0).rotated(TAU * float(i) / float(spawn_count))
 		hatchling.global_position = origin.global_position + offset
 		if hatchling.has_method("setup"):
-			hatchling.setup(source, lifetime, offset)
+			hatchling.setup(source, offset)
 
 
 func _spawn_parent(source: Node) -> Node:
