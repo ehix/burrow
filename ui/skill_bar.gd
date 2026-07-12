@@ -41,15 +41,16 @@ func _rebind() -> void:
 		return
 	var skills := _player.active_skills()
 	var actions := skills.keys()
-	var action1: String = actions[0] if actions.size() > 0 else ""
-	var action2: String = actions[1] if actions.size() > 1 else ""
-	_skill1 = skills.get(action1)
-	_skill2 = skills.get(action2)
-	_bind_slot(action1, _skill1, _key_label1, _name_label1)
-	_bind_slot(action2, _skill2, _key_label2, _name_label2)
+	_skill1 = skills.get(actions[0]) if actions.size() > 0 else null
+	_skill2 = skills.get(actions[1]) if actions.size() > 1 else null
+	_bind_slot(_skill1, "skill_1", _key_label1, _name_label1)
+	_bind_slot(_skill2, "skill_2", _key_label2, _name_label2)
 
 
-func _bind_slot(action: String, skill: SkillComponent, key_label: Label, name_label: Label) -> void:
+## `input_action` is always "skill_1"/"skill_2" now (the generic buttons),
+## never the skill's own name — those per-skill actions no longer exist in
+## the InputMap after the Hatchlings/VFX/input round's keybind collapse.
+func _bind_slot(skill: SkillComponent, input_action: String, key_label: Label, name_label: Label) -> void:
 	if skill == null:
 		key_label.text = ""
 		name_label.text = ""
@@ -57,7 +58,7 @@ func _bind_slot(action: String, skill: SkillComponent, key_label: Label, name_la
 		return
 	name_label.text = skill.display_name
 	name_label.tooltip_text = skill.description
-	var events := InputMap.action_get_events(action)
+	var events := InputMap.action_get_events(input_action)
 	key_label.text = events[0].as_text_physical_keycode() if events.size() > 0 else ""
 
 

@@ -27,8 +27,8 @@ func test_binds_the_default_classs_two_skills() -> void:
 
 	assert_eq(bar._name_label1.text, player._hatchlings.display_name)
 	assert_eq(bar._name_label2.text, player._egg_mine.display_name)
-	assert_eq(bar._key_label1.text, "Y")
-	assert_eq(bar._key_label2.text, "U")
+	assert_eq(bar._key_label1.text, "V")
+	assert_eq(bar._key_label2.text, "B")
 
 
 func test_rebinds_when_the_class_changes() -> void:

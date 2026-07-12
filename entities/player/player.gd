@@ -149,28 +149,24 @@ func _physics_process(delta: float) -> void:
 		_remove_walls.activate(self)
 	if Input.is_action_just_pressed("use_item"):
 		inventory.use(self)
-	if Input.is_action_just_pressed("camouflage") and _is_active_skill("camouflage"):
-		_camouflage.activate(self)
-	# Held, not just-pressed: picking up a trap works either by walking onto
-	# it while holding the button, or by pressing the button while already
-	# stopped on it — both need this checked every frame the button is down,
-	# not just on the press edge. NetHoldSkill.activate() itself gates out
-	# the idle case so this never burns cooldown/hunger while nothing's in
-	# reach.
-	if Input.is_action_pressed("net_hold") and _is_active_skill("net_hold"):
-		_net_hold.activate(self)
-	if Input.is_action_just_pressed("net_shot") and _is_active_skill("net_shot"):
-		_net_shot.activate(self)
-	if Input.is_action_just_pressed("hatchlings") and _is_active_skill("hatchlings"):
-		_hatchlings.activate(self)
-	if Input.is_action_just_pressed("egg_mine") and _is_active_skill("egg_mine"):
-		_egg_mine.activate(self)
-	if Input.is_action_just_pressed("blockade") and _is_active_skill("blockade"):
-		_blockade.activate(self)
-	if Input.is_action_just_pressed("silk_tunnel") and _is_active_skill("silk_tunnel"):
-		_silk_tunnel.activate(self)
-	if Input.is_action_just_pressed("decoy") and _is_active_skill("decoy"):
-		_decoy.activate(self)
+	# Two generic skill buttons (Hatchlings/VFX/input round) resolve
+	# positionally through CLASS_SKILLS instead of each skill owning its own
+	# dedicated action — see _skill_for_slot(). skill_1 polls with
+	# is_action_pressed (not _just_pressed) so it works uniformly whether the
+	# current class's first skill is held (NetHoldSkill, whose own
+	# activate() override already no-ops harmlessly on repeat calls while
+	# already holding or with nothing in reach) or one-shot (cooldown-gated,
+	# so repeat calls while held are harmless). skill_2 never lands on a
+	# held skill in the current CLASS_SKILLS layout, so it stays
+	# _just_pressed for a clean single-trigger feel.
+	if Input.is_action_pressed("skill_1"):
+		var skill1 := _skill_for_slot(0)
+		if skill1 != null:
+			skill1.activate(self)
+	if Input.is_action_just_pressed("skill_2"):
+		var skill2 := _skill_for_slot(1)
+		if skill2 != null:
+			skill2.activate(self)
 	if Input.is_action_just_pressed("buy_upgrade_1"):
 		_try_buy_upgrade(0)
 	if Input.is_action_just_pressed("buy_upgrade_2"):
@@ -205,13 +201,6 @@ func apply_class(spider_class: int) -> void:
 	_update_sprite_tint()
 
 
-## Whether `action`'s skill belongs to the currently active class. Sense and
-## Remove Walls (general utilities) never go through this check at all.
-func _is_active_skill(action: String) -> bool:
-	var skills: Array = CLASS_SKILLS.get(_active_class, [])
-	return action in skills
-
-
 ## The current class's two class-specific SkillComponents, keyed by their
 ## input action name in CLASS_SKILLS order — the seam ui/skill_bar.gd binds
 ## its two icons through.
@@ -223,6 +212,17 @@ func active_skills() -> Dictionary:
 		if skill != null:
 			result[action] = skill
 	return result
+
+
+## The SkillComponent occupying input slot 0 (skill_1) or 1 (skill_2) for
+## whichever class is currently active — the seam _physics_process() and
+## tests both resolve through, instead of duplicating the CLASS_SKILLS/
+## _skill_by_action lookup or needing to drive real Input events.
+func _skill_for_slot(slot: int) -> SkillComponent:
+	var actions: Array = CLASS_SKILLS.get(_active_class, [])
+	if slot < 0 or slot >= actions.size():
+		return null
+	return _skill_by_action.get(actions[slot])
 
 
 ## Recomputes melee damage, web cooldown, hunger rate, and max health from
