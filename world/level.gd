@@ -156,6 +156,9 @@ func _ready() -> void:
 	# RemoveWallsSkill, BlockadeSkill) without needing it threaded through
 	# every call site the way Enemy.bind_level() does.
 	add_to_group("level")
+	# Ceiling/plane mechanics rework: floor re-color tracks the player's own
+	# plane; entity dimming (Task 7) reacts to anyone's plane change.
+	EventBus.plane_changed.connect(_on_plane_changed)
 
 
 ## Build the whole level. Called by World right after instancing.
@@ -532,6 +535,14 @@ func _spawn_entities() -> void:
 	enemy.bind_level(self)
 
 	_spawn_larvae([player_cell, enemy_cell])
+
+
+## Ceiling/plane mechanics rework: the rendered floor always reflects the
+## player's own plane specifically (one camera, one local viewer) — an
+## enemy transitioning doesn't touch the floor color at all.
+func _on_plane_changed(who: Node, _plane: int) -> void:
+	if who == player:
+		_renderer.set_active_plane(player.get_node("PlaneComponent").current_plane)
 
 
 ## Flag a handful of random open, non-spawn tiles as pits so the ceiling
