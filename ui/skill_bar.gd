@@ -62,9 +62,18 @@ func _bind_slot(skill: SkillComponent, input_action: String, key_label: Label, n
 	key_label.text = events[0].as_text_physical_keycode() if events.size() > 0 else ""
 
 
+## _skill1/_skill2 can go stale mid-frame: World._replace_level() frees the
+## old Player (and its SkillComponents) one frame before rebinding the HUD
+## to the new one, and _process() keeps running through that gap. The
+## is_instance_valid() check has to happen here, before the freed reference
+## is ever passed into _update_cooldown()'s typed `skill: SkillComponent`
+## parameter — casting/passing a freed object into a typed slot is what
+## actually throws, not anything inside the function body.
 func _process(_delta: float) -> void:
-	_update_cooldown(_skill1, _panel1, _cooldown_label1)
-	_update_cooldown(_skill2, _panel2, _cooldown_label2)
+	if is_instance_valid(_skill1):
+		_update_cooldown(_skill1, _panel1, _cooldown_label1)
+	if is_instance_valid(_skill2):
+		_update_cooldown(_skill2, _panel2, _cooldown_label2)
 
 
 func _update_cooldown(skill: SkillComponent, panel: Panel, cooldown_label: Label) -> void:

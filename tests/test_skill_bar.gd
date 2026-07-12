@@ -65,3 +65,23 @@ func test_shows_ready_color_and_no_countdown_once_off_cooldown() -> void:
 
 	assert_eq(bar._panel1.modulate, SkillBar.READY_COLOR)
 	assert_eq(bar._cooldown_label1.text, "")
+
+
+## Reproduces a real playtest bug: a depth descent frees the old Player (and
+## its SkillComponents) one frame before World rebinds the HUD to the new
+## one (World._replace_level()'s "await get_tree().process_frame" gap). Any
+## _process() tick that lands in that gap must not touch a freed reference —
+## drives it through _process() itself, the actual call site in production,
+## not _update_cooldown() directly (the freed-reference crash happens at
+## the typed-parameter call boundary, before _update_cooldown()'s own body
+## ever runs).
+func test_process_tolerates_a_freed_skill_reference() -> void:
+	var bar := _make_bar()
+	var skill := SkillComponent.new()
+	bar._skill1 = skill # a valid assignment, same as a normal _rebind()
+	skill.free() # the referenced object is freed later — this is the real gap
+	bar._panel1.modulate = Color.MAGENTA # sentinel, distinct from DIM_COLOR/READY_COLOR
+
+	bar._process(0.0)
+
+	assert_eq(bar._panel1.modulate, Color.MAGENTA, "a freed skill reference must not be touched further")

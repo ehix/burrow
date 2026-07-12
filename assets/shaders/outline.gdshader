@@ -13,24 +13,24 @@ uniform bool outline_enabled = true;
 uniform float body_alpha : hint_range(0.0, 1.0) = 1.0;
 
 void fragment() {
+	// No early `return` in fragment() — this project's renderer rejects it
+	// ("SHADER ERROR: Using 'return' in the 'fragment' processor function
+	// is incorrect."), silently failing the whole shader's compilation.
+	// Every branch below funnels into one COLOR assignment instead.
 	vec4 tex_color = texture(TEXTURE, UV);
-	if (tex_color.a > 0.5) {
+	if (tex_color.a > 0.5 || !outline_enabled) {
 		COLOR = vec4(tex_color.rgb, tex_color.a * body_alpha);
-		return;
+	} else {
+		vec2 texel = outline_width / vec2(textureSize(TEXTURE, 0));
+		float neighbor_alpha = 0.0;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(texel.x, 0.0)).a;
+		neighbor_alpha += texture(TEXTURE, UV - vec2(texel.x, 0.0)).a;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(0.0, texel.y)).a;
+		neighbor_alpha += texture(TEXTURE, UV - vec2(0.0, texel.y)).a;
+		neighbor_alpha += texture(TEXTURE, UV + texel).a;
+		neighbor_alpha += texture(TEXTURE, UV - texel).a;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(texel.x, -texel.y)).a;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(-texel.x, texel.y)).a;
+		COLOR = neighbor_alpha > 0.0 ? outline_color : vec4(tex_color.rgb, tex_color.a * body_alpha);
 	}
-	if (!outline_enabled) {
-		COLOR = vec4(tex_color.rgb, tex_color.a * body_alpha);
-		return;
-	}
-	vec2 texel = outline_width / vec2(textureSize(TEXTURE, 0));
-	float neighbor_alpha = 0.0;
-	neighbor_alpha += texture(TEXTURE, UV + vec2(texel.x, 0.0)).a;
-	neighbor_alpha += texture(TEXTURE, UV - vec2(texel.x, 0.0)).a;
-	neighbor_alpha += texture(TEXTURE, UV + vec2(0.0, texel.y)).a;
-	neighbor_alpha += texture(TEXTURE, UV - vec2(0.0, texel.y)).a;
-	neighbor_alpha += texture(TEXTURE, UV + texel).a;
-	neighbor_alpha += texture(TEXTURE, UV - texel).a;
-	neighbor_alpha += texture(TEXTURE, UV + vec2(texel.x, -texel.y)).a;
-	neighbor_alpha += texture(TEXTURE, UV + vec2(-texel.x, texel.y)).a;
-	COLOR = neighbor_alpha > 0.0 ? outline_color : vec4(tex_color.rgb, tex_color.a * body_alpha);
 }
