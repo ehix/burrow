@@ -87,3 +87,29 @@ func test_off_call_with_no_prior_on_call_does_not_go_negative() -> void:
 
 	var mat := sprite.material as ShaderMaterial
 	assert_false(mat.get_shader_parameter("outline_enabled"))
+
+
+func test_set_body_alpha_sets_the_shader_uniform() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_body_alpha(sprite, 0.15)
+
+	var mat := sprite.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), 0.15, 0.001)
+
+
+func test_set_body_alpha_on_null_sprite_is_a_noop() -> void:
+	OutlineFx.set_body_alpha(null, 0.5) # must not error
+	assert_true(true, "reached this point without erroring")
+
+
+func test_set_body_alpha_reuses_the_same_material_set_outline_uses() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_outline(sprite, true, Color.RED)
+	var mat_after_outline := sprite.material
+	OutlineFx.set_body_alpha(sprite, 0.5)
+	var mat_after_alpha := sprite.material
+
+	assert_eq(mat_after_outline, mat_after_alpha, "one shared material, not a second one stacked on")

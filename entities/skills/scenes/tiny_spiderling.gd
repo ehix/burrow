@@ -1,25 +1,34 @@
 class_name TinySpiderling
 extends CharacterBody2D
-## A temporary attacking hatchling (skill fixes bundle: escort/aggro AI +
-## line-of-sight). Spawned by HatchlingsSkill (scouting mode) — escorts near
-## its owner spider until an enemy spider comes within both aggro_radius and
-## line-of-sight, then breaks off to chase/attack it, reverting to escort
-## once the target dies, leaves aggro_radius, or line-of-sight breaks.
-## Placeholder visual: a small drawn dot, no art asset yet.
+## A temporary attacking hatchling (Hatchlings/VFX/input round: leash+snap
+## escort, real one-hit death, no more fixed lifetime). Spawned by
+## HatchlingsSkill — escorts near its owner spider until an enemy spider
+## comes within both aggro_radius and line-of-sight, then breaks off to
+## chase/attack it, reverting to escort once the target dies, leaves
+## aggro_radius, or line-of-sight breaks. Persists until killed in combat —
+## any hit through the standard Hurtbox pipeline (1 max HP) kills it
+## outright. Placeholder visual: a small drawn dot, no art asset yet.
 ## collision_layer = 0 (doesn't block anything itself); collision_mask =
 ## world(1) only, so move_and_slide() stops at walls but never physically
-## collides with a real spider — damage is resolved via a direct Hurtbox
-## lookup instead, same pattern Enemy/Player melee already use.
+## collides with a real spider — damage dealt to a *target* is resolved via
+## a direct Hurtbox lookup instead, same pattern Enemy/Player melee already
+## use; damage taken by this entity itself goes through its own Hurtbox
+## child below, the same as every other damageable entity.
 
 @export var move_speed: float = 180.0
 @export var attack_range: float = 20.0
 @export var attack_damage: float = 4.0
 @export var attack_cooldown: float = 0.6
 @export var aggro_radius: float = 180.0
+## Escort snaps directly to the desired position instead of continuing to
+## path once it falls this far behind — bounds both "not tight enough" and
+## "stuck on corner geometry while the owner keeps moving away".
+@export var leash_distance: float = 200.0
+
+@onready var _health: HealthComponent = $HealthComponent
 
 var _owner_spider: Node
 var _escort_offset: Vector2 = Vector2.ZERO
-var _lifetime_left: float = 0.0
 var _attack_left: float = 0.0
 var _aggro_target: Node2D = null
 
@@ -28,14 +37,14 @@ var _aggro_target: Node2D = null
 ## radial offset the caster spawned this hatchling at, relative to the
 ## owner — the hatchling escorts around owner.global_position + this offset
 ## when nothing's worth chasing.
-func setup(owner_spider: Node, lifetime: float, escort_offset: Vector2 = Vector2.ZERO) -> void:
+func setup(owner_spider: Node, escort_offset: Vector2 = Vector2.ZERO) -> void:
 	_owner_spider = owner_spider
-	_lifetime_left = lifetime
 	_escort_offset = escort_offset
 
 
 func _ready() -> void:
 	add_to_group("hatchlings")
+	_health.died.connect(queue_free)
 
 
 func _draw() -> void:
@@ -43,11 +52,7 @@ func _draw() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_lifetime_left -= delta
 	_attack_left = maxf(0.0, _attack_left - delta)
-	if _lifetime_left <= 0.0:
-		queue_free()
-		return
 	_update_aggro_target()
 	if _aggro_target != null:
 		_chase(_aggro_target)
@@ -99,9 +104,9 @@ func _chase(target: Node2D) -> void:
 
 
 ## Walks toward the owner's current position plus the fixed spawn-relative
-## offset; holds still once within 1px (avoids jittering, and stays below
-## the ~3px a single physics tick covers at move_speed 180 so it doesn't
-## "arrive" prematurely mid-approach) or if the owner is gone.
+## offset; holds still once within 1px (avoids jittering) or if the owner is
+## gone. Snaps directly to that point instead of walking once the distance
+## exceeds leash_distance — see the export's doc comment.
 func _escort() -> void:
 	# Check validity on the raw reference before casting — casting a freed
 	# (but non-null) object throws, and the owner spider dying mid-escort is
@@ -115,7 +120,10 @@ func _escort() -> void:
 		return
 	var desired := owner_2d.global_position + _escort_offset
 	var to_desired := desired - global_position
-	if to_desired.length() <= 1.0:
+	if to_desired.length() > leash_distance:
+		global_position = desired
+		velocity = Vector2.ZERO
+	elif to_desired.length() <= 1.0:
 		velocity = Vector2.ZERO
 	else:
 		velocity = to_desired.normalized() * move_speed

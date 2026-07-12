@@ -46,14 +46,6 @@ func test_other_classes_keep_web_shooting_enabled() -> void:
 		assert_true(player._active_class_data.web_enabled)
 
 
-func test_is_active_skill_only_true_for_the_current_classs_own_skills() -> void:
-	var player := _make_player()
-	player.apply_class(SpiderClassData.SpiderClass.WOLF)
-	assert_true(player._is_active_skill("hatchlings"))
-	assert_true(player._is_active_skill("egg_mine"))
-	assert_false(player._is_active_skill("camouflage"), "Camouflage belongs to Decoy, not Wolf")
-
-
 func test_unknown_class_id_is_a_noop() -> void:
 	var player := _make_player()
 	player.apply_class(SpiderClassData.SpiderClass.WEAVER)

@@ -33,6 +33,12 @@ const WorldItemPickupScene := preload("res://entities/items/world_item_pickup.ts
 
 ## Fog-of-war ambient when darkness is on. White (no darkening) when off.
 const DARK_MODULATE := Color(0.05, 0.05, 0.07)
+## One consistent "sensed" colour/style for everything Sense reveals —
+## spiders/larvae/traps get the real outline shader; walls/pits (no per-tile
+## sprite to shader-outline — the whole maze is one batched MazeRenderer
+## draw) get a hand-drawn boundary trace in the same colour; items/
+## earthworms (placeholder `_draw()`-only visuals, no sprite either) get a
+## hand-drawn box outline in the same colour. One visual language, not three.
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
 ## Dual-Plane Map Architecture (design §1): the ground floor and the inverted
@@ -41,11 +47,77 @@ const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 ## GridMover.block_check should route through.
 enum Layer { GROUND, CEILING }
 
+## Sense's structural (wall/pit) outline: traces only the true boundary of
+## the given tile sets against their non-member/out-of-radius neighbours —
+## a proper edge outline, not a filled rectangle per tile. Repopulated and
+## redrawn from scratch each frame while Sense is active.
+class SenseStructureOutline:
+	extends Node2D
+
+	var wall_tiles: Dictionary = {}
+	var pit_tiles: Dictionary = {}
+	var tile_size: float = 48.0
+	var line_color: Color = Color.WHITE
+
+	func _draw() -> void:
+		_draw_region_boundary(wall_tiles)
+		_draw_region_boundary(pit_tiles)
+
+	func _draw_region_boundary(region: Dictionary) -> void:
+		var half := tile_size * 0.5
+		for tile in region.keys():
+			var centre := Vector2((tile.x + 0.5) * tile_size, (tile.y + 0.5) * tile_size)
+			if not region.has(tile + Vector2i(0, -1)):
+				draw_line(centre + Vector2(-half, -half), centre + Vector2(half, -half), line_color, 2.0)
+			if not region.has(tile + Vector2i(0, 1)):
+				draw_line(centre + Vector2(-half, half), centre + Vector2(half, half), line_color, 2.0)
+			if not region.has(tile + Vector2i(-1, 0)):
+				draw_line(centre + Vector2(-half, -half), centre + Vector2(-half, half), line_color, 2.0)
+			if not region.has(tile + Vector2i(1, 0)):
+				draw_line(centre + Vector2(half, -half), centre + Vector2(half, half), line_color, 2.0)
+
+
+## Sense's point-entity outline (items, earthworms — placeholder `_draw()`-
+## only visuals with no sprite for the shader technique): a simple box
+## stroke, parented directly to the sensed entity so it moves for free.
+class SensePointOutline:
+	extends Node2D
+
+	var half_size: Vector2 = Vector2(10, 10)
+	var line_color: Color = Color.WHITE
+
+	func _draw() -> void:
+		draw_rect(Rect2(-half_size, half_size * 2.0), line_color, false, 2.0)
+
+
+## Sense's silhouette for a sprite-bearing entity (spider/larva/trap): the
+## real entity's own sprite stays wherever CanvasModulate's darkness put it
+## — no per-sprite shader can opt out of a canvas-wide tint. This ghost
+## mirrors the real sprite's texture and transform on the un-darkened
+## SenseLayer instead, with body_alpha forced to 0 so only the outline
+## silhouette shows — "sensed", not "seen"; the real body stays hidden.
+class SenseGhost:
+	extends Sprite2D
+
+	func sync_to(real_sprite: Sprite2D) -> void:
+		texture = real_sprite.texture
+		global_position = real_sprite.global_position
+		global_rotation = real_sprite.global_rotation
+		scale = real_sprite.scale
+		flip_h = real_sprite.flip_h
+		flip_v = real_sprite.flip_v
+
 @onready var _canvas_modulate: CanvasModulate = $CanvasModulate
 @onready var _walls: StaticBody2D = $Walls
 @onready var _occluders: Node2D = $Occluders
 @onready var _renderer: MazeRenderer = $Renderer
 @onready var _entities: Node2D = $Entities
+## Sense's overlays live here, not under Level directly: CanvasModulate
+## darkens the whole default canvas and no per-CanvasItem shader can opt
+## out of that — only a separate CanvasLayer can. `follow_viewport_enabled`
+## keeps it tracking the camera/world positions like normal gameplay
+## content, while staying outside CanvasModulate's tint.
+@onready var _sense_layer: CanvasLayer = $SenseLayer
 
 var maze: MazeData
 ## The inverted floor plane above `maze` — see CeilingData. Built alongside
@@ -64,6 +136,19 @@ var _wall_nodes: Dictionary = {}
 ## stays visible in sync — mirrors _wall_nodes.
 var _pit_nodes: Dictionary = {}
 var _hazard_director: HazardDirector
+var _sense_active: bool = false
+var _sense_radius: float = 0.0
+## Sprite-bearing node (spider/larva/trap) currently outlined via Sense ->
+## true, so entry/exit toggles the refcounted OutlineFx on/off exactly once
+## each, not every frame.
+var _sense_outlined: Dictionary = {}
+## Point entity (item/earthworm) currently highlighted via Sense -> its
+## highlight node (a child of the entity itself, so it moves for free).
+var _sense_point_highlights: Dictionary = {}
+## Single shared node that draws the wall/pit boundary trace — lazily
+## created, redrawn from scratch each frame while Sense is active rather
+## than one spawned node per tile.
+var _sense_structure_outline: Node2D = null
 
 
 func _ready() -> void:
@@ -91,16 +176,18 @@ func build() -> void:
 	_hazard_director.bind_level(self)
 
 
-## Keep the maze stocked: spawn a larva every interval while under the cap.
+## Keep the maze stocked (larva spawns), and while Sense is active, keep its
+## outline in sync with the player's live position every frame.
 func _process(delta: float) -> void:
 	if maze == null:
 		return
 	_spawn_accum += delta
-	if _spawn_accum < LARVA_SPAWN_INTERVAL:
-		return
-	_spawn_accum = 0.0
-	if get_tree().get_nodes_in_group("larvae").size() < _larva_cap:
-		_spawn_larva_at_random()
+	if _spawn_accum >= LARVA_SPAWN_INTERVAL:
+		_spawn_accum = 0.0
+		if get_tree().get_nodes_in_group("larvae").size() < _larva_cap:
+			_spawn_larva_at_random()
+	if _sense_active:
+		_update_sense_outlines()
 
 
 func get_player() -> Node2D:
@@ -142,30 +229,148 @@ func apply_darkness() -> void:
 			light.enabled = on
 
 
-## SenseSkill's x-ray (design §4): while active, every wall occluder stops
-## blocking light — the vision light passes through nearby walls instead of
-## stopping at them, revealing structure/critters/hostiles just beyond one
-## within light range. A local x-ray, not the full-map reveal the darkness
-## dev toggle does. Only affects walls that exist right now; a wall carved
-## open/collapsed mid-effect is unaffected either way (its occluder is
-## freed/spawned fresh, defaulting to normally-visible).
-func set_sense_active(active: bool) -> void:
-	for nodes in _wall_nodes.values():
-		var occ = nodes.get("occluder")
-		if occ != null and is_instance_valid(occ):
-			occ.visible = not active
+## SenseSkill's outline cue (design round 2): "sensed", not "seen" — every
+## spider/larva/trap within `radius` of the player gets the shared outline
+## shader; wall/pit tiles get a hand-drawn boundary trace; item/earthworm
+## placeholders get a hand-drawn box outline. Everything Sense reveals reads
+## as an outline, not a lit-up patch — no more light-through-walls (the old
+## set_sense_active()). Continuous while active: _process() re-syncs every
+## frame as the player moves, so entering/leaving the radius toggles the
+## effect on/off in real time. `radius` is ignored when `active` is false.
+func set_sense_outline(active: bool, radius: float = 0.0) -> void:
+	_sense_active = active
+	_sense_radius = radius
+	if active:
+		_update_sense_outlines()
+		return
+	for ghost in _sense_outlined.values():
+		if ghost != null and is_instance_valid(ghost):
+			ghost.queue_free()
+	_sense_outlined.clear()
+	for highlight in _sense_point_highlights.values():
+		if highlight != null and is_instance_valid(highlight):
+			highlight.queue_free()
+	_sense_point_highlights.clear()
+	if _sense_structure_outline != null and is_instance_valid(_sense_structure_outline):
+		_sense_structure_outline.wall_tiles.clear()
+		_sense_structure_outline.pit_tiles.clear()
+		_sense_structure_outline.queue_redraw()
 
 
-## SenseSkill's outline cue (skill fixes bundle): every living spider/larva
-## gets the shared outline shader while sense is active, alongside the
-## existing wall-occluder x-ray. A blanket effect, not per-entity occlusion —
-## consistent with set_sense_active()'s own blanket wall treatment.
-func set_sense_outline(active: bool) -> void:
-	for group in ["spiders", "larvae"]:
+func _update_sense_outlines() -> void:
+	if player == null:
+		return
+	_update_sense_sprite_outlines()
+	_update_sense_point_highlights()
+	_update_sense_structure_outline()
+
+
+## Spiders (incl. the player itself), larvae, and web traps all carry a real
+## `Sprite`/`Visual` texture — a SenseGhost mirrors it on the un-darkened
+## _sense_layer with body_alpha at 0, so only the silhouette outline shows.
+## The ghost is spawned once on entry and re-synced to the real sprite's
+## current transform every frame while it stays in range (the real entity
+## keeps moving), then freed on exit.
+func _update_sense_sprite_outlines() -> void:
+	var still_in_range: Dictionary = {}
+	for group in ["spiders", "larvae", "traps"]:
 		for node in get_tree().get_nodes_in_group(group):
-			var sprite := (node as Node).get_node_or_null("Sprite") as CanvasItem
-			if sprite != null:
-				OutlineFx.set_outline(sprite, active, SENSE_OUTLINE_COLOR)
+			var n2d := node as Node2D
+			if n2d == null or not is_instance_valid(n2d):
+				continue
+			if n2d.global_position.distance_to(player.global_position) > _sense_radius:
+				continue
+			var sprite := _sense_sprite_of(n2d) as Sprite2D
+			if sprite == null:
+				continue
+			still_in_range[n2d] = true
+			var ghost: SenseGhost = _sense_outlined.get(n2d)
+			if ghost == null:
+				ghost = SenseGhost.new()
+				OutlineFx.set_outline(ghost, true, SENSE_OUTLINE_COLOR)
+				OutlineFx.set_body_alpha(ghost, 0.0)
+				_sense_layer.add_child(ghost)
+				_sense_outlined[n2d] = ghost
+			ghost.sync_to(sprite)
+	for node in _sense_outlined.keys().duplicate():
+		if not still_in_range.has(node):
+			var ghost = _sense_outlined[node]
+			if ghost != null and is_instance_valid(ghost):
+				ghost.queue_free()
+			_sense_outlined.erase(node)
+
+
+## Most entities name their visual node "Sprite"; WebTrap names its "Visual".
+func _sense_sprite_of(node: Node) -> CanvasItem:
+	var sprite := node.get_node_or_null("Sprite") as CanvasItem
+	if sprite != null:
+		return sprite
+	return node.get_node_or_null("Visual") as CanvasItem
+
+
+## Per-group box half-size for the point-entity outline, roughly matching
+## each placeholder's own `_draw()` shape.
+const SENSE_POINT_HALF_SIZE := {
+	"world_items": Vector2(9, 9),
+	"earthworms": Vector2(18, 8),
+}
+
+
+## World items and earthworms are placeholder `_draw()`-only visuals (no
+## sprite/texture for the shader technique) — they get a hand-drawn box
+## outline instead, parented under the un-darkened _sense_layer (not the
+## entity itself, which lives in the normal, darkened tree) and re-synced
+## to the entity's position every frame while it stays in range.
+func _update_sense_point_highlights() -> void:
+	var still_in_range: Dictionary = {}
+	for group in SENSE_POINT_HALF_SIZE.keys():
+		var half_size: Vector2 = SENSE_POINT_HALF_SIZE[group]
+		for node in get_tree().get_nodes_in_group(group):
+			var n2d := node as Node2D
+			if n2d == null or not is_instance_valid(n2d):
+				continue
+			if n2d.global_position.distance_to(player.global_position) > _sense_radius:
+				continue
+			still_in_range[n2d] = true
+			var outline: SensePointOutline = _sense_point_highlights.get(n2d)
+			if outline == null:
+				outline = SensePointOutline.new()
+				outline.half_size = half_size
+				outline.line_color = SENSE_OUTLINE_COLOR
+				_sense_layer.add_child(outline)
+				_sense_point_highlights[n2d] = outline
+			outline.global_position = n2d.global_position
+	for node in _sense_point_highlights.keys().duplicate():
+		if not still_in_range.has(node):
+			var outline = _sense_point_highlights[node]
+			if outline != null and is_instance_valid(outline):
+				outline.queue_free()
+			_sense_point_highlights.erase(node)
+
+
+## Walls and pits have no per-tile sprite — recomputes which tiles are
+## currently within radius and hands the sets to the single shared
+## SenseStructureOutline drawer (parented under the un-darkened
+## _sense_layer), which traces just their boundary.
+func _update_sense_structure_outline() -> void:
+	if _sense_structure_outline == null or not is_instance_valid(_sense_structure_outline):
+		var outline := SenseStructureOutline.new()
+		outline.tile_size = TILE_SIZE
+		outline.line_color = SENSE_OUTLINE_COLOR
+		_sense_layer.add_child(outline)
+		_sense_structure_outline = outline
+	var walls: Dictionary = {}
+	for tile in _wall_nodes.keys():
+		if centre_of(tile).distance_to(player.global_position) <= _sense_radius:
+			walls[tile] = true
+	var pits: Dictionary = {}
+	for tile in _pit_nodes.keys():
+		if centre_of(tile).distance_to(player.global_position) <= _sense_radius:
+			pits[tile] = true
+	var drawer := _sense_structure_outline as SenseStructureOutline
+	drawer.wall_tiles = walls
+	drawer.pit_tiles = pits
+	drawer.queue_redraw()
 
 
 func _build_collision_and_occluders() -> void:

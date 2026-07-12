@@ -27,12 +27,14 @@ func _make_hurtbox(owner_node: Node) -> Hurtbox:
 	return hurtbox
 
 
-func test_activate_makes_the_sprite_nearly_transparent() -> void:
+func test_activate_sets_body_alpha_to_target_alpha() -> void:
 	var setup := _make_camouflaged()
 	var camo: CamouflageSkill = setup["camo"]
 	var entity: Node2D = setup["entity"]
 	assert_true(camo.active)
-	assert_almost_eq((entity.get_node("Sprite") as Sprite2D).modulate.a, camo.target_alpha, 0.001)
+	var mat := (entity.get_node("Sprite") as CanvasItem).material as ShaderMaterial
+	assert_not_null(mat)
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), camo.target_alpha, 0.001)
 
 
 func test_activate_applies_the_outline_shader() -> void:
@@ -53,6 +55,17 @@ func test_break_camouflage_disables_the_outline_shader() -> void:
 
 	var mat := (entity.get_node("Sprite") as CanvasItem).material as ShaderMaterial
 	assert_false(mat.get_shader_parameter("outline_enabled"))
+
+
+func test_break_camouflage_resets_body_alpha_to_one() -> void:
+	var setup := _make_camouflaged()
+	var camo: CamouflageSkill = setup["camo"]
+	var entity: Node2D = setup["entity"]
+
+	camo.break_camouflage()
+
+	var mat := (entity.get_node("Sprite") as CanvasItem).material as ShaderMaterial
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), 1.0, 0.001)
 
 
 func test_camouflage_breaks_when_the_camouflaged_spider_is_the_victim() -> void:
