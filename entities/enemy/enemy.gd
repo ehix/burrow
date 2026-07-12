@@ -242,6 +242,7 @@ func _physics_process(delta: float) -> void:
 			_do_seek_food()
 		State.PATROL:
 			_do_patrol()
+	_melee_nearby_hatchling()
 
 
 func _update_state() -> void:
@@ -606,6 +607,23 @@ func _nearest_in_group(group: String) -> Node2D:
 			best_dist = d
 			best = n
 	return best
+
+
+## Opportunistic strike (Hatchlings/VFX/input round): a hatchling that
+## wanders within melee range gets swatted regardless of CHASE state/
+## pathing — Enemy never targets hatchlings for pursuit (_acquire_target()
+## only ever returns the player or a decoy), so without this a hatchling
+## could never take damage in real play even though it now has a Hurtbox.
+## Reuses the same shared melee cooldown/_melee_target() as normal combat —
+## a real threat in range this same frame always wins the swing, since this
+## runs after the state-machine match block above.
+func _melee_nearby_hatchling() -> void:
+	var hatchling := _nearest_in_group("hatchlings")
+	if hatchling == null:
+		return
+	var to_hatchling: Vector2 = hatchling.global_position - global_position
+	if to_hatchling.length() <= melee_range:
+		_melee_target(hatchling, to_hatchling)
 
 
 ## Take a landed web/melee hit: get shoved one tile along `push_dir`
