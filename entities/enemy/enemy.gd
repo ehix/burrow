@@ -285,6 +285,11 @@ func _update_state() -> void:
 		if next == State.PATROL or next == State.SEEK_FOOD:
 			_state_lock_left = state_min_duration
 
+	if next == State.CHASE and _current_target != null:
+		_match_plane_to(_current_target)
+	elif _plane.current_plane == Level.Layer.CEILING:
+		_plane.transition() # settle back to ground: not actively chasing anymore
+
 
 # --- per-state behaviour ------------------------------------------------------
 
@@ -297,6 +302,19 @@ func _fire_web(direction: Vector2) -> void:
 	var shot := web_emitter.fire(global_position, direction, self, speed_mult)
 	if shot != null and _active_class_data != null and _active_class_data.web_fire_health_cost > 0.0:
 		health.take_damage(_active_class_data.web_fire_health_cost)
+
+
+## Ceiling/plane mechanics rework: the enemy only ever climbs to match a
+## target's plane while actively chasing it (called from _update_state()),
+## and always settles back to ground the instant it isn't chasing (see the
+## call site above) — the minimum that makes same-plane combat meaningful.
+## A target with no PlaneComponent (a Decoy) is always effective_plane()
+## GROUND, so the enemy never climbs to "chase" a decoy prop. Instant
+## transition, matching the existing Player.toggle_plane precedent exactly —
+## no climb-reaction delay (design's explicit out-of-scope call).
+func _match_plane_to(target: Node2D) -> void:
+	if PlaneComponent.effective_plane(target) != _plane.current_plane:
+		_plane.transition()
 
 
 func _do_chase() -> void:
