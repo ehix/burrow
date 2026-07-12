@@ -67,3 +67,44 @@ func test_player_died_updates_the_wins_label_and_shows_a_banner() -> void:
 	assert_eq(hud.wins_label.text, "Wins: You 0 - Enemy 1")
 	assert_eq(hud.round_banner_label.text, "YOU DIED")
 	assert_almost_eq(hud.round_banner_label.modulate.a, 1.0, 0.001, "banner is fully visible right away")
+
+
+func test_bind_spiders_wires_the_skill_bar_and_status_rows() -> void:
+	var hud := _make_hud()
+	var player: Player = preload("res://entities/player/player.tscn").instantiate()
+	add_child_autofree(player)
+	var enemy := _make_spider("enemy")
+
+	hud.bind_spiders(player, enemy)
+
+	assert_eq(hud.skill_bar._name_label1.text, player._hatchlings.display_name)
+	assert_not_null(hud.player_status_row._bound_spider)
+	assert_eq(hud.enemy_status_row._bound_spider, enemy)
+
+
+func test_bind_spiders_primes_the_inventory_icon_from_the_players_current_item() -> void:
+	var hud := _make_hud()
+	var player: Player = preload("res://entities/player/player.tscn").instantiate()
+	add_child_autofree(player)
+	var item := FungusSenseItem.new()
+	player.inventory.held_item = item
+
+	hud.bind_spiders(player, _make_spider("enemy"))
+
+	assert_true(hud.inventory_icon.visible)
+	assert_eq(hud.inventory_icon.modulate, ConsumableItem.ITEM_COLORS.get(item.item_id, Color.WHITE))
+
+
+func test_inventory_icon_hides_when_the_held_item_clears() -> void:
+	var hud := _make_hud()
+	var player: Player = preload("res://entities/player/player.tscn").instantiate()
+	add_child_autofree(player)
+	hud.bind_spiders(player, _make_spider("enemy"))
+	player.inventory.held_item = FungusSenseItem.new()
+	player.inventory.item_held_changed.emit(player.inventory.held_item)
+	assert_true(hud.inventory_icon.visible)
+
+	player.inventory.held_item = null
+	player.inventory.item_held_changed.emit(null)
+
+	assert_false(hud.inventory_icon.visible)

@@ -36,6 +36,11 @@ const CLASS_DISPLAY_NAMES := {
 @onready var paused_label: Label = $Root/PausedLabel
 @onready var round_banner_label: Label = $Root/RoundBannerLabel
 @onready var hazard_toast_label: Label = $Root/HazardToastLabel
+@onready var skill_bar: SkillBar = $Root/SkillBar
+@onready var shop_overlay: ShopOverlay = $Root/ShopOverlay
+@onready var inventory_icon: Panel = $Root/InventoryIcon
+@onready var player_status_row: StatusEffectRow = $Root/PlayerStatusRow
+@onready var enemy_status_row: StatusEffectRow = $Root/EnemyStatusRow
 
 
 func _ready() -> void:
@@ -58,6 +63,27 @@ func _ready() -> void:
 
 func set_paused_visible(is_paused: bool) -> void:
 	paused_label.visible = is_paused
+
+
+## Called by World each time a new Player/Enemy pair is built (initial spawn
+## and every depth descent) — the one seam this HUD needs to (re)bind its
+## per-spider pieces through. `enemy` may be null (defensive; Level always
+## builds one in practice).
+func bind_spiders(player: Player, enemy: Node2D) -> void:
+	if player != null:
+		skill_bar.bind_player(player)
+		player_status_row.bind_spider(player)
+		if not player.inventory.item_held_changed.is_connected(_on_item_held_changed):
+			player.inventory.item_held_changed.connect(_on_item_held_changed)
+		_on_item_held_changed(player.inventory.held_item)
+	if enemy != null:
+		enemy_status_row.bind_spider(enemy)
+
+
+func _on_item_held_changed(item: ConsumableItem) -> void:
+	inventory_icon.visible = item != null
+	if item != null:
+		inventory_icon.modulate = ConsumableItem.ITEM_COLORS.get(item.item_id, Color.WHITE)
 
 
 func _on_health_changed(who: Node, value: float, max_value: float) -> void:

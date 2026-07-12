@@ -1,6 +1,9 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://ui/hud.gd" id="1_hud"]
+[ext_resource type="PackedScene" path="res://ui/skill_bar.tscn" id="2_skillbar"]
+[ext_resource type="PackedScene" path="res://ui/shop_overlay.tscn" id="3_shop"]
+[ext_resource type="PackedScene" path="res://ui/status_effect_row.tscn" id="4_statusrow"]
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -153,3 +156,36 @@ offset_bottom = -30.0
 theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
 text = ""
+
+[node name="SkillBar" parent="Root" instance=ExtResource("2_skillbar")]
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -140.0
+offset_top = -90.0
+offset_right = 140.0
+offset_bottom = -16.0
+
+[node name="ShopOverlay" parent="Root" instance=ExtResource("3_shop")]
+
+[node name="InventoryIcon" type="Panel" parent="Root"]
+visible = false
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -80.0
+offset_right = 80.0
+offset_bottom = -16.0
+
+[node name="PlayerStatusRow" parent="Root" instance=ExtResource("4_statusrow")]
+offset_left = 16.0
+offset_top = 220.0
+offset_right = 316.0
+offset_bottom = 244.0
+
+[node name="EnemyStatusRow" parent="Root" instance=ExtResource("4_statusrow")]
+offset_left = 260.0
+offset_top = 220.0
+offset_right = 560.0
+offset_bottom = 244.0
