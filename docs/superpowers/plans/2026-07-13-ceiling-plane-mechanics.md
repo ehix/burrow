@@ -226,12 +226,18 @@ func test_receive_hit_is_a_noop_when_attacker_and_victim_are_on_different_planes
 	var pair := _make_hurtbox_with_health(100.0)
 	var hurtbox: Hurtbox = pair[0]
 	var health: HealthComponent = pair[1]
+	# PlaneComponent.new() must be explicitly named — a runtime-created node
+	# isn't auto-named after its class_name (that only happens for nodes
+	# placed in a .tscn), and effective_plane() looks it up as
+	# "PlaneComponent" by name, exactly like player.tscn/enemy.tscn wire it.
 	var victim_plane := PlaneComponent.new()
+	victim_plane.name = "PlaneComponent"
 	hurtbox.get_parent().add_child(victim_plane)
 	victim_plane.current_plane = Level.Layer.GROUND
 	var attacker := Node2D.new()
 	add_child_autofree(attacker)
 	var attacker_plane := PlaneComponent.new()
+	attacker_plane.name = "PlaneComponent"
 	attacker.add_child(attacker_plane)
 	attacker_plane.current_plane = Level.Layer.CEILING
 
@@ -257,12 +263,14 @@ func test_receive_hit_knocks_a_ceiling_victim_down_and_applies_fall_damage() -> 
 	var hurtbox: Hurtbox = pair[0]
 	var health: HealthComponent = pair[1]
 	var victim_plane := PlaneComponent.new()
+	victim_plane.name = "PlaneComponent"
 	hurtbox.get_parent().add_child(victim_plane)
 	victim_plane.current_plane = Level.Layer.CEILING
 	victim_plane.fall_damage = 8.0
 	var attacker := Node2D.new()
 	add_child_autofree(attacker)
 	var attacker_plane := PlaneComponent.new()
+	attacker_plane.name = "PlaneComponent"
 	attacker.add_child(attacker_plane)
 	attacker_plane.current_plane = Level.Layer.CEILING # same plane, so the hit lands
 
@@ -361,6 +369,7 @@ func test_spider_tile_contested_ignores_a_node_on_a_different_plane() -> void:
 	var enemy_mover: GridMover = enemy_pair[1]
 	var enemy_node: Node2D = enemy_pair[0]
 	var enemy_plane := PlaneComponent.new()
+	enemy_plane.name = "PlaneComponent" # runtime nodes aren't auto-named after class_name
 	enemy_node.add_child(enemy_plane)
 	enemy_plane.current_plane = Level.Layer.CEILING # the "other" spider is on the ceiling
 	var player_pair := _make_spider(Vector2(192, 240)) # tile (4,5), stays GROUND (no PlaneComponent)
@@ -547,6 +556,7 @@ func test_enemy_climbs_to_match_a_target_on_the_ceiling_while_entering_chase() -
 	add_child_autofree(target)
 	target.add_to_group("player")
 	var target_plane := PlaneComponent.new()
+	target_plane.name = "PlaneComponent" # runtime nodes aren't auto-named after class_name
 	target.add_child(target_plane)
 	target_plane.current_plane = Level.Layer.CEILING
 	enemy._current_target = target
