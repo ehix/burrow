@@ -49,13 +49,7 @@ func blocked(tile: Vector2i, dir: Vector2i) -> bool:
 static func effective_plane(node: Node) -> Level.Layer:
 	if node == null:
 		return Level.Layer.GROUND
-	# Try to find by name first, then fall back to finding by type
 	var plane := node.get_node_or_null("PlaneComponent") as PlaneComponent
-	if plane == null:
-		for child in node.get_children():
-			if child is PlaneComponent:
-				plane = child
-				break
 	return plane.current_plane if plane != null else Level.Layer.GROUND
 
 

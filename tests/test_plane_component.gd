@@ -8,6 +8,11 @@ func _make_owner_with_plane(plane: Level.Layer = Level.Layer.GROUND) -> Node2D:
 	var owner := Node2D.new()
 	add_child_autofree(owner)
 	var plane_comp := PlaneComponent.new()
+	# A runtime-created node isn't auto-named after its class_name (that only
+	# happens for nodes placed in a .tscn) — effective_plane() looks it up as
+	# "PlaneComponent" by name, exactly like player.tscn/enemy.tscn wire it,
+	# so the test double must match that name too.
+	plane_comp.name = "PlaneComponent"
 	owner.add_child(plane_comp)
 	plane_comp.current_plane = plane
 	return owner
