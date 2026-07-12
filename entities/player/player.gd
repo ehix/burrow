@@ -62,6 +62,10 @@ var _dead := false
 var _melee_left := 0.0
 var _level: Level
 var _class_data_by_id: Dictionary = {}
+## action name -> the matching SkillComponent instance, built once in
+## _ready() — the lookup active_skills() resolves CLASS_SKILLS' action-name
+## lists through, instead of guessing node names from action strings.
+var _skill_by_action: Dictionary = {}
 var _active_class: int = SpiderClassData.SpiderClass.WOLF
 var _active_class_data: SpiderClassData
 var _base_melee_damage: float
@@ -85,6 +89,12 @@ func _ready() -> void:
 		SpiderClassData.SpiderClass.WOLF: WolfData,
 		SpiderClassData.SpiderClass.WEAVER: WeaverData,
 		SpiderClassData.SpiderClass.DECOY: DecoyData,
+	}
+	_skill_by_action = {
+		"net_hold": _net_hold, "net_shot": _net_shot,
+		"hatchlings": _hatchlings, "egg_mine": _egg_mine,
+		"blockade": _blockade, "silk_tunnel": _silk_tunnel,
+		"camouflage": _camouflage, "decoy": _decoy,
 	}
 	_base_melee_damage = melee_damage
 	_base_web_cooldown = web_emitter.cooldown
@@ -200,6 +210,19 @@ func apply_class(spider_class: int) -> void:
 func _is_active_skill(action: String) -> bool:
 	var skills: Array = CLASS_SKILLS.get(_active_class, [])
 	return action in skills
+
+
+## The current class's two class-specific SkillComponents, keyed by their
+## input action name in CLASS_SKILLS order — the seam ui/skill_bar.gd binds
+## its two icons through.
+func active_skills() -> Dictionary:
+	var actions: Array = CLASS_SKILLS.get(_active_class, [])
+	var result: Dictionary = {}
+	for action in actions:
+		var skill: SkillComponent = _skill_by_action.get(action)
+		if skill != null:
+			result[action] = skill
+	return result
 
 
 ## Recomputes melee damage, web cooldown, hunger rate, and max health from

@@ -107,6 +107,8 @@ script = ExtResource("11_plane")
 
 [node name="CamouflageSkill" type="Node" parent="."]
 script = ExtResource("12_camo")
+display_name = "Camouflage"
+description = "Turn nearly invisible for a short time."
 
 [node name="StatusEffectComponent" type="Node" parent="."]
 script = ExtResource("13_status")
@@ -121,32 +123,46 @@ hunger_cost = 25.0
 
 [node name="NetHoldSkill" type="Node" parent="."]
 script = ExtResource("16_nethold")
+display_name = "Net Hold"
+description = "Hold to snare a spider caught in your net."
 
 [node name="NetShotSkill" type="Node" parent="."]
 script = ExtResource("17_netshot")
 net_shot_scene = ExtResource("18_netshot")
 cooldown = 0.0
 hunger_cost = 0.0
+display_name = "Net Shot"
+description = "Fire your held net to trap a spider at range."
 
 [node name="HatchlingsSkill" type="Node" parent="."]
 script = ExtResource("19_hatch")
 hatchling_scene = ExtResource("20_spiderling")
+display_name = "Hatchlings"
+description = "Summon scouting hatchlings that escort you and strike nearby threats."
 
 [node name="EggMineSkill" type="Node" parent="."]
 script = ExtResource("21_eggmine")
 mine_scene = ExtResource("22_mine")
+display_name = "Egg Mine"
+description = "Plant a hidden mine that bursts for heavy damage."
 
 [node name="BlockadeSkill" type="Node" parent="."]
 script = ExtResource("23_blockadeskill")
 blockade_scene = ExtResource("24_blockade")
+display_name = "Blockade"
+description = "Raise a barrier one tile ahead of you."
 
 [node name="SilkTunnelSkill" type="Node" parent="."]
 script = ExtResource("25_silk")
 trap_scene = ExtResource("8_trap")
+display_name = "Silk Tunnel"
+description = "Lay a web tunnel ahead and speed yourself up."
 
 [node name="DecoySkill" type="Node" parent="."]
 script = ExtResource("26_decoyskill")
 decoy_scene = ExtResource("27_decoy")
+display_name = "Decoy"
+description = "Drop a decoy to divert enemy attention."
 
 [node name="InventoryComponent" type="Node" parent="."]
 script = ExtResource("28_inventory")

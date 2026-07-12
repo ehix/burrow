@@ -95,7 +95,21 @@ func _build_level() -> void:
 	add_child(_level)
 	_level.build()
 	_snap_camera()
+	_bind_hud()
 	_rebuilding = false
+
+
+## Hands the freshly-built Level's Player/Enemy to the HUD (skill bar,
+## status-effect rows, inventory icon) — called once per _build_level(), so
+## every depth descent re-binds to the new instances the same way the
+## camera already re-snaps to them.
+func _bind_hud() -> void:
+	if hud == null or not hud.has_method("bind_spiders"):
+		return
+	var player := _current_player() as Player
+	var level := _level as Level
+	var enemy: Node2D = level.enemy if level != null else null
+	hud.bind_spiders(player, enemy)
 
 
 func _snap_camera() -> void:

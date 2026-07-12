@@ -9,6 +9,10 @@ extends Node
 
 @export var cooldown: float = 8.0
 @export var hunger_cost: float = 10.0
+## Read-only HUD metadata (UI/HUD overhaul) — authored per skill instance in
+## each class's .tscn, same pattern cooldown/hunger_cost already use.
+@export var display_name: String = ""
+@export var description: String = ""
 
 var _cooldown_left: float = 0.0
 
@@ -19,6 +23,12 @@ func _process(delta: float) -> void:
 
 func can_activate() -> bool:
 	return _cooldown_left <= 0.0
+
+
+## How many seconds remain before can_activate() returns true again — the
+## seam a HUD polls instead of reaching into the private _cooldown_left.
+func remaining_cooldown() -> float:
+	return _cooldown_left
 
 
 ## Attempt to activate. Returns false on cooldown (no cost charged); starts

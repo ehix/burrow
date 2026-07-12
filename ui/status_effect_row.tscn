@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/status_effect_row.gd" id="1_row"]
+
+[node name="StatusEffectRow" type="Control"]
+offset_right = 300.0
+offset_bottom = 24.0
+script = ExtResource("1_row")
+
+[node name="Row" type="HBoxContainer" parent="."]
