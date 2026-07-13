@@ -182,3 +182,30 @@ func test_collapse_tile_at_destroys_an_item_on_the_tile_permanently() -> void:
 
 	assert_true(pickup.is_queued_for_deletion(),
 		"unlike water (which submerges then restores), compaction destroys an item outright")
+
+
+func test_draining_a_flood_over_a_natural_pit_leaves_the_pit_blocking() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	level.set_pit_at(open_cell, true)
+
+	level.set_water_at(open_cell, true)
+	level.set_water_at(open_cell, false)
+
+	assert_true(level.maze.is_pit(open_cell.x, open_cell.y),
+		"the natural pit under the flood must still block after the water drains")
+	assert_true(level.is_blocked(open_cell, Level.Layer.GROUND))
+	assert_true(level._pit_nodes.has(open_cell), "the brown pit marker survives untouched")
+	assert_false(level._water_nodes.has(open_cell), "the blue water marker was cleared")
+
+
+func test_collapse_tile_at_clears_water_state_on_a_flooded_tile() -> void:
+	var level := _make_level()
+	var interior_cell := Vector2i(3, 3)
+	level.set_water_at(interior_cell, true)
+
+	level.collapse_tile_at(interior_cell)
+
+	assert_false(level._water_nodes.has(interior_cell), "no dangling water marker on the new wall")
+	assert_false(level._water_tiles.has(interior_cell), "no dangling water tracking on the new wall")
+	assert_false(level.maze.is_open(interior_cell.x, interior_cell.y), "the tile really did become a wall")

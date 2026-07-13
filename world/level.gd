@@ -505,8 +505,8 @@ func _spawn_pit_marker(tile: Vector2i) -> Node2D:
 func set_water_at(tile: Vector2i, value: bool) -> void:
 	if maze == null:
 		return
-	maze.set_pit(tile.x, tile.y, value)
 	if value:
+		maze.set_pit(tile.x, tile.y, true)
 		_water_tiles[tile] = true
 		if not _water_nodes.has(tile):
 			_water_nodes[tile] = _spawn_water_marker(tile)
@@ -514,6 +514,11 @@ func set_water_at(tile: Vector2i, value: bool) -> void:
 		_submerge_items_at(tile)
 	else:
 		_water_tiles.erase(tile)
+		# A natural pit shares this same overlay flag (design §7) — if this
+		# tile is also a tracked natural pit, leave the flag set so draining
+		# the flood doesn't silently un-block the pit underneath it.
+		if not _pit_nodes.has(tile):
+			maze.set_pit(tile.x, tile.y, false)
 		var marker = _water_nodes.get(tile)
 		if marker != null and is_instance_valid(marker):
 			marker.queue_free()
@@ -596,6 +601,11 @@ func collapse_tile_at(tile: Vector2i) -> bool:
 		return false
 	_destroy_occupants_at(tile)
 	CombatFx.spawn_collapse_dust(self, _tile_centre(tile.x, tile.y))
+	if _water_tiles.has(tile):
+		# Clear water tracking (marker + shared _pits flag) while the tile is
+		# still open — MazeData.set_pit() no-ops once it's a wall, so this
+		# must happen before set_wall() below or the flag would be stuck.
+		set_water_at(tile, false)
 	maze.set_wall(tile.x, tile.y)
 	_spawn_wall_node(tile)
 	if _astar != null:
