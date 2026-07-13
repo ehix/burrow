@@ -22,7 +22,7 @@ func test_refresh_plane_focus_dims_the_enemy_when_only_it_is_on_the_ceiling() ->
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 	var mat := enemy_sprite.material as ShaderMaterial
 	assert_not_null(mat)
-	assert_almost_eq(mat.get_shader_parameter("body_alpha"), 0.35, 0.001,
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001,
 		"enemy is off the player's plane, so it dims")
 
 
@@ -46,7 +46,7 @@ func test_plane_changed_event_triggers_a_focus_refresh() -> void:
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 	var mat := enemy_sprite.material as ShaderMaterial
 	assert_not_null(mat)
-	assert_almost_eq(mat.get_shader_parameter("body_alpha"), 0.35, 0.001)
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001)
 
 
 ## Camouflage conflict guardrail (design's explicit judgment call): body_alpha
@@ -66,5 +66,30 @@ func test_refresh_plane_focus_never_touches_a_camouflaged_players_body_alpha() -
 	enemy_plane.transition() # triggers a _refresh_plane_focus() via the plane_changed event
 
 	var mat := player_sprite.material as ShaderMaterial
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), camo_alpha, 0.001,
+		"plane-focus dimming must not overwrite Camouflage's own body_alpha")
+
+
+## Enemy-side equivalent of the above: Enemy._make_skills() attaches
+## CamouflageSkill at runtime via a bare add_child() (no explicit node name),
+## unlike player.tscn's literally-named "CamouflageSkill" child — a
+## name-based lookup in _refresh_plane_focus would silently miss this and
+## let plane-focus dimming clobber the enemy's camouflaged body_alpha.
+func test_refresh_plane_focus_never_touches_a_camouflaged_enemys_body_alpha() -> void:
+	var level := _make_level()
+	level.enemy._apply_class(SpiderClassData.SpiderClass.DECOY) # only Decoy carries CamouflageSkill
+	var camo: CamouflageSkill = null
+	for child in level.enemy.get_children():
+		if child is CamouflageSkill:
+			camo = child
+	assert_not_null(camo, "Decoy class should attach a CamouflageSkill")
+	camo.activate(level.enemy)
+	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
+	var camo_alpha: float = (enemy_sprite.material as ShaderMaterial).get_shader_parameter("body_alpha")
+	var player_plane := level.player.get_node("PlaneComponent") as PlaneComponent
+
+	player_plane.transition() # triggers a _refresh_plane_focus() via the plane_changed event
+
+	var mat := enemy_sprite.material as ShaderMaterial
 	assert_almost_eq(mat.get_shader_parameter("body_alpha"), camo_alpha, 0.001,
 		"plane-focus dimming must not overwrite Camouflage's own body_alpha")

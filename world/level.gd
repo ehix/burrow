@@ -550,9 +550,9 @@ func _spawn_entities() -> void:
 ## enemy transitioning doesn't touch the floor color. Either side changing
 ## plane can change their *relative* same/different-plane relationship
 ## though, so both trigger a full dimming refresh.
-func _on_plane_changed(who: Node, _plane: int) -> void:
+func _on_plane_changed(who: Node, plane: int) -> void:
 	if who == player:
-		_renderer.set_active_plane(player.get_node("PlaneComponent").current_plane)
+		_renderer.set_active_plane(plane as Level.Layer)
 	_refresh_plane_focus()
 
 
@@ -564,7 +564,12 @@ func _on_plane_changed(who: Node, _plane: int) -> void:
 ## Camouflage guardrail: body_alpha isn't reference-counted (last caller
 ## wins, by design — see OutlineFx.set_body_alpha's own doc comment), so a
 ## node with an active CamouflageSkill is skipped entirely here — Camouflage
-## keeps sole control of that node's body_alpha until it breaks.
+## keeps sole control of that node's body_alpha until it breaks. Detected by
+## TYPE, not by child name: player.tscn authors a child literally named
+## "CamouflageSkill", but Enemy._make_skills() attaches it at runtime via a
+## bare add_child() with no explicit name, so a name-based lookup silently
+## fails for a camouflaged enemy. Mirrors CamouflageSkill.break_if_present()'s
+## own type-scan for exactly this reason.
 func _refresh_plane_focus() -> void:
 	if player == null or enemy == null:
 		return
@@ -572,14 +577,23 @@ func _refresh_plane_focus() -> void:
 	for node in [player, enemy]:
 		if not is_instance_valid(node):
 			continue
-		var camo := node.get_node_or_null("CamouflageSkill") as CamouflageSkill
-		if camo != null and camo.active:
+		if _has_active_camouflage(node):
 			continue
 		var vis := node.get_node_or_null("Sprite") as CanvasItem
 		if vis == null:
 			continue
 		var alpha := 1.0 if PlaneComponent.effective_plane(node) == focus_plane else OFF_PLANE_ALPHA
 		OutlineFx.set_body_alpha(vis, alpha)
+
+
+## True if `entity` has a currently-active CamouflageSkill child, found by
+## type rather than by the child's node name — see _refresh_plane_focus's
+## doc comment for why name-based lookup isn't reliable here.
+func _has_active_camouflage(entity: Node) -> bool:
+	for child in entity.get_children():
+		if child is CamouflageSkill and child.active:
+			return true
+	return false
 
 
 ## Flag a handful of random open, non-spawn tiles as pits so the ceiling
