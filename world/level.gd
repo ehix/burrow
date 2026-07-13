@@ -462,6 +462,8 @@ func is_blocked(tile: Vector2i, plane: Layer) -> bool:
 		return true
 	if Blockade.at_tile(get_tree(), tile, TILE_SIZE) != null:
 		return true
+	if Centipede.segment_at_tile(get_tree(), tile) != null:
+		return true
 	if plane == Layer.CEILING:
 		return ceiling.is_blocked(tile.x, tile.y)
 	return maze.is_ground_blocked(tile.x, tile.y)
@@ -830,3 +832,14 @@ func _spawn_larva_at(cell: Vector2i) -> void:
 
 func _tile_centre(tx: int, ty: int) -> Vector2:
 	return Vector2((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE)
+
+
+## Public wrapper for _tile_centre() -- Level exposes the one seam external
+## production code should read tile positions through, rather than reaching
+## into the underscore-prefixed internal helper directly (see
+## is_water_at()'s identical rationale, added in a later task). Centipede
+## uses this to position its segments; _tile_centre() itself stays the
+## internal implementation every other in-file caller already uses
+## directly.
+func tile_centre(tile: Vector2i) -> Vector2:
+	return _tile_centre(tile.x, tile.y)

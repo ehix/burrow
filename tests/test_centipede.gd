@@ -1,0 +1,90 @@
+extends GutTest
+## Centipede (sub-project H): shared hit-counter across the whole body,
+## segment_at_tile() lookup, and spawn_at() laying out segment visuals to
+## match its tile array. Movement (crawling/fleeing/relocating) is covered
+## in later tasks' own test files as it's built.
+
+func _make_level() -> Level:
+	var level: Level = preload("res://world/level.tscn").instantiate()
+	add_child_autofree(level)
+	level.build()
+	return level
+
+
+func _make_centipede(level: Level, tiles: Array[Vector2i]) -> Centipede:
+	var centipede := Centipede.new()
+	add_child_autofree(centipede)
+	centipede.bind_level(level)
+	centipede.spawn_at(tiles)
+	return centipede
+
+
+func test_spawn_at_creates_one_segment_per_tile() -> void:
+	var level := _make_level()
+	var tiles: Array[Vector2i] = [Vector2i(1, 1), Vector2i(1, 2), Vector2i(1, 3)]
+	var centipede := _make_centipede(level, tiles)
+	assert_eq(centipede._segments.size(), 3)
+
+
+func test_spawn_at_positions_each_segment_at_its_tile_centre() -> void:
+	var level := _make_level()
+	var tiles: Array[Vector2i] = [Vector2i(1, 1), Vector2i(1, 2)]
+	var centipede := _make_centipede(level, tiles)
+	assert_eq(centipede._segments[0].global_position, level.tile_centre(Vector2i(1, 1)))
+	assert_eq(centipede._segments[1].global_position, level.tile_centre(Vector2i(1, 2)))
+
+
+func test_joins_the_centipedes_group() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1)])
+	assert_true(centipede.is_in_group("centipedes"))
+
+
+func test_take_hit_below_threshold_stays_blocking() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1)])
+	centipede.hits_to_flee = 4
+	centipede.take_hit()
+	centipede.take_hit()
+	centipede.take_hit()
+	assert_eq(centipede.state, Centipede.State.BLOCKING)
+
+
+func test_take_hit_at_threshold_begins_fleeing() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1)])
+	centipede.hits_to_flee = 4
+	for i in 4:
+		centipede.take_hit()
+	assert_eq(centipede.state, Centipede.State.FLEEING)
+
+
+func test_take_hit_is_a_noop_once_already_fleeing() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1)])
+	centipede.hits_to_flee = 2
+	centipede.take_hit()
+	centipede.take_hit() # now FLEEING
+	centipede.take_hit() # must not error or re-trigger anything odd
+	assert_eq(centipede.state, Centipede.State.FLEEING)
+
+
+func test_segment_at_tile_finds_the_owning_centipede() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1), Vector2i(1, 2)])
+	var found := Centipede.segment_at_tile(level.get_tree(), Vector2i(1, 2))
+	assert_eq(found, centipede)
+
+
+func test_segment_at_tile_returns_null_for_an_unoccupied_tile() -> void:
+	var level := _make_level()
+	_make_centipede(level, [Vector2i(1, 1)])
+	var found := Centipede.segment_at_tile(level.get_tree(), Vector2i(5, 5))
+	assert_null(found)
+
+
+func test_level_is_blocked_true_on_a_centipede_tile_for_both_planes() -> void:
+	var level := _make_level()
+	_make_centipede(level, [Vector2i(3, 3)])
+	assert_true(level.is_blocked(Vector2i(3, 3), Level.Layer.GROUND))
+	assert_true(level.is_blocked(Vector2i(3, 3), Level.Layer.CEILING))
