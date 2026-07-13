@@ -331,6 +331,7 @@ func _sense_sprite_of(node: Node) -> CanvasItem:
 const SENSE_POINT_HALF_SIZE := {
 	"world_items": Vector2(9, 9),
 	"earthworms": Vector2(18, 8),
+	"centipede_segments": Vector2(20, 20),
 }
 
 
