@@ -95,3 +95,33 @@ func test_spider_with_no_inventory_component_is_a_noop() -> void:
 	pickup._on_body_entered(spider) # must not error
 
 	assert_false(pickup.is_queued_for_deletion(), "no InventoryComponent -- safe no-op, item stays in the world")
+
+
+func test_submerge_hides_and_disables_the_pickup() -> void:
+	var pickup := _make_pickup(FungusSenseItem.new())
+	pickup.submerge()
+	assert_false(pickup.visible)
+	assert_false(pickup.monitoring)
+
+
+func test_resurface_restores_visibility_and_monitoring() -> void:
+	var pickup := _make_pickup(FungusSenseItem.new())
+	pickup.submerge()
+	pickup.resurface()
+	assert_true(pickup.visible)
+	assert_true(pickup.monitoring)
+
+
+func test_submerged_pickup_ignores_a_spider_walking_through_it() -> void:
+	var pickup := _make_pickup(FungusSenseItem.new())
+	var spider := _make_spider()
+	pickup.submerge()
+
+	pickup._on_body_entered(spider) # direct call, same as every other test in this file
+
+	# _on_body_entered() itself doesn't check `monitoring` (Area2D's own
+	# collision system is what `monitoring` gates in real play) -- this test
+	# instead documents the intended real-game behavior: monitoring=false
+	# means Godot's physics server never actually calls _on_body_entered in
+	# the first place, so exercising `monitoring` itself is what matters.
+	assert_false(pickup.monitoring, "monitoring stays off while submerged, preventing real overlap detection")

@@ -143,6 +143,13 @@ var _wall_nodes: Dictionary = {}
 ## Pit/flood tile -> its visual marker, so MazeData's ground-hazard overlay
 ## stays visible in sync — mirrors _wall_nodes.
 var _pit_nodes: Dictionary = {}
+## Water tile tracking (environment tiles rework): parallel to _pit_nodes,
+## kept entirely separate so a natural pit and a flooded tile can look
+## different even though both block ground movement via the same
+## MazeData._pits overlay underneath.
+var _water_tiles: Dictionary = {}
+var _water_nodes: Dictionary = {}
+const WATER_MARKER_COLOR := Color(0.15, 0.45, 0.75, 0.75)
 var _hazard_director: HazardDirector
 var _sense_active: bool = false
 var _sense_radius: float = 0.0
@@ -488,10 +495,87 @@ func _spawn_pit_marker(tile: Vector2i) -> Node2D:
 	return poly
 
 
-## BlockadeSkill: patch a pit tile for ground traversal by placing a blockade
-## on it. No-op if `tile` isn't currently a pit.
+## Flag/clear a water tile (environment tiles rework). Touches
+## maze.set_pit() directly (not via set_pit_at()) so water gets its own
+## blue marker instead of set_pit_at()'s brown pit one — water and a
+## natural pit share the same underlying ground-block flag but never the
+## same visual. Flooding a tile destroys any WebTrap on it and submerges
+## any WorldItemPickup on it (survives, unlike the trap); draining
+## resurfaces the item.
+func set_water_at(tile: Vector2i, value: bool) -> void:
+	if maze == null:
+		return
+	if value:
+		maze.set_pit(tile.x, tile.y, true)
+		_water_tiles[tile] = true
+		if not _water_nodes.has(tile):
+			_water_nodes[tile] = _spawn_water_marker(tile)
+		_drown_traps_at(tile)
+		_submerge_items_at(tile)
+	else:
+		_water_tiles.erase(tile)
+		# A natural pit shares this same overlay flag (design §7) — if this
+		# tile is also a tracked natural pit, leave the flag set so draining
+		# the flood doesn't silently un-block the pit underneath it.
+		if not _pit_nodes.has(tile):
+			maze.set_pit(tile.x, tile.y, false)
+		var marker = _water_nodes.get(tile)
+		if marker != null and is_instance_valid(marker):
+			marker.queue_free()
+		_water_nodes.erase(tile)
+		_resurface_items_at(tile)
+
+
+func _spawn_water_marker(tile: Vector2i) -> Node2D:
+	var half := TILE_SIZE * 0.5
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)])
+	poly.color = WATER_MARKER_COLOR
+	poly.position = _tile_centre(tile.x, tile.y)
+	add_child(poly)
+	return poly
+
+
+func _drown_traps_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("traps"):
+		var trap := node as WebTrap
+		if trap != null and tile_of(trap.global_position) == tile:
+			trap.force_destroy()
+
+
+func _submerge_items_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("world_items"):
+		var item := node as WorldItemPickup
+		if item != null and tile_of(item.global_position) == tile:
+			item.submerge()
+
+
+func _resurface_items_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("world_items"):
+		var item := node as WorldItemPickup
+		if item != null and tile_of(item.global_position) == tile:
+			item.resurface()
+
+
+## BlockadeSkill: patch a hazard tile (pit or water) for ground traversal by
+## placing a blockade on it. Routes through set_water_at() for a flooded
+## tile so its blue marker and water-tile tracking are cleared too, not
+## just the underlying block flag — otherwise a stale blue marker would be
+## left floating over an already-walkable tile. No-op if `tile` is neither
+## a pit nor water.
 func patch_pit_at(tile: Vector2i) -> void:
-	set_pit_at(tile, false)
+	if _water_tiles.has(tile):
+		set_water_at(tile, false)
+	else:
+		set_pit_at(tile, false)
 
 
 ## Force one eligible hazard to fire right now, bypassing its schedule (dev
@@ -506,7 +590,8 @@ func trigger_random_hazard_now() -> void:
 ## back into a wall (Seismic Compaction's collapse pass). No-op out of
 ## bounds, on a boundary tile (guardrail — re-checked defensively even though
 ## callers should already filter via MazeData.is_boundary), or if the tile is
-## already a wall.
+## already a wall. Destroys whatever's on the tile first (environment tiles
+## rework) and plays a brief cosmetic dust cue.
 func collapse_tile_at(tile: Vector2i) -> bool:
 	if maze == null or maze.is_boundary(tile.x, tile.y):
 		return false
@@ -514,12 +599,41 @@ func collapse_tile_at(tile: Vector2i) -> bool:
 		return false
 	if not maze.is_open(tile.x, tile.y):
 		return false
+	_destroy_occupants_at(tile)
+	CombatFx.spawn_collapse_dust(self, _tile_centre(tile.x, tile.y))
+	if _water_tiles.has(tile):
+		# Clear water tracking (marker + shared _pits flag) while the tile is
+		# still open — MazeData.set_pit() no-ops once it's a wall, so this
+		# must happen before set_wall() below or the flag would be stuck.
+		set_water_at(tile, false)
 	maze.set_wall(tile.x, tile.y)
 	_spawn_wall_node(tile)
 	if _astar != null:
 		_astar.set_point_solid(tile, true)
 	_renderer.queue_redraw()
 	return true
+
+
+## A tile about to become a wall permanently destroys whatever's on it —
+## larvae, web traps (via the same force_destroy() water uses), and items
+## (queue_free directly: unlike water, compaction never restores anything —
+## see set_water_at()'s own doc comment for the deliberate contrast).
+## Spider occupancy is unaffected — the caller (SeismicCompaction) already
+## excludes spider-occupied tiles from its collapse candidates entirely
+## (unchanged), so a living spider is never at risk here.
+func _destroy_occupants_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("larvae"):
+		if tile_of((node as Node2D).global_position) == tile:
+			node.queue_free()
+	for node in get_tree().get_nodes_in_group("traps"):
+		var trap := node as WebTrap
+		if trap != null and tile_of(trap.global_position) == tile:
+			trap.force_destroy()
+	for node in get_tree().get_nodes_in_group("world_items"):
+		if tile_of((node as Node2D).global_position) == tile:
+			node.queue_free()
 
 
 func _spawn_entities() -> void:
