@@ -258,6 +258,7 @@ func _physics_process(delta: float) -> void:
 		State.PATROL:
 			_do_patrol()
 	_melee_nearby_hatchling()
+	_melee_nearby_centipede()
 
 
 func _update_state() -> void:
@@ -657,6 +658,24 @@ func _melee_nearby_hatchling() -> void:
 	var to_hatchling: Vector2 = hatchling.global_position - global_position
 	if to_hatchling.length() <= melee_range:
 		_melee_target(hatchling, to_hatchling)
+
+
+## Opportunistic strike, mirroring _melee_nearby_hatchling() but for a
+## Centipede: Player._melee() already hits a Centipede via an exact-tile
+## lookup (the tile directly ahead, same as its existing Blockade check)
+## because neither carries a Hurtbox _melee_target() could reach -- Enemy
+## needs the identical tile-based check, not the distance-based one
+## _melee_nearby_hatchling() uses.
+func _melee_nearby_centipede() -> void:
+	if _melee_left > 0.0:
+		return
+	var target_tile := _mover.committed_tile() + Vector2i(int(facing.x), int(facing.y))
+	var centipede := Centipede.segment_at_tile(get_tree(), target_tile)
+	if centipede == null:
+		return
+	_melee_left = melee_cooldown
+	centipede.take_hit()
+	HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 
 
 ## Take a landed web/melee hit: get shoved one tile along `push_dir`

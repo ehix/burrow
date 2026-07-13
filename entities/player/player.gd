@@ -366,6 +366,11 @@ func _melee() -> void:
 		blockade.take_hit(facing)
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
+	var centipede := Centipede.segment_at_tile(get_tree(), target_tile)
+	if centipede != null:
+		centipede.take_hit()
+		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
+		return
 	for node in get_tree().get_nodes_in_group("earthworms"):
 		var worm := node as Node2D
 		if worm == null or worm.global_position.distance_to(target) > melee_range:

@@ -119,3 +119,37 @@ func test_melee_always_spawns_the_slash_regardless_of_hit() -> void:
 	var children_before := holder.get_child_count()
 	player._melee()
 	assert_gt(holder.get_child_count(), children_before, "the slash VFX spawns even on a whiff")
+
+
+func test_melee_hits_a_centipede_in_range() -> void:
+	var player := _make_player()
+	var level: Level = preload("res://world/level.tscn").instantiate()
+	add_child_autofree(level)
+	level.build()
+	var centipede := Centipede.new()
+	add_child_autofree(centipede)
+	centipede.bind_level(level)
+	var target_tile: Vector2i = player._mover.committed_tile() + Vector2i(int(player.facing.x), int(player.facing.y))
+	centipede.spawn_at([target_tile])
+
+	player._melee()
+
+	assert_eq(centipede._hits, 1, "the swing landed one hit on the centipede")
+
+
+func test_melee_costs_hunger_when_it_lands_on_a_centipede() -> void:
+	var player := _make_player()
+	var level: Level = preload("res://world/level.tscn").instantiate()
+	add_child_autofree(level)
+	level.build()
+	var centipede := Centipede.new()
+	add_child_autofree(centipede)
+	centipede.bind_level(level)
+	var target_tile: Vector2i = player._mover.committed_tile() + Vector2i(int(player.facing.x), int(player.facing.y))
+	centipede.spawn_at([target_tile])
+	var before := player.hunger.current_hunger
+
+	player._melee()
+
+	assert_almost_eq(player.hunger.current_hunger, before + player.melee_hunger_cost, 0.001,
+		"a landed hit on a centipede costs hunger like any other landed melee hit")
