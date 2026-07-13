@@ -64,3 +64,61 @@ func test_enemy_scene_hurtbox_resolves_its_health() -> void:
 	var before := enemy.health.current_health
 	hurtbox.receive_hit(10.0)
 	assert_almost_eq(enemy.health.current_health, before - 10.0, 0.001)
+
+
+func test_receive_hit_is_a_noop_when_attacker_and_victim_are_on_different_planes() -> void:
+	var pair := _make_hurtbox_with_health(100.0)
+	var hurtbox: Hurtbox = pair[0]
+	var health: HealthComponent = pair[1]
+	# PlaneComponent.new() must be explicitly named — a runtime-created node
+	# isn't auto-named after its class_name (that only happens for nodes
+	# placed in a .tscn), and effective_plane() looks it up as
+	# "PlaneComponent" by name, exactly like player.tscn/enemy.tscn wire it.
+	var victim_plane := PlaneComponent.new()
+	victim_plane.name = "PlaneComponent"
+	hurtbox.get_parent().add_child(victim_plane)
+	victim_plane.current_plane = Level.Layer.GROUND
+	var attacker := Node2D.new()
+	add_child_autofree(attacker)
+	var attacker_plane := PlaneComponent.new()
+	attacker_plane.name = "PlaneComponent"
+	attacker.add_child(attacker_plane)
+	attacker_plane.current_plane = Level.Layer.CEILING
+
+	hurtbox.receive_hit(10.0, attacker)
+
+	assert_almost_eq(health.current_health, 100.0, 0.001, "a cross-plane hit never lands")
+
+
+func test_receive_hit_lands_normally_when_both_default_to_ground() -> void:
+	var pair := _make_hurtbox_with_health(100.0)
+	var hurtbox: Hurtbox = pair[0]
+	var health: HealthComponent = pair[1]
+	var attacker := Node2D.new()
+	add_child_autofree(attacker)
+
+	hurtbox.receive_hit(10.0, attacker)
+
+	assert_almost_eq(health.current_health, 90.0, 0.001, "neither side has a PlaneComponent, so both default to GROUND")
+
+
+func test_receive_hit_knocks_a_ceiling_victim_down_and_applies_fall_damage() -> void:
+	var pair := _make_hurtbox_with_health(100.0)
+	var hurtbox: Hurtbox = pair[0]
+	var health: HealthComponent = pair[1]
+	var victim_plane := PlaneComponent.new()
+	victim_plane.name = "PlaneComponent"
+	hurtbox.get_parent().add_child(victim_plane)
+	victim_plane.current_plane = Level.Layer.CEILING
+	victim_plane.fall_damage = 8.0
+	var attacker := Node2D.new()
+	add_child_autofree(attacker)
+	var attacker_plane := PlaneComponent.new()
+	attacker_plane.name = "PlaneComponent"
+	attacker.add_child(attacker_plane)
+	attacker_plane.current_plane = Level.Layer.CEILING # same plane, so the hit lands
+
+	hurtbox.receive_hit(10.0, attacker)
+
+	assert_eq(victim_plane.current_plane, Level.Layer.GROUND, "knocked down by the hit")
+	assert_almost_eq(health.current_health, 82.0, 0.001, "10 damage from the hit, 8 more from the fall")

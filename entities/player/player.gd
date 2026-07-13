@@ -79,7 +79,6 @@ func _ready() -> void:
 	# Route blocking through the player so the dev noclip toggle can bypass it.
 	_mover.block_check = _blocked
 	_mover.step_finished.connect(_on_step_finished)
-	_plane.plane_changed.connect(_on_plane_changed)
 	_status.effect_applied.connect(_on_effect_applied)
 	_status.effect_expired.connect(_on_effect_expired)
 	inventory.item_held_changed.connect(func(_item: ConsumableItem) -> void: queue_redraw())
@@ -289,21 +288,12 @@ func _blocked(dir: Vector2i) -> bool:
 	return test_move(global_transform, Vector2(dir) * float(_mover.tile_size))
 
 
-## Visual cue for which plane the player currently occupies — a dim,
-## cool-toned tint on the ceiling, restored to normal on the ground.
-func _on_plane_changed(_plane_arg: Level.Layer) -> void:
-	_update_sprite_tint()
-
-
-## The sprite's tint is the active class's color, dimmed/cooled by the
-## ceiling tint on top when on the ceiling plane — the two effects compose
-## instead of one clobbering the other.
+## The sprite's tint is always just the active class's color now — the
+## ceiling/plane mechanics rework replaced the old ceiling tint-multiply
+## (which clashed with each class's identity color) with a floor re-color +
+## entity dimming instead (see Level._refresh_plane_focus()).
 func _update_sprite_tint() -> void:
-	var base := _active_class_data.display_color if _active_class_data != null else Color.WHITE
-	if _plane.current_plane == Level.Layer.CEILING:
-		sprite.modulate = base * Color(0.55, 0.65, 0.85, 0.85)
-	else:
-		sprite.modulate = base
+	sprite.modulate = _active_class_data.display_color if _active_class_data != null else Color.WHITE
 
 
 ## Placeholder held-item indicator — a colored dot above the sprite, keyed

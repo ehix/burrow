@@ -100,3 +100,50 @@ func test_freeze_enemy_halts_physics_process() -> void:
 	var repath_before := enemy._repath_left
 	enemy._physics_process(1.0)
 	assert_eq(enemy._repath_left, repath_before, "a demobilized enemy takes no physics step")
+
+
+# --- Ceiling/plane mechanics rework -----------------------------------------------
+
+func test_enemy_has_a_plane_component_defaulting_to_ground() -> void:
+	var enemy := _make_enemy() # use this file's existing enemy-construction helper
+	var plane := enemy.get_node_or_null("PlaneComponent") as PlaneComponent
+
+	assert_not_null(plane, "Enemy gains a PlaneComponent (ceiling/plane mechanics rework)")
+	assert_eq(plane.current_plane, Level.Layer.GROUND)
+
+
+func test_enemy_climbs_to_match_a_target_on_the_ceiling_while_entering_chase() -> void:
+	var enemy := _make_enemy()
+	var target := Node2D.new()
+	add_child_autofree(target)
+	target.add_to_group("player")
+	var target_plane := PlaneComponent.new()
+	target_plane.name = "PlaneComponent" # runtime nodes aren't auto-named after class_name
+	target.add_child(target_plane)
+	target_plane.current_plane = Level.Layer.CEILING
+	enemy._current_target = target
+
+	enemy._match_plane_to(target)
+
+	assert_eq(enemy._plane.current_plane, Level.Layer.CEILING)
+
+
+func test_enemy_never_climbs_to_chase_a_plane_less_target() -> void:
+	var enemy := _make_enemy()
+	var decoy := Node2D.new() # no PlaneComponent -> always effective_plane() == GROUND
+	add_child_autofree(decoy)
+
+	enemy._match_plane_to(decoy)
+
+	assert_eq(enemy._plane.current_plane, Level.Layer.GROUND)
+
+
+func test_enemy_settles_back_to_ground_when_state_leaves_chase() -> void:
+	var enemy := _make_enemy()
+	enemy._plane.current_plane = Level.Layer.CEILING
+	enemy.state = Enemy.State.PATROL
+	enemy._current_target = null
+
+	enemy._update_state()
+
+	assert_eq(enemy._plane.current_plane, Level.Layer.GROUND, "not chasing anymore, so it climbs back down")

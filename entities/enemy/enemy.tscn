@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://entities/enemy/enemy.gd" id="1_enemy"]
 [ext_resource type="Script" path="res://components/health_component.gd" id="2_health"]
@@ -12,6 +12,7 @@
 [ext_resource type="Texture2D" uid="uid://dq3gyd1ch4syh" path="res://assets/sprites/enemy_trapdoor_spider.png" id="10_trapdoor"]
 [ext_resource type="Script" path="res://components/grid_mover.gd" id="11_mover"]
 [ext_resource type="Script" path="res://components/inventory_component.gd" id="12_inventory"]
+[ext_resource type="Script" path="res://components/plane_component.gd" id="13_plane"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 10.0
@@ -72,3 +73,6 @@ shape = SubResource("CircleShape2D_hurt")
 [node name="InventoryComponent" type="Node" parent="."]
 script = ExtResource("12_inventory")
 auto_use = true
+
+[node name="PlaneComponent" type="Node" parent="."]
+script = ExtResource("13_plane")

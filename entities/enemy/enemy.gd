@@ -62,6 +62,7 @@ const SKILL_DECISION_INTERVAL := 0.75
 @onready var web_emitter: WebEmitter = $WebEmitter
 @onready var trap_placer: TrapPlacer = $TrapPlacer
 @onready var _mover: GridMover = $GridMover
+@onready var _plane: PlaneComponent = $PlaneComponent
 @onready var facing_visual: Node2D = get_node_or_null("Sprite")
 
 var state: State = State.PATROL
@@ -99,6 +100,7 @@ var _base_web_cooldown: float
 ## Level calls this right after instancing so the enemy can path on the grid.
 func bind_level(level: Node) -> void:
 	_level = level
+	_plane.level = level
 
 
 func _ready() -> void:
@@ -143,9 +145,22 @@ func _on_hunger_changed(value: float, max_value: float) -> void:
 ## Blocking seam for the GridMover: checks a tile the player has already
 ## committed to (mid-step, not just physically standing on) before falling
 ## back to the body's own physics (walls, traps, a stationary spider).
+## Ceiling/plane mechanics rework: mirrors Player._blocked()'s plane branch —
+## on the ceiling, blocking is decided entirely by Level.is_blocked (no
+## separate physical collider up there); on the ground, is_blocked() adds
+## the pit check on top of the existing test_move physics check.
 func _blocked(dir: Vector2i) -> bool:
 	if GridMover.spider_tile_contested(_mover, self, dir):
 		return true
+	if _level != null:
+		# _level is typed loosely as Node (unlike Player._level: Level), so an
+		# explicit Vector2i annotation is needed here — `:=` can't infer a type
+		# through Node's dynamically-resolved tile_of() call.
+		var target: Vector2i = _level.tile_of(global_position) + dir
+		if _plane.current_plane == Level.Layer.CEILING:
+			return _level.is_blocked(target, Level.Layer.CEILING)
+		if _level.is_blocked(target, Level.Layer.GROUND):
+			return true
 	return test_move(global_transform, Vector2(dir) * float(_mover.tile_size))
 
 
@@ -270,6 +285,11 @@ func _update_state() -> void:
 		if next == State.PATROL or next == State.SEEK_FOOD:
 			_state_lock_left = state_min_duration
 
+	if next == State.CHASE and _current_target != null:
+		_match_plane_to(_current_target)
+	elif _plane.current_plane == Level.Layer.CEILING:
+		_plane.transition() # settle back to ground: not actively chasing anymore
+
 
 # --- per-state behaviour ------------------------------------------------------
 
@@ -282,6 +302,19 @@ func _fire_web(direction: Vector2) -> void:
 	var shot := web_emitter.fire(global_position, direction, self, speed_mult)
 	if shot != null and _active_class_data != null and _active_class_data.web_fire_health_cost > 0.0:
 		health.take_damage(_active_class_data.web_fire_health_cost)
+
+
+## Ceiling/plane mechanics rework: the enemy only ever climbs to match a
+## target's plane while actively chasing it (called from _update_state()),
+## and always settles back to ground the instant it isn't chasing (see the
+## call site above) — the minimum that makes same-plane combat meaningful.
+## A target with no PlaneComponent (a Decoy) is always effective_plane()
+## GROUND, so the enemy never climbs to "chase" a decoy prop. Instant
+## transition, matching the existing Player.toggle_plane precedent exactly —
+## no climb-reaction delay (design's explicit out-of-scope call).
+func _match_plane_to(target: Node2D) -> void:
+	if PlaneComponent.effective_plane(target) != _plane.current_plane:
+		_plane.transition()
 
 
 func _do_chase() -> void:

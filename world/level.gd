@@ -41,6 +41,14 @@ const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 ## hand-drawn box outline in the same colour. One visual language, not three.
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
+## Ceiling/plane mechanics rework: body_alpha for whichever of Player/Enemy
+## is off the other's plane — "less in focus," per the user's own framing
+## during brainstorming. Deliberately scoped to just these two (the only
+## entities that track a plane at all); larvae/hatchlings/decoys/traps
+## always render at full brightness regardless of plane (design's explicit
+## out-of-scope call).
+const OFF_PLANE_ALPHA := 0.35
+
 ## Dual-Plane Map Architecture (design §1): the ground floor and the inverted
 ## ceiling floor directly above it. A spider's PlaneComponent tracks which one
 ## it currently occupies; `is_blocked()` is the single seam both planes'
@@ -156,6 +164,9 @@ func _ready() -> void:
 	# RemoveWallsSkill, BlockadeSkill) without needing it threaded through
 	# every call site the way Enemy.bind_level() does.
 	add_to_group("level")
+	# Ceiling/plane mechanics rework: floor re-color tracks the player's own
+	# plane; entity dimming (Task 7) reacts to anyone's plane change.
+	EventBus.plane_changed.connect(_on_plane_changed)
 
 
 ## Build the whole level. Called by World right after instancing.
@@ -524,10 +535,65 @@ func _spawn_entities() -> void:
 
 	enemy = EnemyScene.instantiate()
 	enemy.position = _tile_centre(enemy_cell.x, enemy_cell.y)
-	enemy.bind_level(self)
+	# Add to the tree before bind_level (mirroring the player above): Enemy's
+	# PlaneComponent is an @onready var, so bind_level's `_plane.level = level`
+	# needs _ready() to have already run — calling bind_level first left
+	# _plane null (ceiling/plane mechanics rework surfaced this).
 	_entities.add_child(enemy)
+	enemy.bind_level(self)
 
 	_spawn_larvae([player_cell, enemy_cell])
+
+
+## Ceiling/plane mechanics rework: the rendered floor always reflects the
+## player's own plane specifically (one camera, one local viewer) — an
+## enemy transitioning doesn't touch the floor color. Either side changing
+## plane can change their *relative* same/different-plane relationship
+## though, so both trigger a full dimming refresh.
+func _on_plane_changed(who: Node, plane: int) -> void:
+	if who == player:
+		_renderer.set_active_plane(plane as Level.Layer)
+	_refresh_plane_focus()
+
+
+## Dims whichever of Player/Enemy is off the other's plane via the shared
+## outline shader's body_alpha uniform (already shipped for Camouflage) —
+## the floor re-color (above) tells you which plane *you're* on; this tells
+## you which other spider is or isn't reachable from here.
+##
+## Camouflage guardrail: body_alpha isn't reference-counted (last caller
+## wins, by design — see OutlineFx.set_body_alpha's own doc comment), so a
+## node with an active CamouflageSkill is skipped entirely here — Camouflage
+## keeps sole control of that node's body_alpha until it breaks. Detected by
+## TYPE, not by child name: player.tscn authors a child literally named
+## "CamouflageSkill", but Enemy._make_skills() attaches it at runtime via a
+## bare add_child() with no explicit name, so a name-based lookup silently
+## fails for a camouflaged enemy. Mirrors CamouflageSkill.break_if_present()'s
+## own type-scan for exactly this reason.
+func _refresh_plane_focus() -> void:
+	if player == null or enemy == null:
+		return
+	var focus_plane := PlaneComponent.effective_plane(player)
+	for node in [player, enemy]:
+		if not is_instance_valid(node):
+			continue
+		if _has_active_camouflage(node):
+			continue
+		var vis := node.get_node_or_null("Sprite") as CanvasItem
+		if vis == null:
+			continue
+		var alpha := 1.0 if PlaneComponent.effective_plane(node) == focus_plane else OFF_PLANE_ALPHA
+		OutlineFx.set_body_alpha(vis, alpha)
+
+
+## True if `entity` has a currently-active CamouflageSkill child, found by
+## type rather than by the child's node name — see _refresh_plane_focus's
+## doc comment for why name-based lookup isn't reliable here.
+func _has_active_camouflage(entity: Node) -> bool:
+	for child in entity.get_children():
+		if child is CamouflageSkill and child.active:
+			return true
+	return false
 
 
 ## Flag a handful of random open, non-spawn tiles as pits so the ceiling

@@ -60,13 +60,17 @@ func test_apply_class_tints_the_sprite_to_the_class_color() -> void:
 	assert_eq(player.sprite.modulate, Player.WeaverData.display_color)
 
 
-func test_ceiling_tint_composes_with_the_class_color_instead_of_replacing_it() -> void:
+func test_sprite_tint_stays_the_class_color_regardless_of_plane() -> void:
+	# Ceiling/plane mechanics rework: the old ceiling tint-multiply was
+	# deleted (it clashed with each class's identity color) in favor of a
+	# floor re-color + entity dimming instead (Level._refresh_plane_focus()).
 	var player := _make_player()
 	player.apply_class(SpiderClassData.SpiderClass.WEAVER)
 	player._plane.transition() # -> CEILING
-	assert_eq(player.sprite.modulate, Player.WeaverData.display_color * Color(0.55, 0.65, 0.85, 0.85))
+	assert_eq(player.sprite.modulate, Player.WeaverData.display_color,
+		"no more ceiling tint-multiply — the sprite stays the plain class color")
 	player._plane.transition() # -> GROUND
-	assert_eq(player.sprite.modulate, Player.WeaverData.display_color, "back to the plain class color on the ground")
+	assert_eq(player.sprite.modulate, Player.WeaverData.display_color)
 
 
 func test_net_shot_is_free_to_fire() -> void:
