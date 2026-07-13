@@ -41,6 +41,14 @@ const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 ## hand-drawn box outline in the same colour. One visual language, not three.
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
+## Ceiling/plane mechanics rework: body_alpha for whichever of Player/Enemy
+## is off the other's plane — "less in focus," per the user's own framing
+## during brainstorming. Deliberately scoped to just these two (the only
+## entities that track a plane at all); larvae/hatchlings/decoys/traps
+## always render at full brightness regardless of plane (design's explicit
+## out-of-scope call).
+const OFF_PLANE_ALPHA := 0.35
+
 ## Dual-Plane Map Architecture (design §1): the ground floor and the inverted
 ## ceiling floor directly above it. A spider's PlaneComponent tracks which one
 ## it currently occupies; `is_blocked()` is the single seam both planes'
@@ -539,10 +547,39 @@ func _spawn_entities() -> void:
 
 ## Ceiling/plane mechanics rework: the rendered floor always reflects the
 ## player's own plane specifically (one camera, one local viewer) — an
-## enemy transitioning doesn't touch the floor color at all.
+## enemy transitioning doesn't touch the floor color. Either side changing
+## plane can change their *relative* same/different-plane relationship
+## though, so both trigger a full dimming refresh.
 func _on_plane_changed(who: Node, _plane: int) -> void:
 	if who == player:
 		_renderer.set_active_plane(player.get_node("PlaneComponent").current_plane)
+	_refresh_plane_focus()
+
+
+## Dims whichever of Player/Enemy is off the other's plane via the shared
+## outline shader's body_alpha uniform (already shipped for Camouflage) —
+## the floor re-color (above) tells you which plane *you're* on; this tells
+## you which other spider is or isn't reachable from here.
+##
+## Camouflage guardrail: body_alpha isn't reference-counted (last caller
+## wins, by design — see OutlineFx.set_body_alpha's own doc comment), so a
+## node with an active CamouflageSkill is skipped entirely here — Camouflage
+## keeps sole control of that node's body_alpha until it breaks.
+func _refresh_plane_focus() -> void:
+	if player == null or enemy == null:
+		return
+	var focus_plane := PlaneComponent.effective_plane(player)
+	for node in [player, enemy]:
+		if not is_instance_valid(node):
+			continue
+		var camo := node.get_node_or_null("CamouflageSkill") as CamouflageSkill
+		if camo != null and camo.active:
+			continue
+		var vis := node.get_node_or_null("Sprite") as CanvasItem
+		if vis == null:
+			continue
+		var alpha := 1.0 if PlaneComponent.effective_plane(node) == focus_plane else OFF_PLANE_ALPHA
+		OutlineFx.set_body_alpha(vis, alpha)
 
 
 ## Flag a handful of random open, non-spawn tiles as pits so the ceiling
