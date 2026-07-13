@@ -214,3 +214,35 @@ func test_body_entered_still_entangles_when_the_web_is_empty() -> void:
 	autofree(spider)
 	trap._on_body_entered(spider) # nothing caught: just crossing the web
 	assert_eq(spider.hits.size(), 1, "crossing an empty web still entangles")
+
+
+func test_force_destroy_frees_the_trap() -> void:
+	var trap := _make_trap()
+	trap.force_destroy()
+	assert_true(trap.spent, "force_destroy spends the trap immediately")
+	assert_true(trap.is_queued_for_deletion())
+
+
+func test_force_destroy_releases_a_caught_larva() -> void:
+	var trap := _make_trap()
+	var larva := _make_larva()
+	trap.catch_larva(larva)
+	trap.force_destroy()
+	assert_true(larva.is_queued_for_deletion(), "a caught larva is released, not left dangling")
+
+
+func test_force_destroy_ignores_hits_to_destroy() -> void:
+	var trap := _make_trap()
+	trap.hits_to_destroy = 3
+	trap.force_destroy() # zero prior web_hits
+	assert_true(trap.spent, "force_destroy works regardless of the shot counter")
+
+
+func test_force_destroy_is_a_noop_on_an_already_spent_trap() -> void:
+	var trap := _make_trap()
+	trap.take_web_hit()
+	trap.take_web_hit()
+	trap.take_web_hit() # spends it via the normal 3-hit path
+	assert_true(trap.spent)
+	trap.force_destroy() # must not error or double-free
+	assert_true(trap.spent)

@@ -38,6 +38,19 @@ func _on_body_entered(body: Node2D) -> void:
 	queue_free()
 
 
+## Hides and disables the pickup while its tile is underwater — the item
+## survives (unlike a web trap), it's just inaccessible until the water
+## recedes.
+func submerge() -> void:
+	visible = false
+	monitoring = false
+
+
+func resurface() -> void:
+	visible = true
+	monitoring = true
+
+
 func _inventory_of(entity: Node) -> InventoryComponent:
 	for child in entity.get_children():
 		if child is InventoryComponent:

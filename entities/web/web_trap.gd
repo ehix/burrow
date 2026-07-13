@@ -133,6 +133,22 @@ func take_web_hit() -> void:
 		queue_free()
 
 
+## Destroys the trap immediately, regardless of hits_to_destroy — used by
+## anything that removes a trap's tile out from under it (water flooding
+## it, a compacted tile crushing it), as opposed to take_web_hit()'s
+## shot-counter path. Same cleanup either way: releases any caught larva,
+## leaves a torn-web visual, frees itself.
+func force_destroy() -> void:
+	if spent:
+		return
+	spent = true
+	if is_instance_valid(caught_larva):
+		caught_larva.queue_free()
+		caught_larva = null
+	_leave_torn_web()
+	queue_free()
+
+
 func _leave_torn_web() -> void:
 	var holder := get_parent()
 	if holder == null:
