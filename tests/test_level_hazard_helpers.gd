@@ -144,3 +144,41 @@ func test_patch_pit_at_on_a_flooded_tile_clears_water_state_too() -> void:
 
 	assert_false(level.maze.is_pit(open_cell.x, open_cell.y))
 	assert_false(level._water_nodes.has(open_cell), "patching a flooded tile also clears its blue marker")
+
+
+func test_collapse_tile_at_destroys_a_larva_on_the_tile() -> void:
+	var level := _make_level()
+	var interior_cell := Vector2i(3, 3)
+	var larva := Node2D.new()
+	larva.add_to_group("larvae")
+	level.add_child(larva)
+	larva.global_position = level._tile_centre(interior_cell.x, interior_cell.y)
+
+	level.collapse_tile_at(interior_cell)
+
+	assert_true(larva.is_queued_for_deletion(), "a larva on a collapsed tile is destroyed")
+
+
+func test_collapse_tile_at_destroys_a_web_trap_on_the_tile() -> void:
+	var level := _make_level()
+	var interior_cell := Vector2i(3, 3)
+	var trap := WebTrap.new()
+	level.add_child(trap)
+	trap.global_position = level._tile_centre(interior_cell.x, interior_cell.y)
+
+	level.collapse_tile_at(interior_cell)
+
+	assert_true(trap.spent, "a web trap on a collapsed tile is destroyed")
+
+
+func test_collapse_tile_at_destroys_an_item_on_the_tile_permanently() -> void:
+	var level := _make_level()
+	var interior_cell := Vector2i(3, 3)
+	var pickup: WorldItemPickup = preload("res://entities/items/world_item_pickup.tscn").instantiate()
+	level.add_child(pickup)
+	pickup.global_position = level._tile_centre(interior_cell.x, interior_cell.y)
+
+	level.collapse_tile_at(interior_cell)
+
+	assert_true(pickup.is_queued_for_deletion(),
+		"unlike water (which submerges then restores), compaction destroys an item outright")

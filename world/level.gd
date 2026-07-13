@@ -585,7 +585,8 @@ func trigger_random_hazard_now() -> void:
 ## back into a wall (Seismic Compaction's collapse pass). No-op out of
 ## bounds, on a boundary tile (guardrail — re-checked defensively even though
 ## callers should already filter via MazeData.is_boundary), or if the tile is
-## already a wall.
+## already a wall. Destroys whatever's on the tile first (environment tiles
+## rework) and plays a brief cosmetic dust cue.
 func collapse_tile_at(tile: Vector2i) -> bool:
 	if maze == null or maze.is_boundary(tile.x, tile.y):
 		return false
@@ -593,12 +594,36 @@ func collapse_tile_at(tile: Vector2i) -> bool:
 		return false
 	if not maze.is_open(tile.x, tile.y):
 		return false
+	_destroy_occupants_at(tile)
+	CombatFx.spawn_collapse_dust(self, _tile_centre(tile.x, tile.y))
 	maze.set_wall(tile.x, tile.y)
 	_spawn_wall_node(tile)
 	if _astar != null:
 		_astar.set_point_solid(tile, true)
 	_renderer.queue_redraw()
 	return true
+
+
+## A tile about to become a wall permanently destroys whatever's on it —
+## larvae, web traps (via the same force_destroy() water uses), and items
+## (queue_free directly: unlike water, compaction never restores anything —
+## see set_water_at()'s own doc comment for the deliberate contrast).
+## Spider occupancy is unaffected — the caller (SeismicCompaction) already
+## excludes spider-occupied tiles from its collapse candidates entirely
+## (unchanged), so a living spider is never at risk here.
+func _destroy_occupants_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("larvae"):
+		if tile_of((node as Node2D).global_position) == tile:
+			node.queue_free()
+	for node in get_tree().get_nodes_in_group("traps"):
+		var trap := node as WebTrap
+		if trap != null and tile_of(trap.global_position) == tile:
+			trap.force_destroy()
+	for node in get_tree().get_nodes_in_group("world_items"):
+		if tile_of((node as Node2D).global_position) == tile:
+			node.queue_free()
 
 
 func _spawn_entities() -> void:

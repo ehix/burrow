@@ -69,3 +69,22 @@ static func spawn_slash(holder: Node, world_position: Vector2, direction: Vector
 	var tween := visual.create_tween()
 	tween.tween_property(visual, "modulate:a", 0.0, SLASH_TIME)
 	tween.tween_callback(visual.queue_free)
+
+
+## A brief expanding, fading dust cloud at `world_position` — the visual
+## cue for a tile about to be crushed by Seismic Compaction. Purely
+## cosmetic, frees itself; never touches game state.
+static func spawn_collapse_dust(holder: Node, world_position: Vector2) -> void:
+	var dust := Polygon2D.new()
+	var half := 20.0
+	dust.polygon = PackedVector2Array([
+		Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)])
+	dust.color = Color(0.4, 0.35, 0.3, 0.8)
+	dust.position = world_position
+	holder.add_child(dust)
+	var tween := dust.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(dust, "scale", Vector2(1.6, 1.6), 0.3)
+	tween.tween_property(dust, "modulate:a", 0.0, 0.3)
+	tween.chain().tween_callback(dust.queue_free)

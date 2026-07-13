@@ -27,3 +27,24 @@ func test_flash_is_a_noop_outside_the_tree() -> void:
 	sprite.modulate = Color(0.4, 0.75, 0.45)
 	CombatFx.flash(sprite) # must not error
 	assert_eq(sprite.modulate, Color(0.4, 0.75, 0.45), "no-op leaves modulate untouched")
+
+
+func test_spawn_collapse_dust_adds_a_node_under_holder() -> void:
+	var holder := Node2D.new()
+	add_child_autofree(holder)
+
+	CombatFx.spawn_collapse_dust(holder, Vector2(100, 100))
+
+	assert_eq(holder.get_child_count(), 1, "spawns exactly one dust node")
+
+
+func test_spawn_collapse_dust_frees_itself_after_its_tween() -> void:
+	var holder := Node2D.new()
+	add_child_autofree(holder)
+
+	CombatFx.spawn_collapse_dust(holder, Vector2(100, 100))
+	var dust: Node = holder.get_child(0)
+
+	await get_tree().create_timer(0.4).timeout
+
+	assert_true(dust.is_queued_for_deletion(), "the dust cloud frees itself once its tween finishes")
