@@ -529,6 +529,15 @@ func set_water_at(tile: Vector2i, value: bool) -> void:
 		_resurface_items_at(tile)
 
 
+## Public accessor for water-tile state -- until now _water_tiles was only
+## ever read from inside Level itself or directly by tests; Centipede's
+## pathing is the first production consumer outside Level, so it gets the
+## same one-entry-point treatment as set_water_at()/patch_pit_at() rather
+## than reaching into the underscore-prefixed dict directly.
+func is_water_at(tile: Vector2i) -> bool:
+	return _water_tiles.has(tile)
+
+
 func _spawn_water_marker(tile: Vector2i) -> Node2D:
 	var half := TILE_SIZE * 0.5
 	var poly := Polygon2D.new()

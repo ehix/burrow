@@ -80,3 +80,47 @@ static func segment_at_tile(tree: SceneTree, tile: Vector2i) -> Centipede:
 		if tile in centipede._tiles:
 			return centipede
 	return null
+
+
+## Local BFS from `from` to `to` (design §6): a tile is passable if it's
+## open, not flooded, and not currently occupied by this body's own
+## trailing tiles (so a crawl step never tries to path through itself).
+## Deliberately separate from the shared Enemy/Player AStar (Level._astar/
+## GridNav) -- that grid doesn't treat water as solid at all today, and
+## Centipede's own pathing needs (reach a boundary tile, reach a fresh spot)
+## are much simpler than Enemy's chase-a-moving-target. Returns [] if
+## unreachable.
+func _find_path(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	if from == to:
+		return [from]
+	var occupied := {}
+	for tile in _tiles:
+		occupied[tile] = true
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	var came_from := {from: from}
+	var frontier: Array[Vector2i] = [from]
+	while not frontier.is_empty():
+		var current: Vector2i = frontier.pop_front()
+		if current == to:
+			break
+		for dir in dirs:
+			var next: Vector2i = current + dir
+			if came_from.has(next):
+				continue
+			if not _level.maze.is_open(next.x, next.y):
+				continue
+			if _level.is_water_at(next):
+				continue
+			if occupied.has(next):
+				continue
+			came_from[next] = current
+			frontier.append(next)
+	if not came_from.has(to):
+		return []
+	var path: Array[Vector2i] = [to]
+	var walk: Vector2i = to
+	while walk != from:
+		walk = came_from[walk]
+		path.append(walk)
+	path.reverse()
+	return path
