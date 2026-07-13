@@ -24,6 +24,8 @@ var _tiles: Array[Vector2i] = []
 var _hits := 0
 var _level: Node
 var _segments: Array[CentipedeSegment] = []
+var _target: Vector2i
+var _path: Array[Vector2i] = []
 
 
 func _ready() -> void:
@@ -64,6 +66,90 @@ func take_hit() -> void:
 
 func _begin_flee() -> void:
 	state = State.FLEEING
+	_target = _nearest_boundary_tile()
+	_start_crawl()
+	_schedule_next_step()
+
+
+## Closest of the four map edges to the current head, as a real tile
+## coordinate (not a raw direction -- unlike Earthworm's own
+## _direction_to_nearest_boundary(), which moved in a straight line that
+## could clip through walls, this feeds a real wall-aware BFS target).
+func _nearest_boundary_tile() -> Vector2i:
+	var head: Vector2i = _tiles[0]
+	var maze: Object = _level.maze
+	var candidates: Dictionary = {
+		Vector2i(0, head.y): head.x,
+		Vector2i(maze.width - 1, head.y): maze.width - 1 - head.x,
+		Vector2i(head.x, 0): head.y,
+		Vector2i(head.x, maze.height - 1): maze.height - 1 - head.y,
+	}
+	var best_tile: Vector2i = Vector2i(0, head.y)
+	var best_dist := INF
+	for tile in candidates:
+		if candidates[tile] < best_dist:
+			best_dist = candidates[tile]
+			best_tile = tile
+	return best_tile
+
+
+func _start_crawl() -> void:
+	_path = _find_path(_tiles[0], _target)
+
+
+## Schedules one crawl tick crawl_step_time seconds from now, real-timer-
+## paced like WaterIngress's own ring scheduling (not per-frame movement --
+## this is a slow, deliberate crawl, not player-speed motion).
+func _schedule_next_step() -> void:
+	if _level == null or not is_instance_valid(_level):
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
+	tree.create_timer(crawl_step_time).timeout.connect(_crawl_step)
+
+
+func _crawl_step() -> void:
+	if _level == null or not is_instance_valid(_level):
+		return
+	if _path.is_empty():
+		# Nowhere to go yet (e.g. still boxed in) -- retry the search next
+		# tick rather than freezing or falsely "arriving".
+		_start_crawl()
+		_schedule_next_step()
+		return
+	if _path.size() == 1:
+		_arrive()
+		return
+	var next_tile: Vector2i = _path[1]
+	if not _level.maze.is_open(next_tile.x, next_tile.y) or _level.is_water_at(next_tile):
+		# Something changed underfoot mid-crawl (e.g. a fresh flood) --
+		# recompute from where we are now instead of stepping into it.
+		_start_crawl()
+		_schedule_next_step()
+		return
+	_level._destroy_occupants_at(next_tile)
+	_tiles.push_front(next_tile)
+	_tiles.pop_back()
+	_sync_segments()
+	_path.remove_at(0)
+	if next_tile == _target:
+		_arrive()
+	else:
+		_schedule_next_step()
+
+
+func _arrive() -> void:
+	if state == State.FLEEING:
+		queue_free()
+	elif state == State.RELOCATING:
+		state = State.BLOCKING
+
+
+func _sync_segments() -> void:
+	for i in _segments.size():
+		if i < _tiles.size():
+			_segments[i].global_position = _level.tile_centre(_tiles[i])
 
 
 ## The live Centipede whose body occupies `tile`, or null. Mirrors
