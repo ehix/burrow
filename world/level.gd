@@ -143,6 +143,13 @@ var _wall_nodes: Dictionary = {}
 ## Pit/flood tile -> its visual marker, so MazeData's ground-hazard overlay
 ## stays visible in sync — mirrors _wall_nodes.
 var _pit_nodes: Dictionary = {}
+## Water tile tracking (environment tiles rework): parallel to _pit_nodes,
+## kept entirely separate so a natural pit and a flooded tile can look
+## different even though both block ground movement via the same
+## MazeData._pits overlay underneath.
+var _water_tiles: Dictionary = {}
+var _water_nodes: Dictionary = {}
+const WATER_MARKER_COLOR := Color(0.15, 0.45, 0.75, 0.75)
 var _hazard_director: HazardDirector
 var _sense_active: bool = false
 var _sense_radius: float = 0.0
@@ -488,10 +495,82 @@ func _spawn_pit_marker(tile: Vector2i) -> Node2D:
 	return poly
 
 
-## BlockadeSkill: patch a pit tile for ground traversal by placing a blockade
-## on it. No-op if `tile` isn't currently a pit.
+## Flag/clear a water tile (environment tiles rework). Touches
+## maze.set_pit() directly (not via set_pit_at()) so water gets its own
+## blue marker instead of set_pit_at()'s brown pit one — water and a
+## natural pit share the same underlying ground-block flag but never the
+## same visual. Flooding a tile destroys any WebTrap on it and submerges
+## any WorldItemPickup on it (survives, unlike the trap); draining
+## resurfaces the item.
+func set_water_at(tile: Vector2i, value: bool) -> void:
+	if maze == null:
+		return
+	maze.set_pit(tile.x, tile.y, value)
+	if value:
+		_water_tiles[tile] = true
+		if not _water_nodes.has(tile):
+			_water_nodes[tile] = _spawn_water_marker(tile)
+		_drown_traps_at(tile)
+		_submerge_items_at(tile)
+	else:
+		_water_tiles.erase(tile)
+		var marker = _water_nodes.get(tile)
+		if marker != null and is_instance_valid(marker):
+			marker.queue_free()
+		_water_nodes.erase(tile)
+		_resurface_items_at(tile)
+
+
+func _spawn_water_marker(tile: Vector2i) -> Node2D:
+	var half := TILE_SIZE * 0.5
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		Vector2(-half, -half), Vector2(half, -half),
+		Vector2(half, half), Vector2(-half, half)])
+	poly.color = WATER_MARKER_COLOR
+	poly.position = _tile_centre(tile.x, tile.y)
+	add_child(poly)
+	return poly
+
+
+func _drown_traps_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("traps"):
+		var trap := node as WebTrap
+		if trap != null and tile_of(trap.global_position) == tile:
+			trap.force_destroy()
+
+
+func _submerge_items_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("world_items"):
+		var item := node as WorldItemPickup
+		if item != null and tile_of(item.global_position) == tile:
+			item.submerge()
+
+
+func _resurface_items_at(tile: Vector2i) -> void:
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("world_items"):
+		var item := node as WorldItemPickup
+		if item != null and tile_of(item.global_position) == tile:
+			item.resurface()
+
+
+## BlockadeSkill: patch a hazard tile (pit or water) for ground traversal by
+## placing a blockade on it. Routes through set_water_at() for a flooded
+## tile so its blue marker and water-tile tracking are cleared too, not
+## just the underlying block flag — otherwise a stale blue marker would be
+## left floating over an already-walkable tile. No-op if `tile` is neither
+## a pit nor water.
 func patch_pit_at(tile: Vector2i) -> void:
-	set_pit_at(tile, false)
+	if _water_tiles.has(tile):
+		set_water_at(tile, false)
+	else:
+		set_pit_at(tile, false)
 
 
 ## Force one eligible hazard to fire right now, bypassing its schedule (dev

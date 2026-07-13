@@ -67,3 +67,80 @@ func test_collapse_tile_at_on_an_already_wall_tile_is_a_noop() -> void:
 	var wall_cell := Vector2i(2, 2) # even/even — always a wall in the expanded grid
 	assert_false(level.maze.is_open(wall_cell.x, wall_cell.y))
 	assert_false(level.collapse_tile_at(wall_cell))
+
+
+func test_set_water_at_blocks_ground_movement_like_a_pit() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	level.set_water_at(open_cell, true)
+	assert_true(level.maze.is_pit(open_cell.x, open_cell.y))
+	assert_true(level.is_blocked(open_cell, Level.Layer.GROUND))
+
+
+func test_set_water_at_spawns_a_distinct_blue_marker_not_the_pit_marker() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	level.set_water_at(open_cell, true)
+	assert_true(level._water_nodes.has(open_cell))
+	assert_false(level._pit_nodes.has(open_cell), "water uses its own marker, not the brown pit one")
+	var marker: Node2D = level._water_nodes[open_cell]
+	assert_eq((marker as Polygon2D).color, Level.WATER_MARKER_COLOR)
+
+
+func test_set_water_at_false_clears_the_block_and_frees_the_marker() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	level.set_water_at(open_cell, true)
+	level.set_water_at(open_cell, false)
+	assert_false(level.maze.is_pit(open_cell.x, open_cell.y))
+	assert_false(level._water_nodes.has(open_cell))
+
+
+func test_set_water_at_true_destroys_a_web_trap_on_that_tile() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	var trap := WebTrap.new()
+	level.add_child(trap)
+	trap.global_position = level._tile_centre(open_cell.x, open_cell.y)
+
+	level.set_water_at(open_cell, true)
+
+	assert_true(trap.spent, "flooding a tile destroys the web trap on it")
+
+
+func test_set_water_at_true_submerges_an_item_on_that_tile() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	var pickup: WorldItemPickup = preload("res://entities/items/world_item_pickup.tscn").instantiate()
+	level.add_child(pickup)
+	pickup.global_position = level._tile_centre(open_cell.x, open_cell.y)
+
+	level.set_water_at(open_cell, true)
+
+	assert_false(pickup.visible, "flooding a tile submerges the item on it")
+	assert_false(pickup.monitoring)
+
+
+func test_set_water_at_false_resurfaces_an_item_on_that_tile() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	var pickup: WorldItemPickup = preload("res://entities/items/world_item_pickup.tscn").instantiate()
+	level.add_child(pickup)
+	pickup.global_position = level._tile_centre(open_cell.x, open_cell.y)
+	level.set_water_at(open_cell, true)
+
+	level.set_water_at(open_cell, false)
+
+	assert_true(pickup.visible, "draining a tile resurfaces the item on it")
+	assert_true(pickup.monitoring)
+
+
+func test_patch_pit_at_on_a_flooded_tile_clears_water_state_too() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+	level.set_water_at(open_cell, true)
+
+	level.patch_pit_at(open_cell)
+
+	assert_false(level.maze.is_pit(open_cell.x, open_cell.y))
+	assert_false(level._water_nodes.has(open_cell), "patching a flooded tile also clears its blue marker")
