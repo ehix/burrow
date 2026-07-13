@@ -37,8 +37,11 @@ func trigger(level: Node) -> void:
 		var ring_tiles: Array = rings[k]
 		if ring_tiles.is_empty():
 			continue
-		tree.create_timer(float(k) * RING_STEP).timeout.connect(
-			func() -> void: _flood_ring(level, ring_tiles))
+		if k == 0:
+			_flood_ring(level, ring_tiles)
+		else:
+			tree.create_timer(float(k) * RING_STEP).timeout.connect(
+				func() -> void: _flood_ring(level, ring_tiles))
 		var drain_delay: float = full_flood_time + FLOOD_DURATION + float(FLOOD_RADIUS - k) * RING_STEP
 		tree.create_timer(drain_delay).timeout.connect(
 			func() -> void: _drain_ring(level, ring_tiles))
