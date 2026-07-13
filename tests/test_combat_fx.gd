@@ -47,4 +47,4 @@ func test_spawn_collapse_dust_frees_itself_after_its_tween() -> void:
 
 	await get_tree().create_timer(0.4).timeout
 
-	assert_true(dust.is_queued_for_deletion(), "the dust cloud frees itself once its tween finishes")
+	assert_false(is_instance_valid(dust), "the dust cloud frees itself once its tween finishes")
