@@ -135,9 +135,13 @@ func test_step_deflects_90_degrees_around_another_centipedes_body() -> void:
 
 	rider._step()
 
-	assert_eq(rider._direction, Vector2i.DOWN, "turns 90 degrees clockwise instead of plowing through")
+	# The turn direction is randomized (clockwise or counter-clockwise) --
+	# either way, deflecting off a horizontal heading always lands on a
+	# vertical one.
+	assert_true(rider._direction == Vector2i.UP or rider._direction == Vector2i.DOWN,
+		"turns 90 degrees instead of plowing through")
 	assert_ne(rider._tiles[0], blocked_tile, "never steps onto another Centipede's own body")
-	assert_eq(rider._tiles[0], entry + Vector2i.DOWN, "advances in its new heading the same tick")
+	assert_eq(rider._tiles[0], entry + rider._direction, "advances in its new heading the same tick")
 
 
 func test_step_deflects_again_if_the_new_heading_is_also_blocked() -> void:
@@ -148,13 +152,36 @@ func test_step_deflects_again_if_the_new_heading_is_also_blocked() -> void:
 	var blocker := Centipede.new()
 	level.add_child(blocker)
 	blocker.bind_level(level)
-	# Blocks straight ahead (RIGHT) and the first clockwise deflection (DOWN).
-	blocker.spawn_at([entry + Vector2i.RIGHT, entry + Vector2i.DOWN])
+	# Blocks straight ahead (RIGHT) and both possible first deflections (UP
+	# and DOWN) -- whichever orientation this run randomly picks, LEFT is
+	# the only heading left open.
+	blocker.spawn_at([entry + Vector2i.RIGHT, entry + Vector2i.UP, entry + Vector2i.DOWN])
 
 	rider._step()
 
-	assert_eq(rider._direction, Vector2i.LEFT, "keeps turning clockwise until it finds a clear heading")
+	assert_eq(rider._direction, Vector2i.LEFT, "keeps turning until it finds the one clear heading")
 	assert_eq(rider._tiles[0], entry + Vector2i.LEFT)
+
+
+func test_step_deflection_registers_a_hit_on_the_blocking_centipede() -> void:
+	var level := _make_level()
+	var entry := Vector2i(1, 3)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
+	rider._step() # head arrives at entry
+	var blocked_tile := entry + Vector2i.RIGHT
+	var blocker := Centipede.new()
+	level.add_child(blocker)
+	blocker.bind_level(level)
+	blocker.hits_to_flee = 5
+	blocker.spawn_at([blocked_tile])
+	var struck_segment := blocker._segments[0]
+	var rest := struck_segment.position
+
+	rider._step()
+
+	assert_eq(blocker._hits, 1, "colliding with another Centipede counts as a real hit on it")
+	assert_ne(struck_segment.position, rest,
+		"the segment it collided with visibly nudges (CombatFx.shunt), same as a melee/web-shot hit")
 
 
 func test_run_frees_itself_once_the_tail_clears_the_boundary_ring_not_just_reaches_it() -> void:

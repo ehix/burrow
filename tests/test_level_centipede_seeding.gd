@@ -30,6 +30,13 @@ func test_seeded_centipede_body_is_a_connected_chain() -> void:
 		assert_eq(dist, 1, "consecutive body tiles are always orthogonally adjacent")
 
 
+func test_seeded_centipede_body_length_is_randomized_within_range() -> void:
+	var level := _make_level()
+	var centipede := level.get_tree().get_nodes_in_group("centipedes")[0] as Centipede
+	assert_between(centipede.body_length, Level.CENTIPEDE_BODY_LENGTH_MIN, Level.CENTIPEDE_BODY_LENGTH_MAX,
+		"varying lengths (3-7), not always the same fixed length (playtest feedback)")
+
+
 func test_seeded_centipede_is_away_from_both_spawns() -> void:
 	var level := _make_level()
 	var player_tile := level.tile_of(level.player.global_position)

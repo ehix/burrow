@@ -23,6 +23,11 @@ const NATURAL_PIT_COUNT := 2
 ## Seed Pod, and Lure pickups — all picked up the same way now.
 const ITEM_SPAWN_COUNT := 3
 const CENTIPEDE_COUNT := 1
+## Every spawned centipede (obstacle or Express rider) gets a randomized
+## body_length in this range rather than a single fixed length, for visual
+## variety (playtest feedback).
+const CENTIPEDE_BODY_LENGTH_MIN := 3
+const CENTIPEDE_BODY_LENGTH_MAX := 7
 const CentipedeScene := preload("res://entities/centipede/centipede.tscn")
 const CentipedeExpressRiderScene := preload("res://entities/centipede/centipede_express_rider.tscn")
 
@@ -152,6 +157,9 @@ var _pit_nodes: Dictionary = {}
 var _water_tiles: Dictionary = {}
 var _water_nodes: Dictionary = {}
 const WATER_MARKER_COLOR := Color(0.15, 0.45, 0.75, 0.75)
+## Every WaterIngress.ActiveFlood still mid-lifecycle (trigger to final
+## drain) -- see register_active_flood()'s own doc comment.
+var _active_floods: Array = []
 var _hazard_director: HazardDirector
 var _sense_active: bool = false
 var _sense_radius: float = 0.0
@@ -445,26 +453,29 @@ func dev_remove_wall_at(tile: Vector2i) -> bool:
 	if _astar != null:
 		_astar.set_point_solid(tile, false)
 	_renderer.queue_redraw()
-	if _is_adjacent_to_water(tile):
-		set_water_at(tile, true)
+	for flood in _active_floods:
+		if flood.absorb_new_opening(self, tile):
+			break
 	return true
 
 
-## True if any orthogonal neighbor of `tile` is currently flooded. A wall
-## carved open right in the middle of an active flood (Centipede Express
-## punching through, a Centipede's own tunnel fallback, RemoveWallsSkill,
-## Seismic Compaction) was never itself part of that flood's ring
-## computation -- WaterIngress._compute_rings() only ever considers tiles
-## that were already open floor at trigger time, so a wall doesn't get a
-## ring assignment at all. Left alone, the fresh opening would sit
-## conspicuously dry in the middle of visibly flooded ground (found via
-## playtest). set_water_at() handles all of flooding's usual bookkeeping
-## (pit flag, blue marker, drowning traps/items) once called.
-func _is_adjacent_to_water(tile: Vector2i) -> bool:
-	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-		if _water_tiles.has(tile + dir):
-			return true
-	return false
+## Registered by WaterIngress for the whole lifetime of one flood (trigger
+## to final drain) -- see WaterIngress.ActiveFlood's own doc comment for why
+## this can't just be "flood it if adjacent to water": a wall carved open
+## later (Centipede Express punching through, a Centipede's own tunnel
+## fallback, RemoveWallsSkill, Seismic Compaction) was never part of any
+## ring's own computation (WaterIngress._compute_rings() only ever
+## considers tiles that were already open floor at trigger time), so
+## without this it either stays permanently dry inside an active flood's
+## radius, or (a naive adjacency check) gets flooded regardless of whether
+## it's actually within the flood's radius and then never scheduled to
+## drain with the rest of its ring.
+func register_active_flood(flood) -> void:
+	_active_floods.append(flood)
+
+
+func unregister_active_flood(flood) -> void:
+	_active_floods.erase(flood)
 
 
 ## True for the outermost ring of tiles — convenience wrapper for
@@ -821,6 +832,7 @@ func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 ## path as it goes and never becomes a stationary BLOCKING body.
 func spawn_centipede_express_rider(entry: Vector2i, direction: Vector2i) -> void:
 	var rider: CentipedeExpressRider = CentipedeExpressRiderScene.instantiate()
+	rider.body_length = randi_range(CENTIPEDE_BODY_LENGTH_MIN, CENTIPEDE_BODY_LENGTH_MAX)
 	_entities.add_child(rider)
 	rider.bind_level(self)
 	rider.start_run(entry, direction)
@@ -835,6 +847,7 @@ func _seed_centipedes() -> void:
 	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
 	for i in CENTIPEDE_COUNT:
 		var centipede: Centipede = CentipedeScene.instantiate()
+		centipede.body_length = randi_range(CENTIPEDE_BODY_LENGTH_MIN, CENTIPEDE_BODY_LENGTH_MAX)
 		var chain := _find_open_chain(centipede.body_length, reserved)
 		if chain.is_empty():
 			centipede.free()

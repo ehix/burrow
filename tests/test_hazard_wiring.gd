@@ -8,6 +8,12 @@ func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
 	add_child_autofree(level)
 	level.build()
+	# A seeded obstacle Centipede placed on the exact row/column Centipede
+	# Express picks would legitimately deflect the rider around it, so a
+	# straight full-row/column carve isn't guaranteed -- free it so these
+	# hazard tests aren't at the mercy of Task 8's own random placement.
+	for node in level.get_tree().get_nodes_in_group("centipedes"):
+		node.free()
 	return level
 
 

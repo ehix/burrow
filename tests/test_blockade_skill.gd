@@ -24,6 +24,12 @@ func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
 	add_child_autofree(level)
 	level.build()
+	# A seeded obstacle Centipede could legitimately occupy the tile a test
+	# forces open right next to the player (Level.is_blocked() correctly
+	# refuses a Centipede-occupied tile) -- free it so these placement tests
+	# aren't at the mercy of Task 8's own random placement.
+	for node in level.get_tree().get_nodes_in_group("centipedes"):
+		node.free()
 	return level
 
 

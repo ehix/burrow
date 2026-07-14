@@ -86,16 +86,30 @@ static func _turn_clockwise(direction: Vector2i) -> Vector2i:
 	return Vector2i(-direction.y, direction.x)
 
 
+## A 90-degree counter-clockwise turn: RIGHT -> UP -> LEFT -> DOWN -> RIGHT.
+static func _turn_counter_clockwise(direction: Vector2i) -> Vector2i:
+	return Vector2i(direction.y, -direction.x)
+
+
 ## Advances one tile every tick. While still traveling: deflects 90 degrees
-## (up to all 4 headings, so it can't get stuck oscillating between two
-## Centipede-occupied neighbors) whenever the next tile in its current
-## heading is another Centipede's own body -- it doesn't plow through one
-## obstacle Centipede to reach another, it turns and keeps going. Once the
-## next tile would be the boundary ring, travel is over regardless of
-## heading and it switches to a straight, unconditional exit crawl (no more
-## carving/shoving/deflecting -- past the ring is solid boundary and beyond,
-## by design never carved or walkable, see Centipede._exit_step()'s
-## identical reasoning).
+## whenever the next tile in its current heading is another Centipede's own
+## body -- it doesn't plow through one obstacle Centipede to reach another,
+## it turns and keeps going. The turn direction (clockwise or counter-
+## clockwise) is picked once per collision, at random, rather than always
+## the same way, and re-tried up to all 4 headings (so it can't get stuck
+## oscillating between two Centipede-occupied neighbors); if every heading
+## is blocked (fully boxed in -- extremely unlikely), it just waits and
+## retries next tick rather than forcing its way through. Every Centipede
+## it collides with along the way registers as a real hit on that body --
+## Centipede.hit_segment_at() both nudges the exact segment struck
+## (CombatFx.shunt, the same visual a melee/web-shot hit already gives) and
+## counts toward its shared hits_to_flee counter, so repeatedly running into
+## the express train can drive an obstacle Centipede off just like combat
+## does. Once the next tile would be the boundary ring, travel is over
+## regardless of heading and it switches to a straight, unconditional exit
+## crawl (no more carving/shoving/deflecting -- past the ring is solid
+## boundary and beyond, by design never carved or walkable, see
+## Centipede._exit_step()'s identical reasoning).
 func _step() -> void:
 	if _level == null or not is_instance_valid(_level):
 		return
@@ -110,12 +124,21 @@ func _step() -> void:
 			_schedule_next_step()
 		return
 	var next_tile: Vector2i = _tiles[0] + _direction
+	var turn_clockwise := randi() % 2 == 0
 	var deflect_attempts := 0
-	while not _level.is_boundary(next_tile) and Centipede.segment_at_tile(get_tree(), next_tile) != null \
-			and deflect_attempts < 4:
-		_direction = _turn_clockwise(_direction)
+	while not _level.is_boundary(next_tile) and deflect_attempts < 4:
+		var blocked := Centipede.segment_at_tile(get_tree(), next_tile)
+		if blocked == null:
+			break
+		blocked.hit_segment_at(next_tile, Vector2(_direction))
+		_direction = _turn_clockwise(_direction) if turn_clockwise else _turn_counter_clockwise(_direction)
 		next_tile = _tiles[0] + _direction
 		deflect_attempts += 1
+	if not _level.is_boundary(next_tile) and Centipede.segment_at_tile(get_tree(), next_tile) != null:
+		# Boxed in on all 4 sides by other Centipedes -- exceedingly
+		# unlikely, but wait for one to move rather than forcing through.
+		_schedule_next_step()
+		return
 	if _level.is_boundary(next_tile):
 		_exiting = true
 		_exit_steps_remaining = body_length + 1

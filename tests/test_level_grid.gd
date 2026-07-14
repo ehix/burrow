@@ -49,41 +49,68 @@ func test_dev_remove_wall_out_of_bounds_is_a_noop() -> void:
 	assert_false(level.dev_remove_wall_at(Vector2i(-1, -1)))
 
 
-func test_dev_remove_wall_floods_the_new_opening_if_adjacent_to_water() -> void:
+## Finds an open, non-boundary cell (a plausible flood origin) with a wall
+## tile somewhere within WaterIngress.FLOOD_RADIUS of it -- returns
+## [origin, wall_tile], or [] if none exists in this maze.
+func _find_origin_with_a_wall_in_radius(level: Level) -> Array:
+	for cell in level.maze.open_cells():
+		if level.is_boundary(cell):
+			continue
+		for dx in range(-WaterIngress.FLOOD_RADIUS, WaterIngress.FLOOD_RADIUS + 1):
+			for dy in range(-WaterIngress.FLOOD_RADIUS, WaterIngress.FLOOD_RADIUS + 1):
+				var candidate: Vector2i = cell + Vector2i(dx, dy)
+				if level.is_boundary(candidate) or level.maze.is_open(candidate.x, candidate.y):
+					continue
+				return [cell, candidate]
+	return []
+
+
+func test_dev_remove_wall_floods_a_new_opening_within_an_active_floods_radius() -> void:
 	var level := _make_level()
 	level.build()
-	# Find a wall tile with an open, non-boundary neighbor to flood.
+	var found := _find_origin_with_a_wall_in_radius(level)
+	assert_eq(found.size(), 2, "found an origin with a wall tile inside its flood radius")
+	var flood := WaterIngress.ActiveFlood.new(found[0])
+	level.register_active_flood(flood)
+
+	level.dev_remove_wall_at(found[1])
+
+	assert_true(level.is_water_at(found[1]),
+		"a wall carved open within an active flood's radius is flooded too, not left dry in the middle of it")
+
+
+func test_dev_remove_wall_does_not_flood_an_opening_outside_the_floods_radius() -> void:
+	var level := _make_level()
+	level.build()
+	var origin: Vector2i = level.maze.open_cells()[0]
+	level.register_active_flood(WaterIngress.ActiveFlood.new(origin))
 	var target := Vector2i(-1, -1)
-	var wet_neighbor := Vector2i(-1, -1)
 	for y in range(1, level.maze.height - 1):
 		for x in range(1, level.maze.width - 1):
 			if level.maze.is_open(x, y):
 				continue
-			var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
-			for dir in dirs:
-				var neighbor := Vector2i(x, y) + dir
-				if level.maze.is_open(neighbor.x, neighbor.y) and not level.is_boundary(neighbor):
-					target = Vector2i(x, y)
-					wet_neighbor = neighbor
-					break
-			if target != Vector2i(-1, -1):
+			if maxi(absi(x - origin.x), absi(y - origin.y)) > WaterIngress.FLOOD_RADIUS:
+				target = Vector2i(x, y)
 				break
 		if target != Vector2i(-1, -1):
 			break
-	assert_ne(target, Vector2i(-1, -1), "found a wall tile with an open neighbor to flood")
-	level.set_water_at(wet_neighbor, true)
+	assert_ne(target, Vector2i(-1, -1), "found a wall tile outside the flood's radius")
 
 	level.dev_remove_wall_at(target)
 
-	assert_true(level.is_water_at(target),
-		"a wall carved open right next to an active flood is flooded too, not left dry in the middle of it")
+	assert_false(level.is_water_at(target), "outside the flood's radius -- stays dry")
 
 
-func test_dev_remove_wall_does_not_flood_a_new_opening_away_from_water() -> void:
+func test_dev_remove_wall_does_not_flood_once_the_floods_ring_already_drained() -> void:
 	var level := _make_level()
 	level.build()
-	assert_false(level.maze.is_open(0, 0))
+	var found := _find_origin_with_a_wall_in_radius(level)
+	assert_eq(found.size(), 2)
+	var flood := WaterIngress.ActiveFlood.new(found[0])
+	flood.started_at_msec -= 60000 # long enough ago that every ring has already drained
+	level.register_active_flood(flood)
 
-	level.dev_remove_wall_at(Vector2i(0, 0))
+	level.dev_remove_wall_at(found[1])
 
-	assert_false(level.is_water_at(Vector2i(0, 0)), "no flood nearby -- stays dry")
+	assert_false(level.is_water_at(found[1]),
+		"the flood already receded past here -- stays dry, doesn't get permanently re-flooded")

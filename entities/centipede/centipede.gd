@@ -15,7 +15,7 @@ const SegmentScene := preload("res://entities/centipede/centipede_segment.tscn")
 
 enum State { BLOCKING, FLEEING, RELOCATING }
 
-@export var hits_to_flee: int = 4
+@export var hits_to_flee: int = 3
 @export var body_length: int = 4
 @export var crawl_step_time: float = 0.35
 
