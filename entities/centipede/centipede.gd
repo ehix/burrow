@@ -227,7 +227,7 @@ func _crawl_step() -> void:
 		_start_crawl()
 		_schedule_next_step()
 		return
-	_shove_spiders_out_of(next_tile, next_tile - _tiles[0])
+	Centipede.shove_spiders_out_of(get_tree(), next_tile, next_tile - _tiles[0])
 	_level._destroy_occupants_at(next_tile)
 	_tiles.push_front(next_tile)
 	_tiles.pop_back()
@@ -240,19 +240,22 @@ func _crawl_step() -> void:
 
 
 ## Any spider (Player/Enemy) currently standing on `tile` gets shoved out of
-## it in `push_dir` before the body's head moves there. Level.is_blocked()
-## already stops a spider from stepping ONTO an occupied Centipede tile, but
-## nothing stopped the body itself from crawling into a spider already
-## standing there -- a strong physical boundary shouldn't ever overlap a
-## spider, fleeing or not, so every crawl step clears its own way first.
-## Reuses GridMover.knockback() (the same forced-shove primitive a landed
-## combat hit already uses): tries straight along the body's own travel
-## direction first, then falls back to the other three cardinal directions
-## so a spider caught against a wall still gets bumped sideways onto open
-## floor instead of getting walked through -- a genuine "rock and hard
-## place" would need all four directions blocked simultaneously.
-func _shove_spiders_out_of(tile: Vector2i, push_dir: Vector2i) -> void:
-	var tree := get_tree()
+## it in `push_dir` before a crawling body's head moves there. Level.
+## is_blocked() already stops a spider from stepping ONTO an occupied
+## Centipede tile, but nothing stopped the body itself from crawling into a
+## spider already standing there -- a strong physical boundary shouldn't
+## ever overlap a spider, fleeing or not, so every crawl step clears its own
+## way first. Reuses GridMover.knockback() (the same forced-shove primitive
+## a landed combat hit already uses): tries straight along the body's own
+## travel direction first, then falls back to the other three cardinal
+## directions so a spider caught against a wall still gets bumped sideways
+## onto open floor instead of getting walked through -- a genuine "rock and
+## hard place" would need all four directions blocked simultaneously.
+## Static so CentipedeExpressRider (Centipede Express's own transient,
+## always-moving creature) can reuse the identical primitive without
+## inheriting this obstacle-Centipede's BLOCKING/FLEEING/RELOCATING state
+## machine, which doesn't apply to it at all.
+static func shove_spiders_out_of(tree: SceneTree, tile: Vector2i, push_dir: Vector2i) -> void:
 	if tree == null:
 		return
 	for node in tree.get_nodes_in_group("spiders"):

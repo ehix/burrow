@@ -24,6 +24,7 @@ const NATURAL_PIT_COUNT := 2
 const ITEM_SPAWN_COUNT := 3
 const CENTIPEDE_COUNT := 1
 const CentipedeScene := preload("res://entities/centipede/centipede.tscn")
+const CentipedeExpressRiderScene := preload("res://entities/centipede/centipede_express_rider.tscn")
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
@@ -792,48 +793,17 @@ func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 	pickup.global_position = world_pos
 
 
-## Sends a fresh apex Centipede down `line` (the already-open, in-order
-## tiles CentipedeExpress just carved) -- an express-carved corridor gets
-## an express rider. Finds any contiguous run of body_length tiles along
-## the line that isn't boundary and isn't already a spider's tile or
-## another Centipede's own body (segment_at_tile(), the same occupancy
-## check Level.is_blocked() and Seismic Compaction's own guard both use).
-## Silently does nothing if no such run exists anywhere along the line --
-## graceful degradation, same precedent as _seed_centipedes()'s own
-## empty-chain case.
-func spawn_centipede_along(line: Array[Vector2i]) -> void:
-	var centipede: Centipede = CentipedeScene.instantiate()
-	var chain := _find_chain_in_line(line, centipede.body_length)
-	if chain.is_empty():
-		centipede.free()
-		return
-	_entities.add_child(centipede)
-	centipede.bind_level(self)
-	centipede.spawn_at(chain)
-
-
-func _find_chain_in_line(line: Array[Vector2i], length: int) -> Array[Vector2i]:
-	if line.size() < length:
-		return []
-	var starts: Array = range(line.size() - length + 1)
-	starts.shuffle()
-	for start in starts:
-		var run: Array[Vector2i] = line.slice(start, start + length)
-		if _line_run_is_clear(run):
-			return run
-	return []
-
-
-func _line_run_is_clear(run: Array[Vector2i]) -> bool:
-	for tile in run:
-		if maze.is_boundary(tile.x, tile.y) or not maze.is_open(tile.x, tile.y):
-			return false
-		for spider in get_tree().get_nodes_in_group("spiders"):
-			if tile_of((spider as Node2D).global_position) == tile:
-				return false
-		if Centipede.segment_at_tile(get_tree(), tile) != null:
-			return false
-	return true
+## Sends a transient apex centipede in from the boundary at `entry`,
+## crawling in a straight line along `direction` for `steps` tiles before
+## exiting off the opposite edge and freeing itself -- CentipedeExpress's
+## own creature (design follow-up): unlike the obstacle Centipede this
+## carves its own path as it goes and never becomes a stationary BLOCKING
+## body.
+func spawn_centipede_express_rider(entry: Vector2i, direction: Vector2i, steps: int) -> void:
+	var rider: CentipedeExpressRider = CentipedeExpressRiderScene.instantiate()
+	_entities.add_child(rider)
+	rider.bind_level(self)
+	rider.start_run(entry, direction, steps)
 
 
 ## Seed a Centipede obstacle (sub-project H): a connected, in-bounds,

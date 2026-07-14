@@ -1,28 +1,40 @@
 class_name CentipedeExpress
 extends HazardEvent
-## An apex centipede runs a straight line across the maze, carving a fresh
-## corridor: opens every wall tile along a random horizontal or vertical
-## sweep, skipping the boundary (guardrail). Unlike Seismic Compaction (net-
-## neutral), this hazard only ever adds tunnel, never removes one. A real
-## Centipede then rides its own fresh corridor (Level.spawn_centipede_along())
-## -- the hazard's name stops being purely metaphorical.
+## An apex centipede bursts in through one boundary edge and crawls in a
+## straight line clear across the maze to the opposite edge (Level.
+## spawn_centipede_express_rider() / CentipedeExpressRider), carving open
+## whatever wall stands in its way, destroying larvae/traps/items, and
+## shoving any spider caught in its path -- a quick, disruptive pass through
+## the environment rather than a permanent obstacle (unlike the seeded
+## obstacle Centipede, this one always keeps moving and frees itself once
+## it's fully exited the far side).
 
 func trigger(level: Node) -> void:
 	if level == null or level.maze == null:
 		return
 	var maze: MazeData = level.maze
-	var line: Array[Vector2i] = []
-	if randi() % 2 == 0:
+	var horizontal := randi() % 2 == 0
+	var forward := randi() % 2 == 0
+	var entry: Vector2i
+	var direction: Vector2i
+	var steps: int
+	if horizontal:
 		var y := 1 + randi() % maxi(1, maze.height - 2)
-		for x in maze.width:
-			if not maze.is_boundary(x, y):
-				level.dev_remove_wall_at(Vector2i(x, y))
-				line.append(Vector2i(x, y))
+		if forward:
+			entry = Vector2i(1, y)
+			direction = Vector2i.RIGHT
+		else:
+			entry = Vector2i(maze.width - 2, y)
+			direction = Vector2i.LEFT
+		steps = maze.width - 3
 	else:
 		var x := 1 + randi() % maxi(1, maze.width - 2)
-		for y in maze.height:
-			if not maze.is_boundary(x, y):
-				level.dev_remove_wall_at(Vector2i(x, y))
-				line.append(Vector2i(x, y))
-	level.spawn_centipede_along(line)
+		if forward:
+			entry = Vector2i(x, 1)
+			direction = Vector2i.DOWN
+		else:
+			entry = Vector2i(x, maze.height - 2)
+			direction = Vector2i.UP
+		steps = maze.height - 3
+	level.spawn_centipede_express_rider(entry, direction, maxi(steps, 0))
 	EventBus.hazard_triggered.emit("centipede_express")
