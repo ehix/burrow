@@ -209,6 +209,8 @@ func build() -> void:
 func _process(delta: float) -> void:
 	if maze == null:
 		return
+	if player != null and is_instance_valid(player):
+		_renderer.set_fade_focus(player.global_position)
 	_spawn_accum += delta
 	if _spawn_accum >= LARVA_SPAWN_INTERVAL:
 		_spawn_accum = 0.0

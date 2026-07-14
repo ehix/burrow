@@ -95,6 +95,9 @@ shape = SubResource("CircleShape2D_hurt")
 texture = SubResource("GradientTexture2D_light")
 energy = 1.5
 shadow_enabled = true
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_filter = 1
+shadow_filter_smooth = 3.0
 texture_scale = 1.3
 
 [node name="GridMover" type="Node" parent="."]
