@@ -126,6 +126,23 @@ func test_melee_hits_a_centipede_in_range() -> void:
 	var level: Level = preload("res://world/level.tscn").instantiate()
 	add_child_autofree(level)
 	level.build()
+	# This test places its own centipede at a tile it controls directly, and
+	# only wants Level.build() for a real maze to bind it to -- clear
+	# everything else Level.build() auto-seeds nearby so it can't intercept
+	# or be confused with the tile this test places. None of this is caused
+	# by Task 8 except the centipede line; the player/enemy/larvae
+	# interceptions are pre-existing latent flakes this file never
+	# stress-tested enough times to catch before now. _melee()'s "spiders"
+	# and "larvae" scans both run before its Centipede check, so Level's own
+	# internally-spawned player/enemy, or any of its randomly-placed larvae,
+	# landing within melee_range of this test's fixed swing target would
+	# consume the swing before it ever reaches the Centipede check.
+	for node in level.get_tree().get_nodes_in_group("centipedes"):
+		node.free()
+	for node in level.get_tree().get_nodes_in_group("larvae"):
+		node.free()
+	level.player.global_position = Vector2(-10000, -10000)
+	level.enemy.global_position = Vector2(-10000, -10000)
 	var centipede := Centipede.new()
 	add_child_autofree(centipede)
 	centipede.bind_level(level)
@@ -142,6 +159,23 @@ func test_melee_costs_hunger_when_it_lands_on_a_centipede() -> void:
 	var level: Level = preload("res://world/level.tscn").instantiate()
 	add_child_autofree(level)
 	level.build()
+	# This test places its own centipede at a tile it controls directly, and
+	# only wants Level.build() for a real maze to bind it to -- clear
+	# everything else Level.build() auto-seeds nearby so it can't intercept
+	# or be confused with the tile this test places. None of this is caused
+	# by Task 8 except the centipede line; the player/enemy/larvae
+	# interceptions are pre-existing latent flakes this file never
+	# stress-tested enough times to catch before now. _melee()'s "spiders"
+	# and "larvae" scans both run before its Centipede check, so Level's own
+	# internally-spawned player/enemy, or any of its randomly-placed larvae,
+	# landing within melee_range of this test's fixed swing target would
+	# consume the swing before it ever reaches the Centipede check.
+	for node in level.get_tree().get_nodes_in_group("centipedes"):
+		node.free()
+	for node in level.get_tree().get_nodes_in_group("larvae"):
+		node.free()
+	level.player.global_position = Vector2(-10000, -10000)
+	level.enemy.global_position = Vector2(-10000, -10000)
 	var centipede := Centipede.new()
 	add_child_autofree(centipede)
 	centipede.bind_level(level)

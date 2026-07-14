@@ -105,30 +105,58 @@ func _start_crawl() -> void:
 		_path = _find_path(_tiles[0], _target)
 
 
-## Finds the adjacent (4-directional from the current head) wall tile that
-## minimizes remaining Manhattan distance to `target`, excluding any
-## boundary tile from candidacy -- the same caller-side guardrail check
-## RemoveWallsSkill/SeismicCompaction both perform before touching wall
-## geometry (Level.dev_remove_wall_at() itself enforces no such
-## restriction; it's the unrestricted dev cheat). Carves the chosen tile
-## open. Returns false if no non-boundary wall candidate exists.
+## Finds the wall tile, adjacent to ANY tile currently reachable from the
+## head (open, dry, not this body's own tiles -- the same criteria
+## _find_path() itself walks), that minimizes remaining Manhattan distance
+## to `target`, excluding any boundary tile from candidacy -- the same
+## caller-side guardrail check RemoveWallsSkill/SeismicCompaction both
+## perform before touching wall geometry (Level.dev_remove_wall_at() itself
+## enforces no such restriction; it's the unrestricted dev cheat). Carves
+## the chosen tile open. Returns false if no non-boundary wall candidate
+## exists anywhere on the reachable pocket's boundary.
+##
+## Searching the whole reachable pocket -- not just the head's own 4
+## neighbors -- matters: the head's own position never moves just from
+## carving (only an actual _crawl_step() advances it), so a head-only
+## search exhausts itself after at most 4 carves and then returns false
+## forever, even though the tile it just carved may have its own wall
+## neighbors leading further out. Found via stress-testing: a boxed-in
+## centipede whose first carve opened onto a small dead-end pocket got
+## stuck retrying indefinitely, since every later _start_crawl() call
+## re-examined the exact same (now fully open-or-boundary) head neighbors.
 func _tunnel_toward(target: Vector2i) -> bool:
 	var head: Vector2i = _tiles[0]
+	var occupied := {}
+	for tile in _tiles:
+		occupied[tile] = true
 	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	var reachable := {head: true}
+	var frontier: Array[Vector2i] = [head]
+	while not frontier.is_empty():
+		var current: Vector2i = frontier.pop_back()
+		for dir in dirs:
+			var next: Vector2i = current + dir
+			if reachable.has(next) or occupied.has(next):
+				continue
+			if not _level.maze.is_open(next.x, next.y) or _level.is_water_at(next):
+				continue
+			reachable[next] = true
+			frontier.append(next)
 	var best_tile := Vector2i.ZERO
 	var best_dist := INF
 	var found := false
-	for dir in dirs:
-		var candidate: Vector2i = head + dir
-		if _level.is_boundary(candidate):
-			continue
-		if _level.maze.is_open(candidate.x, candidate.y):
-			continue
-		var dist := absi(candidate.x - target.x) + absi(candidate.y - target.y)
-		if dist < best_dist:
-			best_dist = dist
-			best_tile = candidate
-			found = true
+	for reached in reachable:
+		for dir in dirs:
+			var candidate: Vector2i = reached + dir
+			if _level.is_boundary(candidate):
+				continue
+			if _level.maze.is_open(candidate.x, candidate.y):
+				continue
+			var dist := absi(candidate.x - target.x) + absi(candidate.y - target.y)
+			if dist < best_dist:
+				best_dist = dist
+				best_tile = candidate
+				found = true
 	if not found:
 		return false
 	_level.dev_remove_wall_at(best_tile)

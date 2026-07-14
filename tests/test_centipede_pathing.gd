@@ -11,6 +11,11 @@ func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
 	add_child_autofree(level)
 	level.build()
+	# This file places its own centipede(s) at tiles it controls directly --
+	# free any centipede Level.build() auto-seeded (Task 8) so it can never
+	# collide with (or be found instead of) the tiles these tests place.
+	for node in get_tree().get_nodes_in_group("centipedes"):
+		node.free()
 	return level
 
 

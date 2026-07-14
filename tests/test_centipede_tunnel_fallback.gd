@@ -8,6 +8,11 @@ func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
 	add_child_autofree(level)
 	level.build()
+	# This file places its own centipede(s) at tiles it controls directly --
+	# free any centipede Level.build() auto-seeded (Task 8) so it can never
+	# collide with (or be found instead of) the tiles these tests place.
+	for node in get_tree().get_nodes_in_group("centipedes"):
+		node.free()
 	return level
 
 
@@ -33,15 +38,23 @@ func _seal_in(level: Level, tile: Vector2i) -> void:
 			level.set_water_at(neighbor, true)
 
 
-## A cell guaranteed to have at least one adjacent non-boundary wall tile --
-## the fixed cells[0] (this maze's top-left corner) has only two possible
-## non-boundary neighbors, and at LOOP_CHANCE=0.7 both are frequently already
-## carved open, leaving _tunnel_toward() nothing to carve through no matter
-## how correctly it's implemented. Searching for a cell with a real wall
-## neighbor makes these tests exercise the tunnel fallback deterministically
-## instead of depending on how heavily this particular maze got braided.
+## A true cell-centre (odd/odd tile -- see MazeData's own doc comment on the
+## "expanded" grid representation) guaranteed to have at least one adjacent
+## non-boundary wall tile. The fixed cells[0] (this maze's top-left corner)
+## has only two possible non-boundary neighbors, and at LOOP_CHANCE=0.7 both
+## are frequently already carved open, leaving _tunnel_toward() nothing to
+## carve through no matter how correctly it's implemented -- searching for a
+## cell with a real wall neighbor fixes that. Restricting the search to
+## cell-centres (skipping already-open connector tiles) matters too: a
+## connector tile's only "wall" neighbor is an even/even corner tile whose
+## OTHER three neighbors are independent, unrelated maze edges -- carving it
+## open is frequently a dead end. A cell-centre's non-boundary neighbors are
+## always the direct connector to another cell-centre, so carving one always
+## reaches real, already-connected territory.
 func _find_boxable_cell(level: Level) -> Vector2i:
 	for cell in level.maze.open_cells():
+		if cell.x % 2 == 0 or cell.y % 2 == 0:
+			continue
 		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 			var neighbor: Vector2i = cell + dir
 			if not level.maze.is_boundary(neighbor.x, neighbor.y) and not level.maze.is_open(neighbor.x, neighbor.y):
@@ -80,6 +93,15 @@ func test_tunnel_toward_never_carves_a_boundary_tile() -> void:
 			assert_false(level.is_boundary(cell), "the newly carved tile is never on the boundary")
 
 
+## _start_crawl()'s own doc comment is explicit that a single call isn't
+## guaranteed to succeed: carving opens exactly one wall per call (see
+## _tunnel_toward()), and the newly-reachable pocket can itself still be
+## fully sealed off from `target`, needing another carve next tick.
+## _crawl_step()'s real production retry loop (a fresh _start_crawl() call
+## every crawl_step_time) is what actually guarantees eventual escape, not
+## a single call -- so this test drives that same retry loop directly
+## (never the real timer -- mirrors every other test in this file) up to a
+## generous bound rather than asserting success after just one call.
 func test_start_crawl_finds_a_path_after_tunneling_through_when_boxed_in() -> void:
 	var level := _make_level()
 	var cells := level.maze.open_cells()
@@ -88,6 +110,10 @@ func test_start_crawl_finds_a_path_after_tunneling_through_when_boxed_in() -> vo
 	var centipede := _make_centipede(level, [start])
 	centipede._target = cells[cells.size() - 1]
 
-	centipede._start_crawl()
+	var tries := 0
+	while centipede._path.is_empty() and tries < 10:
+		centipede._start_crawl()
+		tries += 1
 
-	assert_false(centipede._path.is_empty(), "boxed-in start_crawl tunnels through and finds a path")
+	assert_false(centipede._path.is_empty(),
+		"boxed-in start_crawl tunnels through (over one or more retries) and finds a path")
