@@ -175,8 +175,8 @@ func _ready() -> void:
 	# RemoveWallsSkill, BlockadeSkill) without needing it threaded through
 	# every call site the way Enemy.bind_level() does.
 	add_to_group("level")
-	# Ceiling/plane mechanics rework: floor re-color tracks the player's own
-	# plane; entity dimming (Task 7) reacts to anyone's plane change.
+	# GroundLayer's dim tracks the player's own plane; entity dimming
+	# (_refresh_plane_focus) reacts to anyone's plane change.
 	EventBus.plane_changed.connect(_on_plane_changed)
 
 

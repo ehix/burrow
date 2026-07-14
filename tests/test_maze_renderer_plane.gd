@@ -14,7 +14,7 @@ func _make_renderer() -> MazeRenderer:
 	return renderer
 
 
-func test_defaults_to_ground_floor_color() -> void:
+func test_defaults_to_ground_plane() -> void:
 	var renderer := _make_renderer()
 
 	assert_eq(renderer._active_plane, Level.Layer.GROUND)

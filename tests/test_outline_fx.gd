@@ -201,3 +201,23 @@ func test_set_dimmed_true_keeps_the_material_even_though_outline_and_body_alpha_
 	OutlineFx.set_dimmed(sprite, true)
 
 	assert_not_null(sprite.material, "dim_enabled alone is enough reason to keep the material attached")
+
+
+## The exact interaction Task 4's review flagged as the highest-risk,
+## previously untested: Sense's outline and plane-focus dimming can be
+## active on the same sprite at once (e.g. a Sensed enemy that's also off
+## the player's plane). The material must survive until BOTH release --
+## releasing just one of the two must never strip it early.
+func test_outline_and_dimmed_together_only_release_once_both_are_cleared() -> void:
+	var sprite := _make_sprite()
+	OutlineFx.set_outline(sprite, true, Color.RED)
+	OutlineFx.set_dimmed(sprite, true)
+	assert_not_null(sprite.material, "both effects active -- material must be attached")
+
+	OutlineFx.set_outline(sprite, false)
+
+	assert_not_null(sprite.material, "dim_enabled is still true -- releasing only the outline must not strip it")
+
+	OutlineFx.set_dimmed(sprite, false)
+
+	assert_null(sprite.material, "both effects now cleared -- the material finally releases")

@@ -1,9 +1,9 @@
 extends GutTest
-## Level's plane-focus dimming (ceiling/plane mechanics rework): whichever of
-## Player/Enemy is off the other's plane dims via the shared outline
-## shader's body_alpha uniform (already shipped for Camouflage) — the floor
-## re-color tells you which plane you're on, this tells you which other
-## spider is or isn't reachable from here.
+## Level's plane-focus dimming: whichever of Player/Enemy is off the
+## other's plane dims via the shared outline shader's dim_enabled uniform
+## (tunnel visual rework Phase 2 — previously a flat body_alpha fade) — the
+## GroundLayer dim (see test_ground_layer.gd) tells you which plane you're
+## on, this tells you which other spider is or isn't reachable from here.
 
 func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
