@@ -22,13 +22,18 @@ const NATURAL_PIT_COUNT := 2
 ## World items seeded per depth (design §5): a mix of Fungus Poison/Sense,
 ## Seed Pod, and Lure pickups — all picked up the same way now.
 const ITEM_SPAWN_COUNT := 3
-## Earthworm obstacles seeded per depth (design §6).
-const EARTHWORM_COUNT := 1
+const CENTIPEDE_COUNT := 1
+## Every spawned centipede (obstacle or Express rider) gets a randomized
+## body_length in this range rather than a single fixed length, for visual
+## variety (playtest feedback).
+const CENTIPEDE_BODY_LENGTH_MIN := 3
+const CENTIPEDE_BODY_LENGTH_MAX := 7
+const CentipedeScene := preload("res://entities/centipede/centipede.tscn")
+const CentipedeExpressRiderScene := preload("res://entities/centipede/centipede_express_rider.tscn")
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
 const LarvaScene := preload("res://entities/larva/larva.tscn")
-const EarthwormScene := preload("res://entities/earthworm/earthworm.tscn")
 const WorldItemPickupScene := preload("res://entities/items/world_item_pickup.tscn")
 
 ## Fog-of-war ambient when darkness is on. White (no darkening) when off.
@@ -37,8 +42,9 @@ const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 ## spiders/larvae/traps get the real outline shader; walls/pits (no per-tile
 ## sprite to shader-outline — the whole maze is one batched MazeRenderer
 ## draw) get a hand-drawn boundary trace in the same colour; items/
-## earthworms (placeholder `_draw()`-only visuals, no sprite either) get a
-## hand-drawn box outline in the same colour. One visual language, not three.
+## Centipede segments (placeholder `_draw()`-only visuals, no sprite either)
+## get a hand-drawn box outline in the same colour. One visual language, not
+## three.
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
 ## Ceiling/plane mechanics rework: body_alpha for whichever of Player/Enemy
@@ -85,9 +91,10 @@ class SenseStructureOutline:
 				draw_line(centre + Vector2(half, -half), centre + Vector2(half, half), line_color, 2.0)
 
 
-## Sense's point-entity outline (items, earthworms — placeholder `_draw()`-
-## only visuals with no sprite for the shader technique): a simple box
-## stroke, parented directly to the sensed entity so it moves for free.
+## Sense's point-entity outline (items, Centipede segments — placeholder
+## `_draw()`-only visuals with no sprite for the shader technique): a
+## simple box stroke, parented directly to the sensed entity so it moves
+## for free.
 class SensePointOutline:
 	extends Node2D
 
@@ -150,6 +157,9 @@ var _pit_nodes: Dictionary = {}
 var _water_tiles: Dictionary = {}
 var _water_nodes: Dictionary = {}
 const WATER_MARKER_COLOR := Color(0.15, 0.45, 0.75, 0.75)
+## Every WaterIngress.ActiveFlood still mid-lifecycle (trigger to final
+## drain) -- see register_active_flood()'s own doc comment.
+var _active_floods: Array = []
 var _hazard_director: HazardDirector
 var _sense_active: bool = false
 var _sense_radius: float = 0.0
@@ -157,8 +167,8 @@ var _sense_radius: float = 0.0
 ## true, so entry/exit toggles the refcounted OutlineFx on/off exactly once
 ## each, not every frame.
 var _sense_outlined: Dictionary = {}
-## Point entity (item/earthworm) currently highlighted via Sense -> its
-## highlight node (a child of the entity itself, so it moves for free).
+## Point entity (item/Centipede segment) currently highlighted via Sense ->
+## its highlight node (a child of the entity itself, so it moves for free).
 var _sense_point_highlights: Dictionary = {}
 ## Single shared node that draws the wall/pit boundary trace — lazily
 ## created, redrawn from scratch each frame while Sense is active rather
@@ -187,7 +197,7 @@ func build() -> void:
 	_spawn_entities()
 	_seed_natural_pits()
 	_seed_world_items()
-	_seed_earthworms()
+	_seed_centipedes()
 	apply_darkness()
 	_hazard_director = HazardDirector.new()
 	add_child(_hazard_director)
@@ -249,8 +259,8 @@ func apply_darkness() -> void:
 
 ## SenseSkill's outline cue (design round 2): "sensed", not "seen" — every
 ## spider/larva/trap within `radius` of the player gets the shared outline
-## shader; wall/pit tiles get a hand-drawn boundary trace; item/earthworm
-## placeholders get a hand-drawn box outline. Everything Sense reveals reads
+## shader; wall/pit tiles get a hand-drawn boundary trace; item/Centipede-
+## segment placeholders get a hand-drawn box outline. Everything Sense reveals reads
 ## as an outline, not a lit-up patch — no more light-through-walls (the old
 ## set_sense_active()). Continuous while active: _process() re-syncs every
 ## frame as the player moves, so entering/leaving the radius toggles the
@@ -330,12 +340,13 @@ func _sense_sprite_of(node: Node) -> CanvasItem:
 ## each placeholder's own `_draw()` shape.
 const SENSE_POINT_HALF_SIZE := {
 	"world_items": Vector2(9, 9),
-	"earthworms": Vector2(18, 8),
+	"centipede_segments": Vector2(20, 20),
 }
 
 
-## World items and earthworms are placeholder `_draw()`-only visuals (no
-## sprite/texture for the shader technique) — they get a hand-drawn box
+## World items and Centipede segments are placeholder `_draw()`-only
+## visuals (no sprite/texture for the shader technique) — they get a
+## hand-drawn box
 ## outline instead, parented under the un-darkened _sense_layer (not the
 ## entity itself, which lives in the normal, darkened tree) and re-synced
 ## to the entity's position every frame while it stays in range.
@@ -442,7 +453,29 @@ func dev_remove_wall_at(tile: Vector2i) -> bool:
 	if _astar != null:
 		_astar.set_point_solid(tile, false)
 	_renderer.queue_redraw()
+	for flood in _active_floods:
+		if flood.absorb_new_opening(self, tile):
+			break
 	return true
+
+
+## Registered by WaterIngress for the whole lifetime of one flood (trigger
+## to final drain) -- see WaterIngress.ActiveFlood's own doc comment for why
+## this can't just be "flood it if adjacent to water": a wall carved open
+## later (Centipede Express punching through, a Centipede's own tunnel
+## fallback, RemoveWallsSkill, Seismic Compaction) was never part of any
+## ring's own computation (WaterIngress._compute_rings() only ever
+## considers tiles that were already open floor at trigger time), so
+## without this it either stays permanently dry inside an active flood's
+## radius, or (a naive adjacency check) gets flooded regardless of whether
+## it's actually within the flood's radius and then never scheduled to
+## drain with the rest of its ring.
+func register_active_flood(flood) -> void:
+	_active_floods.append(flood)
+
+
+func unregister_active_flood(flood) -> void:
+	_active_floods.erase(flood)
 
 
 ## True for the outermost ring of tiles — convenience wrapper for
@@ -460,6 +493,8 @@ func is_blocked(tile: Vector2i, plane: Layer) -> bool:
 	if maze == null:
 		return true
 	if Blockade.at_tile(get_tree(), tile, TILE_SIZE) != null:
+		return true
+	if Centipede.segment_at_tile(get_tree(), tile) != null:
 		return true
 	if plane == Layer.CEILING:
 		return ceiling.is_blocked(tile.x, tile.y)
@@ -512,6 +547,7 @@ func set_water_at(tile: Vector2i, value: bool) -> void:
 			_water_nodes[tile] = _spawn_water_marker(tile)
 		_drown_traps_at(tile)
 		_submerge_items_at(tile)
+		_flood_centipedes_at(tile)
 	else:
 		_water_tiles.erase(tile)
 		# A natural pit shares this same overlay flag (design §7) — if this
@@ -524,6 +560,15 @@ func set_water_at(tile: Vector2i, value: bool) -> void:
 			marker.queue_free()
 		_water_nodes.erase(tile)
 		_resurface_items_at(tile)
+
+
+## Public accessor for water-tile state -- until now _water_tiles was only
+## ever read from inside Level itself or directly by tests; Centipede's
+## pathing is the first production consumer outside Level, so it gets the
+## same one-entry-point treatment as set_water_at()/patch_pit_at() rather
+## than reaching into the underscore-prefixed dict directly.
+func is_water_at(tile: Vector2i) -> bool:
+	return _water_tiles.has(tile)
 
 
 func _spawn_water_marker(tile: Vector2i) -> Node2D:
@@ -563,6 +608,15 @@ func _resurface_items_at(tile: Vector2i) -> void:
 		var item := node as WorldItemPickup
 		if item != null and tile_of(item.global_position) == tile:
 			item.resurface()
+
+
+## Sweeps active Centipedes for one occupying `tile` and tells it the tile
+## just flooded -- mirrors _drown_traps_at()/_submerge_items_at()'s shape,
+## called from set_water_at()'s flood branch alongside them.
+func _flood_centipedes_at(tile: Vector2i) -> void:
+	var centipede := Centipede.segment_at_tile(get_tree(), tile)
+	if centipede != null:
+		centipede.notify_flooded()
 
 
 ## BlockadeSkill: patch a hazard tile (pit or water) for ground traversal by
@@ -769,23 +823,75 @@ func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 	pickup.global_position = world_pos
 
 
-## Seed a handful of Earthworm obstacles (design §6) across random open,
-## non-spawn tiles.
-func _seed_earthworms() -> void:
+## Sends a transient apex centipede in from the boundary at `entry`,
+## crawling in a straight line along `direction` until it exits off whatever
+## edge it eventually reaches (it deflects 90 degrees around any other
+## Centipede's body in its way, so that isn't necessarily the opposite edge
+## from `entry`) and freeing itself -- CentipedeExpress's own creature
+## (design follow-up): unlike the obstacle Centipede this carves its own
+## path as it goes and never becomes a stationary BLOCKING body.
+func spawn_centipede_express_rider(entry: Vector2i, direction: Vector2i) -> void:
+	var rider: CentipedeExpressRider = CentipedeExpressRiderScene.instantiate()
+	rider.body_length = randi_range(CENTIPEDE_BODY_LENGTH_MIN, CENTIPEDE_BODY_LENGTH_MAX)
+	_entities.add_child(rider)
+	rider.bind_level(self)
+	rider.start_run(entry, direction)
+
+
+## Seed a Centipede obstacle (sub-project H): a connected, in-bounds,
+## non-boundary chain of body_length open tiles, reserved away from both
+## spawns. Skips spawning entirely if no valid chain exists (graceful
+## degradation, matching WaterIngress's own no-op-on-empty-maze precedent)
+## -- this can legitimately happen on a very cramped maze.
+func _seed_centipedes() -> void:
 	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
-	var cells := maze.open_cells()
-	cells.shuffle()
-	var placed := 0
-	for cell in cells:
-		if placed >= EARTHWORM_COUNT:
-			break
-		if reserved.has(cell):
+	for i in CENTIPEDE_COUNT:
+		var centipede: Centipede = CentipedeScene.instantiate()
+		centipede.body_length = randi_range(CENTIPEDE_BODY_LENGTH_MIN, CENTIPEDE_BODY_LENGTH_MAX)
+		var chain := _find_open_chain(centipede.body_length, reserved)
+		if chain.is_empty():
+			centipede.free()
 			continue
-		var worm := EarthwormScene.instantiate()
-		worm.global_position = _tile_centre(cell.x, cell.y)
-		worm.bind_level(self)
-		_entities.add_child(worm)
-		placed += 1
+		_entities.add_child(centipede)
+		centipede.bind_level(self)
+		centipede.spawn_at(chain)
+		for tile in chain:
+			reserved[tile] = true
+
+
+## A randomized-walk search for a connected chain of `length` open,
+## non-boundary tiles, none of which are in `reserved`. Backtracks (starts
+## a fresh walk from a new candidate) on a dead end rather than giving up
+## immediately -- a single greedy walk from an unlucky starting tile could
+## dead-end long before reaching `length` even in a maze with plenty of
+## room elsewhere. Returns [] if no candidate start produces a full chain.
+func _find_open_chain(length: int, reserved: Dictionary) -> Array[Vector2i]:
+	var starts := maze.open_cells()
+	starts.shuffle()
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	for start in starts:
+		if reserved.has(start) or maze.is_boundary(start.x, start.y):
+			continue
+		var chain: Array[Vector2i] = [start]
+		var in_chain := {start: true}
+		while chain.size() < length:
+			var options: Array[Vector2i] = []
+			for dir in dirs:
+				var candidate: Vector2i = chain[chain.size() - 1] + dir
+				if in_chain.has(candidate) or reserved.has(candidate):
+					continue
+				if not maze.is_open(candidate.x, candidate.y) or maze.is_boundary(candidate.x, candidate.y):
+					continue
+				options.append(candidate)
+			if options.is_empty():
+				break
+			options.shuffle()
+			var next: Vector2i = options[0]
+			chain.append(next)
+			in_chain[next] = true
+		if chain.size() == length:
+			return chain
+	return []
 
 
 func _spawn_larvae(reserved: Array) -> void:
@@ -801,7 +907,10 @@ func _spawn_larvae(reserved: Array) -> void:
 		placed += 1
 
 
-## Spawn one larva at a random open cell that no spider is standing on.
+## Spawn one larva at a random open cell that no spider is standing on and
+## no Centipede body occupies -- otherwise a larva could spawn sitting
+## inside an already-BLOCKING Centipede, stuck there indefinitely since a
+## stationary body never crawls over its own tiles to squash it away.
 func _spawn_larva_at_random() -> void:
 	var cells := maze.open_cells()
 	if cells.is_empty():
@@ -813,9 +922,12 @@ func _spawn_larva_at_random() -> void:
 			occupied[tile_of(s.global_position)] = true
 	cells.shuffle()
 	for cell in cells:
-		if not occupied.has(cell):
-			_spawn_larva_at(cell)
-			return
+		if occupied.has(cell):
+			continue
+		if Centipede.segment_at_tile(get_tree(), cell) != null:
+			continue
+		_spawn_larva_at(cell)
+		return
 
 
 func _spawn_larva_at(cell: Vector2i) -> void:
@@ -829,3 +941,14 @@ func _spawn_larva_at(cell: Vector2i) -> void:
 
 func _tile_centre(tx: int, ty: int) -> Vector2:
 	return Vector2((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE)
+
+
+## Public wrapper for _tile_centre() -- Level exposes the one seam external
+## production code should read tile positions through, rather than reaching
+## into the underscore-prefixed internal helper directly (see
+## is_water_at()'s identical rationale, added in a later task). Centipede
+## uses this to position its segments; _tile_centre() itself stays the
+## internal implementation every other in-file caller already uses
+## directly.
+func tile_centre(tile: Vector2i) -> Vector2:
+	return _tile_centre(tile.x, tile.y)

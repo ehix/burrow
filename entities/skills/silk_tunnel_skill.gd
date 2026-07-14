@@ -31,7 +31,15 @@ func _lay_tunnel(source: Node) -> void:
 		return
 	var facing: Vector2 = source.get("facing") if "facing" in source else Vector2.RIGHT
 	var dir := _dominant(facing)
-	var tile := level.tile_of(origin.global_position)
+	# GridMover.committed_tile() rather than origin's raw, interpolated
+	# global_position -- mirrors BlockadeSkill._target_tile()'s own fix for
+	# the identical bug (see its doc comment): floor-dividing the
+	# interpolated position flips which tile it resolves to partway through
+	# a step's animation, so spamming this while moving could start the
+	# tunnel from a tile inconsistent with where the caster visually was,
+	# reading as a web placed "between tiles" (playtest feedback).
+	var mover := _mover_of(source)
+	var tile := mover.committed_tile() if mover != null else level.tile_of(origin.global_position)
 	var holder := _spawn_parent(source)
 	for i in tile_count:
 		tile += dir

@@ -23,3 +23,18 @@ func test_collapse_candidates_exclude_a_spider_occupied_tile() -> void:
 	var compaction := SeismicCompaction.new()
 	assert_true(compaction._is_occupied(level, interior_cell),
 		"a spider-occupied tile is still excluded from collapse candidates")
+
+
+func test_collapse_candidates_exclude_a_centipede_occupied_tile() -> void:
+	var level := _make_level()
+	for node in level.get_tree().get_nodes_in_group("centipedes"):
+		node.free()
+	var interior_cell := Vector2i(3, 3)
+	var centipede := Centipede.new()
+	level.add_child(centipede)
+	centipede.bind_level(level)
+	centipede.spawn_at([interior_cell])
+
+	var compaction := SeismicCompaction.new()
+	assert_true(compaction._is_occupied(level, interior_cell),
+		"a Centipede-occupied tile must never collapse into a wall out from under it")

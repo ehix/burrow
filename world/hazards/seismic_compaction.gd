@@ -46,4 +46,9 @@ func _is_occupied(level: Node, cell: Vector2i) -> bool:
 	for spider in level.get_tree().get_nodes_in_group("spiders"):
 		if level.tile_of((spider as Node2D).global_position) == cell:
 			return true
+	# A Centipede tile must never collapse into a wall out from under it --
+	# it's still an open, occupied floor tile even while BLOCKING (no
+	# physical collider of its own to make collapse_tile_at() itself refuse).
+	if Centipede.segment_at_tile(level.get_tree(), cell) != null:
+		return true
 	return false

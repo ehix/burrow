@@ -1,22 +1,38 @@
 class_name CentipedeExpress
 extends HazardEvent
-## An apex centipede runs a straight line across the maze, carving a fresh
-## corridor: opens every wall tile along a random horizontal or vertical
-## sweep, skipping the boundary (guardrail). Unlike Seismic Compaction (net-
-## neutral), this hazard only ever adds tunnel, never removes one.
+## An apex centipede bursts in through one boundary edge and crawls in a
+## straight line (Level.spawn_centipede_express_rider() /
+## CentipedeExpressRider), carving open whatever wall stands in its way,
+## destroying larvae/traps/items, and shoving any spider caught in its path
+## -- a quick, disruptive pass through the environment rather than a
+## permanent obstacle (unlike the seeded obstacle Centipede, this one always
+## keeps moving and frees itself once it's fully exited whatever edge it
+## eventually reaches -- it deflects 90 degrees around any other
+## Centipede's body, so that isn't always the edge directly opposite entry).
 
 func trigger(level: Node) -> void:
 	if level == null or level.maze == null:
 		return
 	var maze: MazeData = level.maze
-	if randi() % 2 == 0:
+	var horizontal := randi() % 2 == 0
+	var forward := randi() % 2 == 0
+	var entry: Vector2i
+	var direction: Vector2i
+	if horizontal:
 		var y := 1 + randi() % maxi(1, maze.height - 2)
-		for x in maze.width:
-			if not maze.is_boundary(x, y):
-				level.dev_remove_wall_at(Vector2i(x, y))
+		if forward:
+			entry = Vector2i(1, y)
+			direction = Vector2i.RIGHT
+		else:
+			entry = Vector2i(maze.width - 2, y)
+			direction = Vector2i.LEFT
 	else:
 		var x := 1 + randi() % maxi(1, maze.width - 2)
-		for y in maze.height:
-			if not maze.is_boundary(x, y):
-				level.dev_remove_wall_at(Vector2i(x, y))
+		if forward:
+			entry = Vector2i(x, 1)
+			direction = Vector2i.DOWN
+		else:
+			entry = Vector2i(x, maze.height - 2)
+			direction = Vector2i.UP
+	level.spawn_centipede_express_rider(entry, direction)
 	EventBus.hazard_triggered.emit("centipede_express")

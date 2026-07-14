@@ -8,6 +8,12 @@ func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
 	add_child_autofree(level)
 	level.build()
+	# A seeded obstacle Centipede placed on the exact row/column Centipede
+	# Express picks would legitimately deflect the rider around it, so a
+	# straight full-row/column carve isn't guaranteed -- free it so these
+	# hazard tests aren't at the mercy of Task 8's own random placement.
+	for node in level.get_tree().get_nodes_in_group("centipedes"):
+		node.free()
 	return level
 
 
@@ -56,10 +62,18 @@ func test_seismic_compaction_emits_hazard_triggered() -> void:
 	assert_has(fired, "seismic_compaction")
 
 
-func test_centipede_express_opens_a_full_row_or_column() -> void:
+func test_centipede_express_eventually_opens_a_full_row_or_column() -> void:
 	var level := _make_level()
 	CentipedeExpress.new().trigger(level)
-	assert_true(_has_full_open_line(level), "one full interior row or column should be open")
+	var riders := level.get_tree().get_nodes_in_group("centipede_express_riders")
+	assert_eq(riders.size(), 1, "trigger() spawns exactly one rider")
+	var rider := riders[0] as CentipedeExpressRider
+	var ticks := 0
+	while is_instance_valid(rider) and not rider.is_queued_for_deletion() and ticks < 500:
+		rider._step()
+		ticks += 1
+	assert_true(_has_full_open_line(level),
+		"the rider's straight run across the map carves a full interior row or column")
 
 
 func test_centipede_express_emits_hazard_triggered() -> void:

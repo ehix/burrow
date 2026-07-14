@@ -20,6 +20,58 @@ const FLOOD_DURATION := 12.0
 const RING_STEP := 0.4
 
 
+## One flood's own record, alive for the flood's whole lifetime (trigger to
+## final drain) — kept separate from the WaterIngress instance itself
+## (HazardDirector reuses one instance across every future trigger(), so
+## instance fields would get clobbered by the next flood before this one
+## finishes). Registered with Level (register_active_flood()) so
+## Level.dev_remove_wall_at() can correctly fold a wall carved open *after*
+## trigger() already returned (Centipede Express punching through, a
+## Centipede's own tunnel fallback, Seismic Compaction, ...) into whichever
+## ring it falls in: flooding it immediately only if it's still within this
+## flood's radius and that ring hasn't drained yet, and scheduling its own
+## drain for exactly when the rest of that ring would drain. A naive "flood
+## it if it's adjacent to any currently-wet tile" check (an earlier pass at
+## this) doesn't check the radius at all, so it can spread flooding
+## arbitrarily far past the original pool one carve at a time, and doesn't
+## have a ring to hang a drain timer off of, so it never drains at all
+## (found via playtest: a wall opened near, but genuinely outside, a flood
+## became permanently flooded, and every such tile survived the pool's own
+## retreat).
+class ActiveFlood:
+	extends RefCounted
+	var origin: Vector2i
+	var started_at_msec: int
+
+	func _init(p_origin: Vector2i) -> void:
+		origin = p_origin
+		started_at_msec = Time.get_ticks_msec()
+
+	func _ring_of(tile: Vector2i) -> int:
+		return maxi(absi(tile.x - origin.x), absi(tile.y - origin.y))
+
+	## Floods `tile` and schedules its own drain if it's still within this
+	## flood's radius and that ring's drain hasn't already happened; returns
+	## false (does nothing) otherwise, so the caller knows to try another
+	## active flood or leave the tile dry.
+	func absorb_new_opening(level, tile: Vector2i) -> bool:
+		var k := _ring_of(tile)
+		if k > FLOOD_RADIUS:
+			return false
+		var full_flood_time := float(FLOOD_RADIUS) * RING_STEP
+		var drain_delay_from_start: float = full_flood_time + FLOOD_DURATION + float(FLOOD_RADIUS - k) * RING_STEP
+		var elapsed := float(Time.get_ticks_msec() - started_at_msec) / 1000.0
+		var remaining := drain_delay_from_start - elapsed
+		if remaining <= 0.0:
+			return false
+		level.set_water_at(tile, true)
+		var tree = level.get_tree()
+		if tree != null:
+			tree.create_timer(remaining).timeout.connect(
+				func() -> void: WaterIngress._drain_ring(level, [tile]))
+		return true
+
+
 func trigger(level: Node) -> void:
 	if level == null or level.maze == null:
 		return
@@ -32,6 +84,8 @@ func trigger(level: Node) -> void:
 	var tree := level.get_tree()
 	if tree == null:
 		return
+	var flood := ActiveFlood.new(origin)
+	level.register_active_flood(flood)
 	var full_flood_time := float(FLOOD_RADIUS) * RING_STEP
 	for k in rings.size():
 		var ring_tiles: Array = rings[k]
@@ -45,6 +99,11 @@ func trigger(level: Node) -> void:
 		var drain_delay: float = full_flood_time + FLOOD_DURATION + float(FLOOD_RADIUS - k) * RING_STEP
 		tree.create_timer(drain_delay).timeout.connect(
 			func() -> void: _drain_ring(level, ring_tiles))
+	var total_lifetime: float = full_flood_time + FLOOD_DURATION + float(FLOOD_RADIUS) * RING_STEP
+	tree.create_timer(total_lifetime).timeout.connect(
+		func() -> void:
+			if is_instance_valid(level):
+				level.unregister_active_flood(flood))
 	EventBus.hazard_triggered.emit("water_ingress")
 
 

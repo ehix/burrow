@@ -29,7 +29,7 @@ func _ready() -> void:
 		_base_sprite_scale = _sprite.scale
 
 
-## Called by Level right after instancing, mirroring Player/Enemy/Earthworm's
+## Called by Level right after instancing, mirroring Player/Enemy/Centipede's
 ## own bind_level() — lets the larva's blocking check resolve pit/water
 ## hazards without the maze data being handed to it directly.
 func bind_level(level: Level) -> void:

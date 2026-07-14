@@ -9,7 +9,7 @@ extends Resource
 @export var display_name: String = "Larva"
 ## Hunger removed via HungerComponent.satiate() on consumption.
 @export var hunger_value: float = 40.0
-## False marks a hazard/obstacle creature (Earthworm) that cannot be eaten at
+## False marks a hazard/obstacle creature (Centipede) that cannot be eaten at
 ## all — melee/web interactions with it never call satiate().
 @export var edible: bool = true
 ## Status effect applied to the eater via its StatusEffectComponent on

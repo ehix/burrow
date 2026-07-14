@@ -62,3 +62,19 @@ func test_hitting_a_blockade_registers_a_hit() -> void:
 	_make_shot()._on_body_entered(blockade)
 	_make_shot()._on_body_entered(blockade)
 	assert_true(blockade.is_queued_for_deletion(), "the third hit destroys it")
+
+
+class FakeCentipedeBody:
+	extends Node2D
+	var hits := 0
+	func take_hit() -> void:
+		hits += 1
+
+
+func test_hitting_a_centipede_segment_registers_a_hit() -> void:
+	var body := FakeCentipedeBody.new()
+	add_child_autofree(body)
+	var segment: CentipedeSegment = preload("res://entities/centipede/centipede_segment.tscn").instantiate()
+	body.add_child(segment)
+	_make_shot()._on_body_entered(segment)
+	assert_eq(body.hits, 1, "a web-shot hitting any segment forwards to the shared counter")

@@ -114,17 +114,6 @@ func test_set_sense_outline_boxes_a_nearby_world_item() -> void:
 	assert_false(level._sense_point_highlights.has(pickup))
 
 
-func test_set_sense_outline_boxes_a_nearby_earthworm() -> void:
-	var level := _make_level()
-	var worm: Earthworm = preload("res://entities/earthworm/earthworm.tscn").instantiate()
-	level.add_child(worm)
-	worm.global_position = level.player.global_position
-
-	level.set_sense_outline(true, 50.0)
-
-	assert_true(level._sense_point_highlights.has(worm))
-
-
 func test_set_sense_outline_outlines_a_nearby_trap() -> void:
 	var level := _make_level()
 	var trap: WebTrap = preload("res://entities/web/web_trap.tscn").instantiate()
@@ -158,3 +147,14 @@ func test_build_seeds_natural_pits_away_from_both_spawns() -> void:
 			assert_ne(cell, player_tile, "a natural pit never lands on the player's spawn tile")
 			assert_ne(cell, enemy_tile, "a natural pit never lands on the enemy's spawn tile")
 	assert_eq(pit_count, Level.NATURAL_PIT_COUNT)
+
+
+func test_set_sense_outline_boxes_a_nearby_centipede_segment() -> void:
+	var level := _make_level()
+	var segment: CentipedeSegment = preload("res://entities/centipede/centipede_segment.tscn").instantiate()
+	level.add_child(segment)
+	segment.global_position = level.player.global_position
+
+	level.set_sense_outline(true, 50.0)
+
+	assert_true(level._sense_point_highlights.has(segment))
