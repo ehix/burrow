@@ -192,12 +192,26 @@ which plane the player is viewing from — dimming it along with the actual
 floor content would be wrong, since it's not "background" the way a loose
 larva or item is. Both Centipede types stay parented under `Entities`
 (undimmed), same as `Player`/`Enemy`. `Player`/`Enemy`/mines/blockades
-also stay under the existing `Entities` node, unaffected, keeping their
-current per-entity `body_alpha` dimming exactly as sub-project F shipped
-it — that mechanism already handles "is this specific plane-aware entity
-on the off-plane" (still applies normally to `Enemy`), a different
-question from "is this static ground-only content in the background
+also stay under the existing `Entities` node, unaffected — that's a
+different question ("is this specific plane-aware entity on the
+off-plane") from "is this static ground-only content in the background
 right now" (which never applies to either Centipede type).
+
+**Enemy's off-plane dimming switches from a flat alpha fade to the same
+hazy/desaturate look** (second correction, same day): sub-project F's
+`body_alpha`-only fade (`OFF_PLANE_ALPHA = 0.35`) is replaced by the same
+desaturate+darken formula `GroundLayer` uses, for visual consistency
+across the whole "off-plane/background" language — Enemy stays fully
+opaque but reads hazy/darker instead of merely more transparent. Since
+`Player`/`Enemy` sprites already share one `ShaderMaterial`
+(`outline.gdshader`, via `OutlineFx`) for their outline/Camouflage
+effects, and a `CanvasItem` can only ever hold one `material`, the
+formula is merged directly into `outline.gdshader` as new uniforms
+(`saturation`, `brightness`, `dim_enabled`) rather than given a second
+material — `GroundLayer`'s own `ground_dim.gdshader` stays a separate,
+dedicated shader, since a `CanvasGroup` has no outline/Camouflage
+concerns to share a material with. `OFF_PLANE_ALPHA` is retired entirely;
+`body_alpha` remains, now exclusively Camouflage's uniform.
 
 **New scene tree order** (`world/level.tscn`): `GroundLayer` (floor +
 hazards + larvae/items) draws first, then `Renderer` (`MazeRenderer`,

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give the ceiling plane its own inverse wall treatment (front faces hang down instead of rising up) and make the ground floor read as a hazy, out-of-focus background layer while the player is on the ceiling, instead of the current flat floor-color swap.
+**Goal:** Give the ceiling plane its own inverse wall treatment (front faces hang down instead of rising up), make the ground floor read as a hazy, out-of-focus background layer while the player is on the ceiling instead of the current flat floor-color swap, and switch the Enemy's existing off-plane dimming from a flat alpha fade to the same hazy/desaturated look.
 
-**Architecture:** `MazeRenderer` (`world/maze/maze_renderer.gd`) gets a per-plane wall-drawing variant — `_draw_wall_ground()`/`_draw_wall_ceiling()` — driven by its existing `_active_plane`, with a mirrored `wall_occludes_position_ceiling()` fade check alongside Phase 1's ground-plane one. Floor rendering moves out of `MazeRenderer` entirely into a new `FloorRenderer` node living inside a new `GroundLayer` (`CanvasGroup`), which carries a small new hand-written shader (`assets/shaders/ground_dim.gdshader`, this project's second shader after `outline.gdshader`) doing a cheap desaturate+darken pass — no blur, no `SubViewport`, matching the design doc's own recommendation to start simple. This retires `MazeRenderer.ceiling_floor_color` (shipped in sub-project F): a real background layer that dims independently makes the old floor-recolor trick for "which plane am I on" redundant. `GroundLayer` also absorbs always-ground entities that today get parented under `Entities`/`Level` directly — larvae, `WorldItemPickup`, and hazard markers — confirmed via grep that none carry a `PlaneComponent`, so this only changes where they're parented for rendering, not any plane-aware behavior. Both Centipede types (the obstacle `Centipede` and `CentipedeExpressRider`) are deliberately excluded from `GroundLayer`: a Centipede's body is the same width as the tunnel itself, so it must read identically regardless of which plane the player is viewing from, unlike a loose larva or item — both stay parented under `Entities`, undimmed. `Player`/`Enemy` (and anything they can place on either plane) also stay under the existing `Entities` node, keeping their current per-entity `body_alpha` dimming exactly as sub-project F shipped it. Full design: `docs/superpowers/specs/2026-07-14-tunnel-visual-rework-design.md`'s Phase 2 section (revised 2026-07-14 after Phase 1 shipped, then corrected the same day on Centipede scope).
+**Architecture:** `MazeRenderer` (`world/maze/maze_renderer.gd`) gets a per-plane wall-drawing variant — `_draw_wall_ground()`/`_draw_wall_ceiling()` — driven by its existing `_active_plane`, with a mirrored `wall_occludes_position_ceiling()` fade check alongside Phase 1's ground-plane one. Floor rendering moves out of `MazeRenderer` entirely into a new `FloorRenderer` node living inside a new `GroundLayer` (`CanvasGroup`), which carries a small new hand-written shader (`assets/shaders/ground_dim.gdshader`, this project's second shader after `outline.gdshader`) doing a cheap desaturate+darken pass — no blur, no `SubViewport`, matching the design doc's own recommendation to start simple. This retires `MazeRenderer.ceiling_floor_color` (shipped in sub-project F): a real background layer that dims independently makes the old floor-recolor trick for "which plane am I on" redundant. `GroundLayer` also absorbs always-ground entities that today get parented under `Entities`/`Level` directly — larvae, `WorldItemPickup`, and hazard markers — confirmed via grep that none carry a `PlaneComponent`, so this only changes where they're parented for rendering, not any plane-aware behavior. Both Centipede types (the obstacle `Centipede` and `CentipedeExpressRider`) are deliberately excluded from `GroundLayer`: a Centipede's body is the same width as the tunnel itself, so it must read identically regardless of which plane the player is viewing from, unlike a loose larva or item — both stay parented under `Entities`, undimmed. `Player`/`Enemy` also stay under the existing `Entities` node — but (correction, 2026-07-14, after Task 3) Enemy's existing per-entity off-plane dimming switches from a flat `body_alpha` fade to the same desaturate+darken formula `GroundLayer` uses, for visual consistency across the whole "off-plane/background" language. Since `Player`/`Enemy` sprites already share one `ShaderMaterial` (`outline.gdshader`, via `OutlineFx`) for their outline/Camouflage effects, and a `CanvasItem` can only ever hold one `material`, the desaturate formula is merged directly into `outline.gdshader` as new uniforms rather than duplicated into a second material — `GroundLayer`'s dedicated `ground_dim.gdshader` stays separate since a `CanvasGroup` has no outline/Camouflage concerns to share a material with. Full design: `docs/superpowers/specs/2026-07-14-tunnel-visual-rework-design.md`'s Phase 2 section (revised 2026-07-14 after Phase 1 shipped, then corrected twice more the same day: once on Centipede scope, once on Enemy's dim treatment).
 
 **Tech Stack:** Godot 4.7, GDScript, GUT for tests.
 
@@ -759,3 +759,303 @@ git commit -m "Level: reparent ground-only content (larvae, items, hazards) unde
 - [ ] **Step 8: Manual playtest verification**
 
 This phase is visual-only in its ultimate effect (no automated test renders pixels) — actually launch the game (`~/.local/bin/godot --path . res://world/world.tscn`), transition to the ceiling plane, and confirm: ceiling walls read as hanging down (mirrored from the ground's rising-up walls), and the floor below reads as a hazy/duller background rather than a flat recolor. This step doesn't get a checkbox for "expected output" the way the others do — it's a subjective look-and-feel call for a human to make.
+
+---
+
+### Task 4: Enemy's off-plane dimming switches from alpha fade to hazy/desaturate
+
+**Files:**
+- Modify: `assets/shaders/outline.gdshader`
+- Modify: `components/outline_fx.gd`
+- Modify: `world/level.gd`
+- Test: `tests/test_outline_fx.gd` (add to it)
+- Test: `tests/test_level_plane_focus.gd` (modify)
+
+**Interfaces:**
+- Consumes: nothing from Tasks 1-3.
+- Produces: `OutlineFx.set_dimmed(sprite: CanvasItem, dimmed: bool) -> void`. Nothing later in this plan depends on this — this is the last task.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `tests/test_outline_fx.gd`:
+
+```gdscript
+func test_set_dimmed_true_sets_the_shader_uniform() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_dimmed(sprite, true)
+
+	var mat := sprite.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_true(mat.get_shader_parameter("dim_enabled"))
+
+
+func test_set_dimmed_on_null_sprite_is_a_noop() -> void:
+	OutlineFx.set_dimmed(null, true) # must not error
+	assert_true(true, "reached this point without erroring")
+
+
+## Mirrors test_set_body_alpha_back_to_neutral_releases_the_material's own
+## rationale: the shader must actually come off once dimmed becomes false
+## and nothing else needs the material, not just numerically neutralize
+## while staying attached.
+func test_set_dimmed_back_to_false_releases_the_material() -> void:
+	var sprite := _make_sprite()
+	OutlineFx.set_dimmed(sprite, true) # e.g. off the player's plane
+	assert_not_null(sprite.material)
+
+	OutlineFx.set_dimmed(sprite, false) # e.g. back on the same plane
+
+	assert_null(sprite.material,
+		"back to neutral -- the shader comes off entirely, not just numerically neutral")
+
+
+func test_set_dimmed_false_on_an_untouched_sprite_never_creates_a_material() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_dimmed(sprite, false)
+
+	assert_null(sprite.material, "the common case (never off-plane) never even touches the shader")
+
+
+func test_set_dimmed_reuses_the_same_material_set_outline_uses() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_outline(sprite, true, Color.RED)
+	var mat_after_outline := sprite.material
+	OutlineFx.set_dimmed(sprite, true)
+	var mat_after_dim := sprite.material
+
+	assert_eq(mat_after_outline, mat_after_dim, "one shared material, not a second one stacked on")
+
+
+## Verifies _release_if_neutral() now checks dim_enabled too, not just
+## outline_active/body_alpha -- otherwise a sprite that's dimmed but
+## otherwise neutral (no outline, body_alpha at 1.0) would have its
+## material incorrectly stripped, silently losing the dim visual.
+func test_set_dimmed_true_keeps_the_material_even_though_outline_and_body_alpha_are_neutral() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_dimmed(sprite, true)
+
+	assert_not_null(sprite.material, "dim_enabled alone is enough reason to keep the material attached")
+```
+
+Replace the two body_alpha-based dimming assertions in `tests/test_level_plane_focus.gd`. First, in `test_refresh_plane_focus_dims_the_enemy_when_only_it_is_on_the_ceiling()`, replace:
+
+```gdscript
+	var mat := enemy_sprite.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001,
+		"enemy is off the player's plane, so it dims")
+```
+
+with:
+
+```gdscript
+	var mat := enemy_sprite.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_true(mat.get_shader_parameter("dim_enabled"), "enemy is off the player's plane, so it reads hazy/desaturated")
+```
+
+Second, in `test_plane_changed_event_triggers_a_focus_refresh()`, replace:
+
+```gdscript
+	var mat := enemy_sprite.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001)
+```
+
+with:
+
+```gdscript
+	var mat := enemy_sprite.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_true(mat.get_shader_parameter("dim_enabled"))
+```
+
+The other four tests in that file (`test_refresh_plane_focus_keeps_full_brightness_when_planes_match` and the two Camouflage guardrail tests) need no changes — they don't assert on `body_alpha`'s off-plane value.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `~/.local/bin/godot --headless --path . -s addons/gut/gut_cmdln.gd -gexit 2>&1 | grep -A10 "test_outline_fx\|test_level_plane_focus"`
+Expected: `test_outline_fx.gd` fails to parse (`set_dimmed` doesn't exist yet); `test_level_plane_focus.gd`'s two modified tests fail (`dim_enabled` doesn't exist on the shader yet either).
+
+- [ ] **Step 3: Add the desaturate uniforms and math to `outline.gdshader`**
+
+Replace the entire contents of `assets/shaders/outline.gdshader` with:
+
+```glsl
+shader_type canvas_item;
+
+// Standard alpha-edge outline: if this texel is (near-)transparent but a
+// same-distance neighbour (8-tap: 4 cardinal + 4 diagonal, so corners get
+// full coverage too) is opaque, paint outline_color instead. body_alpha
+// dims normal body pixels only — kept independent of outline_color's own
+// alpha so a caller (Camouflage) can fade the body to near-invisible while
+// the outline stays fully visible, which node `modulate` can't do (it
+// multiplies everything this shader outputs, outline included).
+//
+// dim_enabled/saturation/brightness (tunnel visual rework Phase 2): the
+// same desaturate+darken formula GroundLayer's ground_dim.gdshader uses
+// for "hazy background" content, merged into this shader instead of a
+// second material — a CanvasItem can only ever hold one material, and
+// Player/Enemy sprites already depend on this one for outline/Camouflage.
+// Applies to the body color only, never outline_color (a deliberately
+// chosen flat color, not sampled texture content, so there's nothing to
+// desaturate).
+uniform vec4 outline_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+uniform float outline_width : hint_range(0.0, 4.0) = 2.0;
+uniform bool outline_enabled = true;
+uniform float body_alpha : hint_range(0.0, 1.0) = 1.0;
+uniform float saturation : hint_range(0.0, 1.0) = 0.6;
+uniform float brightness : hint_range(0.0, 1.0) = 0.75;
+uniform bool dim_enabled = false;
+
+void fragment() {
+	// No early `return` in fragment() — this project's renderer rejects it
+	// ("SHADER ERROR: Using 'return' in the 'fragment' processor function
+	// is incorrect."), silently failing the whole shader's compilation.
+	// Every branch below funnels into one COLOR assignment instead.
+	vec4 tex_color = texture(TEXTURE, UV);
+	vec3 body_rgb = tex_color.rgb;
+	if (dim_enabled) {
+		float luminance = dot(body_rgb, vec3(0.299, 0.587, 0.114));
+		body_rgb = mix(vec3(luminance), body_rgb, saturation) * brightness;
+	}
+	if (tex_color.a > 0.5 || !outline_enabled) {
+		COLOR = vec4(body_rgb, tex_color.a * body_alpha);
+	} else {
+		vec2 texel = outline_width / vec2(textureSize(TEXTURE, 0));
+		float neighbor_alpha = 0.0;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(texel.x, 0.0)).a;
+		neighbor_alpha += texture(TEXTURE, UV - vec2(texel.x, 0.0)).a;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(0.0, texel.y)).a;
+		neighbor_alpha += texture(TEXTURE, UV - vec2(0.0, texel.y)).a;
+		neighbor_alpha += texture(TEXTURE, UV + texel).a;
+		neighbor_alpha += texture(TEXTURE, UV - texel).a;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(texel.x, -texel.y)).a;
+		neighbor_alpha += texture(TEXTURE, UV + vec2(-texel.x, texel.y)).a;
+		COLOR = neighbor_alpha > 0.0 ? outline_color : vec4(body_rgb, tex_color.a * body_alpha);
+	}
+}
+```
+
+- [ ] **Step 4: Add `OutlineFx.set_dimmed()` and update `_release_if_neutral()`**
+
+In `components/outline_fx.gd`, add this function immediately after `set_body_alpha()`:
+
+```gdscript
+## Sets the shader's dim_enabled uniform directly (tunnel visual rework
+## Phase 2) -- no ref-counting, same rationale as set_body_alpha: only
+## one caller (Level._refresh_plane_focus) ever decides this per sprite,
+## so the last call wins.
+static func set_dimmed(sprite: CanvasItem, dimmed: bool) -> void:
+	if sprite == null:
+		return
+	# Mirrors set_body_alpha's fast path: nothing to do if there's no
+	# material yet and this call wouldn't need one either.
+	if not dimmed and (sprite.material as ShaderMaterial == null or (sprite.material as ShaderMaterial).shader != OutlineShader):
+		return
+	var mat := _material_of(sprite)
+	mat.set_shader_parameter("dim_enabled", dimmed)
+	_release_if_neutral(sprite)
+```
+
+Replace `_release_if_neutral()` entirely with:
+
+```gdscript
+## Once neither effect this shader provides is actually doing anything
+## (outline off for every caller, body_alpha back to its neutral 1.0,
+## AND dim_enabled false), detaches the material entirely and restores
+## `sprite.material` to null -- every sprite this project ever applies
+## the outline shader to starts with no material of its own. Leaving a
+## "neutral" ShaderMaterial permanently attached instead (found via
+## playtest: a ceiling-plane transition dims the off-plane spider via
+## set_body_alpha(), and the shader visibly never came back off even
+## once alpha returned to 1.0) takes the sprite out of the engine's
+## default per-item rendering path for good, for no reason -- the
+## numeric effect is already fully neutral, so there's nothing left for
+## a lingering material to be doing.
+static func _release_if_neutral(sprite: CanvasItem) -> void:
+	var mat := sprite.material as ShaderMaterial
+	if mat == null or mat.shader != OutlineShader:
+		return
+	var id := sprite.get_instance_id()
+	var outline_active: bool = _ref_counts.get(id, 0) > 0
+	# get_shader_parameter() returns null (not the shader's own declared
+	# default) for a uniform this material has never explicitly set --
+	# an unset body_alpha is still the neutral 1.0, just not overridden yet.
+	var alpha_param: Variant = mat.get_shader_parameter("body_alpha")
+	var alpha: float = alpha_param if alpha_param != null else 1.0
+	var dim_param: Variant = mat.get_shader_parameter("dim_enabled")
+	var dimmed: bool = dim_param if dim_param != null else false
+	if not outline_active and is_equal_approx(alpha, 1.0) and not dimmed:
+		sprite.material = null
+```
+
+- [ ] **Step 5: Wire `Level._refresh_plane_focus()` to use `set_dimmed` instead of `set_body_alpha`**
+
+In `world/level.gd`, remove this constant and its doc comment entirely:
+
+```gdscript
+## Ceiling/plane mechanics rework: body_alpha for whichever of Player/Enemy
+## is off the other's plane — "less in focus," per the user's own framing
+## during brainstorming. Deliberately scoped to just these two (the only
+## entities that track a plane at all); larvae/hatchlings/decoys/traps
+## always render at full brightness regardless of plane (design's explicit
+## out-of-scope call).
+const OFF_PLANE_ALPHA := 0.35
+```
+
+Replace the doc comment above `_refresh_plane_focus()` (the one starting `## Dims whichever of Player/Enemy is off the other's plane via the shared`) with:
+
+```gdscript
+## Dims whichever of Player/Enemy is off the other's plane via the shared
+## outline shader's dim_enabled uniform (tunnel visual rework Phase 2 --
+## previously a flat body_alpha fade, switched to match GroundLayer's own
+## hazy/desaturated "background" look for visual consistency) -- the
+## floor dim (above, GroundLayer) tells you which plane *you're* on; this
+## tells you which other spider is or isn't reachable from here.
+```
+
+In `_refresh_plane_focus()`, replace the loop's last two lines:
+
+```gdscript
+		var alpha := 1.0 if PlaneComponent.effective_plane(node) == focus_plane else OFF_PLANE_ALPHA
+		OutlineFx.set_body_alpha(vis, alpha)
+```
+
+with:
+
+```gdscript
+		OutlineFx.set_dimmed(vis, PlaneComponent.effective_plane(node) != focus_plane)
+```
+
+- [ ] **Step 6: Run tests to verify they pass**
+
+Run: `~/.local/bin/godot --headless --path . -s addons/gut/gut_cmdln.gd -gexit 2>&1 | grep -A15 "test_outline_fx\|test_level_plane_focus"`
+Expected: `test_outline_fx.gd` shows `18/18 passed.` (12 pre-existing + 6 new); `test_level_plane_focus.gd` shows `7/7 passed.` (unchanged count from Task 2, since Task 4 modifies existing tests rather than adding new ones).
+
+- [ ] **Step 7: Run the full suite to check for regressions**
+
+Run: `~/.local/bin/godot --headless --path . -s addons/gut/gut_cmdln.gd -gexit 2>&1 | tail -20`
+Expected: no new failures beyond the known pre-existing `test_larva_hazards.gd` flake. Double-check nothing else in the suite reads `Level.OFF_PLANE_ALPHA` (a stale reference would now be a parse error, not a silent pass) — this plan's own research found only `world/level.gd` and `tests/test_level_plane_focus.gd` reference it, both handled by this task.
+
+- [ ] **Step 8: Headless boot check**
+
+Run: `~/.local/bin/godot --headless --path . res://world/world.tscn --quit-after 600 2>&1 | grep -iE "error|warning|script"`
+Expected: no output (clean boot — this is the check that would catch a shader compile failure in the merged `outline.gdshader`, per this project's own established gotcha).
+
+- [ ] **Step 9: Import + commit**
+
+```bash
+~/.local/bin/godot --headless --path . --import
+git add assets/shaders/outline.gdshader components/outline_fx.gd world/level.gd \
+	tests/test_outline_fx.gd tests/test_level_plane_focus.gd
+git commit -m "Enemy off-plane dimming: switch from flat alpha fade to hazy/desaturate"
+```
+
+- [ ] **Step 10: Manual playtest verification**
+
+Actually launch the game (`~/.local/bin/godot --path . res://world/world.tscn`), get Player and Enemy onto different planes (e.g. transition to the ceiling, or use the dev tools if available), and confirm Enemy reads as hazy/desaturated rather than merely more transparent. This step doesn't get a checkbox for "expected output" the way the others do — it's a subjective look-and-feel call for a human to make.
