@@ -185,8 +185,8 @@ func test_arriving_at_the_target_while_fleeing_does_not_free_it_instantly() -> v
 
 	assert_false(centipede.is_queued_for_deletion(),
 		"the body keeps crawling out through the boundary instead of vanishing whole the instant it arrives")
-	assert_eq(centipede._exit_steps_remaining, centipede.body_length,
-		"the exit crawl takes exactly body_length more steps -- enough for the tail to also clear the target")
+	assert_eq(centipede._exit_steps_remaining, centipede.body_length + 1,
+		"the exit crawl takes body_length + 1 more steps -- enough for the tail to clear the boundary ring itself, not just reach it")
 
 
 func test_exit_step_advances_the_head_and_moves_its_segment_same_as_an_ordinary_crawl_step() -> void:

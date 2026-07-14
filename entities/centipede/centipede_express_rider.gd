@@ -4,14 +4,17 @@ extends Node2D
 ## after playtest feedback on the first pass): unlike the obstacle Centipede
 ## (a stationary BLOCKING body you have to fight off), this one only ever
 ## moves -- entering the map from one boundary edge, crawling in a straight
-## line clear across to the opposite edge at a faster pace than the obstacle
-## Centipede's own crawl, carving open whatever wall stands in its way as it
-## goes (rather than the whole corridor being pre-carved before it appears),
-## destroying any larva/trap/item it crawls over, and shoving any spider
-## caught in its path out of the way (Centipede.shove_spiders_out_of(), the
-## exact primitive the obstacle Centipede's own crawl step uses). It never
-## takes a hit and never becomes a permanent obstacle -- once its tail
-## clears the far edge it frees itself.
+## line at a faster pace than the obstacle Centipede's own crawl, carving
+## open whatever wall stands in its way as it goes (rather than the whole
+## corridor being pre-carved before it appears), destroying any larva/trap/
+## item it crawls over, and shoving any spider caught in its path out of the
+## way (Centipede.shove_spiders_out_of(), the exact primitive the obstacle
+## Centipede's own crawl step uses). If it runs into another Centipede's own
+## body it deflects 90 degrees rather than plowing through or stopping dead,
+## and keeps going -- so it doesn't necessarily exit from the edge directly
+## opposite where it came in. It never takes a hit and never becomes a
+## permanent obstacle -- once its tail clears whichever edge it eventually
+## reaches, it frees itself.
 
 const SegmentScene := preload("res://entities/centipede/centipede_segment.tscn")
 
@@ -25,7 +28,17 @@ var _tiles: Array[Vector2i] = []
 var _segments: Array[CentipedeSegment] = []
 var _level: Node
 var _direction := Vector2i.ZERO
-var _steps_remaining := 0
+## Once the head's next step would be the boundary ring, travel is done and
+## the body just keeps advancing in a straight line off the map -- no more
+## carving/shoving/deflecting, mirrors Centipede._exit_step()'s own
+## "skip every ordinary guard" reasoning.
+var _exiting := false
+## Counts down body_length + 1 once _exiting starts: body_length steps
+## alone only brings the tail as far as the boundary ring tile itself --
+## still a solid, rendered wall block, not genuinely off-map -- so it would
+## still look like it's sitting right at the edge the instant it frees
+## (the same off-by-one found in Centipede._begin_exit(), fixed there too).
+var _exit_steps_remaining := 0
 
 
 func _ready() -> void:
@@ -39,18 +52,14 @@ func bind_level(level: Node) -> void:
 ## Starts the whole body tucked off-map, `body_length` tiles behind `entry`
 ## along `direction` (tile_centre() is pure arithmetic, so an out-of-bounds
 ## tile position is perfectly safe -- Centipede._exit_step() relies on the
-## same fact to crawl a fleeing body out through the boundary), so the very
-## first steps crawl it INTO view at `entry` instead of popping into
-## existence already mid-map. `total_steps` is how many tiles separate the
-## two boundary edges along `direction` (i.e. how far the head must travel
-## to clear the far side) -- body_length more steps are added on top so the
-## tail also fully exits before the body frees itself.
-func start_run(entry: Vector2i, direction: Vector2i, total_steps: int) -> void:
+## same fact), so the very first steps crawl it INTO view at `entry` instead
+## of popping into existence already mid-map.
+func start_run(entry: Vector2i, direction: Vector2i) -> void:
 	_direction = direction
+	_exiting = false
 	_tiles.clear()
 	for i in body_length:
 		_tiles.append(entry - direction * (i + 1))
-	_steps_remaining = total_steps + body_length
 	for segment in _segments:
 		if is_instance_valid(segment):
 			segment.queue_free()
@@ -72,29 +81,54 @@ func _schedule_next_step() -> void:
 	tree.create_timer(step_time).timeout.connect(_step)
 
 
-## Advances one tile along `_direction` every tick, unconditionally -- no
-## pathing, no fallback: Centipede Express always drives dead straight from
-## one boundary edge to the other. Carves the next tile open first if it's
-## currently a wall (guardrail: never the boundary ring itself, matching
-## every other wall-editing path's own guardrail), then clears it exactly
-## like an obstacle Centipede's own crawl step does (shove any spider out of
-## the way, destroy any larva/trap/item standing there) before stepping in.
+## A 90-degree clockwise turn: RIGHT -> DOWN -> LEFT -> UP -> RIGHT.
+static func _turn_clockwise(direction: Vector2i) -> Vector2i:
+	return Vector2i(-direction.y, direction.x)
+
+
+## Advances one tile every tick. While still traveling: deflects 90 degrees
+## (up to all 4 headings, so it can't get stuck oscillating between two
+## Centipede-occupied neighbors) whenever the next tile in its current
+## heading is another Centipede's own body -- it doesn't plow through one
+## obstacle Centipede to reach another, it turns and keeps going. Once the
+## next tile would be the boundary ring, travel is over regardless of
+## heading and it switches to a straight, unconditional exit crawl (no more
+## carving/shoving/deflecting -- past the ring is solid boundary and beyond,
+## by design never carved or walkable, see Centipede._exit_step()'s
+## identical reasoning).
 func _step() -> void:
 	if _level == null or not is_instance_valid(_level):
 		return
+	if _exiting:
+		_tiles.push_front(_tiles[0] + _direction)
+		_tiles.pop_back()
+		_sync_segments()
+		_exit_steps_remaining -= 1
+		if _exit_steps_remaining <= 0:
+			queue_free()
+		else:
+			_schedule_next_step()
+		return
 	var next_tile: Vector2i = _tiles[0] + _direction
-	if not _level.is_boundary(next_tile) and not _level.maze.is_open(next_tile.x, next_tile.y):
+	var deflect_attempts := 0
+	while not _level.is_boundary(next_tile) and Centipede.segment_at_tile(get_tree(), next_tile) != null \
+			and deflect_attempts < 4:
+		_direction = _turn_clockwise(_direction)
+		next_tile = _tiles[0] + _direction
+		deflect_attempts += 1
+	if _level.is_boundary(next_tile):
+		_exiting = true
+		_exit_steps_remaining = body_length + 1
+		_schedule_next_step()
+		return
+	if not _level.maze.is_open(next_tile.x, next_tile.y):
 		_level.dev_remove_wall_at(next_tile)
 	Centipede.shove_spiders_out_of(get_tree(), next_tile, _direction)
 	_level._destroy_occupants_at(next_tile)
 	_tiles.push_front(next_tile)
 	_tiles.pop_back()
 	_sync_segments()
-	_steps_remaining -= 1
-	if _steps_remaining <= 0:
-		queue_free()
-	else:
-		_schedule_next_step()
+	_schedule_next_step()
 
 
 func _sync_segments() -> void:

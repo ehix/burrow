@@ -1,8 +1,9 @@
 extends GutTest
 ## CentipedeExpressRider (Centipede Express hazard's own creature, corrected
-## after playtest feedback on the first pass -- it's a transient, always-
-## moving creature that crawls straight across the map carving/destroying/
-## shoving as it goes, never a stationary obstacle like the seeded Centipede).
+## after playtest feedback -- it's a transient, always-moving creature that
+## crawls straight across the map carving/destroying/shoving as it goes,
+## deflecting 90 degrees around another Centipede's body, never a stationary
+## obstacle like the seeded Centipede).
 
 func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
@@ -13,11 +14,11 @@ func _make_level() -> Level:
 	return level
 
 
-func _make_rider(level: Level, entry: Vector2i, direction: Vector2i, steps: int) -> CentipedeExpressRider:
+func _make_rider(level: Level, entry: Vector2i, direction: Vector2i) -> CentipedeExpressRider:
 	var rider := CentipedeExpressRider.new()
 	add_child_autofree(rider)
 	rider.bind_level(level)
-	rider.start_run(entry, direction, steps)
+	rider.start_run(entry, direction)
 	return rider
 
 
@@ -38,7 +39,7 @@ func _make_fake_spider(level: Level, tile: Vector2i) -> Node2D:
 func test_start_run_tucks_the_whole_body_off_map_behind_entry() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
-	var rider := _make_rider(level, entry, Vector2i.RIGHT, 5)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
 
 	for i in rider.body_length:
 		assert_eq(rider._tiles[i], entry - Vector2i.RIGHT * (i + 1))
@@ -47,7 +48,7 @@ func test_start_run_tucks_the_whole_body_off_map_behind_entry() -> void:
 func test_first_step_brings_the_head_onto_the_entry_tile() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
-	var rider := _make_rider(level, entry, Vector2i.RIGHT, 5)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
 
 	rider._step()
 
@@ -58,7 +59,7 @@ func test_first_step_brings_the_head_onto_the_entry_tile() -> void:
 func test_step_carves_a_wall_tile_directly_ahead() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
-	var rider := _make_rider(level, entry, Vector2i.RIGHT, 5)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
 	rider._step() # head arrives at entry
 	var next_tile := entry + Vector2i.RIGHT
 	level.maze.set_wall(next_tile.x, next_tile.y) # force it to be a wall
@@ -72,7 +73,7 @@ func test_step_carves_a_wall_tile_directly_ahead() -> void:
 func test_step_never_carves_the_boundary_ring() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
-	var rider := _make_rider(level, entry, Vector2i.LEFT, 0)
+	var rider := _make_rider(level, entry, Vector2i.LEFT)
 	rider._step() # head arrives at entry
 	rider._step() # next tile is x=0, the boundary ring
 
@@ -82,7 +83,7 @@ func test_step_never_carves_the_boundary_ring() -> void:
 func test_step_destroys_a_larva_on_the_tile_it_enters() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
-	var rider := _make_rider(level, entry, Vector2i.RIGHT, 5)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
 	var larva := Node2D.new()
 	larva.add_to_group("larvae")
 	level.add_child(larva)
@@ -96,7 +97,7 @@ func test_step_destroys_a_larva_on_the_tile_it_enters() -> void:
 func test_step_destroys_a_world_item_on_the_tile_it_enters() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
-	var rider := _make_rider(level, entry, Vector2i.RIGHT, 5)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
 	var item := Node2D.new()
 	item.add_to_group("world_items")
 	level.add_child(item)
@@ -110,7 +111,7 @@ func test_step_destroys_a_world_item_on_the_tile_it_enters() -> void:
 func test_step_shoves_a_spider_off_the_tile_it_enters() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
-	var rider := _make_rider(level, entry, Vector2i.RIGHT, 5)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
 	var spider := _make_fake_spider(level, entry)
 	var mover: GridMover = spider.get_node("GridMover")
 
@@ -121,14 +122,56 @@ func test_step_shoves_a_spider_off_the_tile_it_enters() -> void:
 	assert_eq(rider._tiles[0], entry, "the rider still advances once the tile is cleared")
 
 
-func test_run_frees_itself_after_the_tail_clears_the_far_edge() -> void:
+func test_step_deflects_90_degrees_around_another_centipedes_body() -> void:
 	var level := _make_level()
-	var rider := _make_rider(level, Vector2i(1, 3), Vector2i.RIGHT, 2)
+	var entry := Vector2i(1, 3)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
+	rider._step() # head arrives at entry
+	var blocked_tile := entry + Vector2i.RIGHT
+	var blocker := Centipede.new()
+	level.add_child(blocker)
+	blocker.bind_level(level)
+	blocker.spawn_at([blocked_tile])
+
+	rider._step()
+
+	assert_eq(rider._direction, Vector2i.DOWN, "turns 90 degrees clockwise instead of plowing through")
+	assert_ne(rider._tiles[0], blocked_tile, "never steps onto another Centipede's own body")
+	assert_eq(rider._tiles[0], entry + Vector2i.DOWN, "advances in its new heading the same tick")
+
+
+func test_step_deflects_again_if_the_new_heading_is_also_blocked() -> void:
+	var level := _make_level()
+	var entry := Vector2i(3, 3)
+	var rider := _make_rider(level, entry, Vector2i.RIGHT)
+	rider._step() # head arrives at entry
+	var blocker := Centipede.new()
+	level.add_child(blocker)
+	blocker.bind_level(level)
+	# Blocks straight ahead (RIGHT) and the first clockwise deflection (DOWN).
+	blocker.spawn_at([entry + Vector2i.RIGHT, entry + Vector2i.DOWN])
+
+	rider._step()
+
+	assert_eq(rider._direction, Vector2i.LEFT, "keeps turning clockwise until it finds a clear heading")
+	assert_eq(rider._tiles[0], entry + Vector2i.LEFT)
+
+
+func test_run_frees_itself_once_the_tail_clears_the_boundary_ring_not_just_reaches_it() -> void:
+	var level := _make_level()
+	var entry := Vector2i(1, 3)
+	var rider := _make_rider(level, entry, Vector2i.LEFT) # heads straight for the near edge (x=0)
 
 	var ticks := 0
 	while is_instance_valid(rider) and not rider.is_queued_for_deletion() and ticks < 50:
 		rider._step()
 		ticks += 1
 
-	assert_true(rider.is_queued_for_deletion(), "frees itself once the whole body has exited the far side")
-	assert_eq(ticks, 2 + rider.body_length, "exactly total_steps + body_length steps -- no more, no less")
+	assert_true(rider.is_queued_for_deletion(), "frees itself once the whole body has exited")
+	# queue_free() defers actual destruction -- _tiles is still readable here.
+	# The boundary ring tile is x=0; fully "exited" means the tail's x has
+	# gone strictly past it, not merely reached it -- the ring tile itself
+	# is still a solid, rendered wall block, not genuinely off-map (found
+	# via playtest: it looked like it vanished a beat too early).
+	var tail: Vector2i = rider._tiles[rider._tiles.size() - 1]
+	assert_lt(tail.x, 0, "the tail clears the boundary ring tile itself, not just reaches it")

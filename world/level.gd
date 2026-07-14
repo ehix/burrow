@@ -445,7 +445,26 @@ func dev_remove_wall_at(tile: Vector2i) -> bool:
 	if _astar != null:
 		_astar.set_point_solid(tile, false)
 	_renderer.queue_redraw()
+	if _is_adjacent_to_water(tile):
+		set_water_at(tile, true)
 	return true
+
+
+## True if any orthogonal neighbor of `tile` is currently flooded. A wall
+## carved open right in the middle of an active flood (Centipede Express
+## punching through, a Centipede's own tunnel fallback, RemoveWallsSkill,
+## Seismic Compaction) was never itself part of that flood's ring
+## computation -- WaterIngress._compute_rings() only ever considers tiles
+## that were already open floor at trigger time, so a wall doesn't get a
+## ring assignment at all. Left alone, the fresh opening would sit
+## conspicuously dry in the middle of visibly flooded ground (found via
+## playtest). set_water_at() handles all of flooding's usual bookkeeping
+## (pit flag, blue marker, drowning traps/items) once called.
+func _is_adjacent_to_water(tile: Vector2i) -> bool:
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if _water_tiles.has(tile + dir):
+			return true
+	return false
 
 
 ## True for the outermost ring of tiles — convenience wrapper for
@@ -794,16 +813,17 @@ func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 
 
 ## Sends a transient apex centipede in from the boundary at `entry`,
-## crawling in a straight line along `direction` for `steps` tiles before
-## exiting off the opposite edge and freeing itself -- CentipedeExpress's
-## own creature (design follow-up): unlike the obstacle Centipede this
-## carves its own path as it goes and never becomes a stationary BLOCKING
-## body.
-func spawn_centipede_express_rider(entry: Vector2i, direction: Vector2i, steps: int) -> void:
+## crawling in a straight line along `direction` until it exits off whatever
+## edge it eventually reaches (it deflects 90 degrees around any other
+## Centipede's body in its way, so that isn't necessarily the opposite edge
+## from `entry`) and freeing itself -- CentipedeExpress's own creature
+## (design follow-up): unlike the obstacle Centipede this carves its own
+## path as it goes and never becomes a stationary BLOCKING body.
+func spawn_centipede_express_rider(entry: Vector2i, direction: Vector2i) -> void:
 	var rider: CentipedeExpressRider = CentipedeExpressRiderScene.instantiate()
 	_entities.add_child(rider)
 	rider.bind_level(self)
-	rider.start_run(entry, direction, steps)
+	rider.start_run(entry, direction)
 
 
 ## Seed a Centipede obstacle (sub-project H): a connected, in-bounds,

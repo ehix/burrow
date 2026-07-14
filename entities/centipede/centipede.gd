@@ -281,15 +281,20 @@ func _arrive() -> void:
 
 ## Once a FLEEING body's head reaches its boundary-adjacent target, it
 ## doesn't just vanish -- it keeps crawling straight out through the
-## boundary ring for body_length more steps (the same push_front/pop_back
-## mechanic every ordinary crawl step already uses), so the whole segmented
-## body visibly recedes off the edge of the map tile-by-tile, exactly like
-## it crawled in, instead of the entire node popping out of existence at
-## once. body_length steps is exactly how many it takes for the tail to
-## also clear the target tile in a straight line.
+## boundary ring for body_length + 1 more steps (the same push_front/
+## pop_back mechanic every ordinary crawl step already uses), so the whole
+## segmented body visibly recedes off the edge of the map tile-by-tile,
+## exactly like it crawled in, instead of the entire node popping out of
+## existence at once. body_length steps alone only brings the TAIL as far
+## as the boundary ring tile itself -- still a solid, visibly-rendered
+## wall block, not genuinely off-map -- so the tail would still appear to
+## be sitting right at the edge the instant the node frees (found via
+## playtest: it looked like it vanished a beat too early). The extra step
+## carries the tail one tile past the ring too, into space that's never
+## rendered at all.
 func _begin_exit() -> void:
 	_exit_direction = _direction_off_the_map(_tiles[0])
-	_exit_steps_remaining = body_length
+	_exit_steps_remaining = body_length + 1
 	_schedule_next_exit_step()
 
 
@@ -317,8 +322,9 @@ func _schedule_next_exit_step() -> void:
 ## past the target these tiles are the solid boundary ring and beyond, by
 ## design never carved or walkable, so treating them as ordinary crawl
 ## destinations would wrongly reroute or tunnel. `_exit_steps_remaining`
-## counts down from body_length; once it hits 0 the tail has cleared the
-## target tile too and the whole body is gone.
+## counts down from body_length + 1; once it hits 0 the tail has cleared
+## the boundary ring itself (not just reached it) and the whole body is
+## genuinely off-map.
 func _exit_step() -> void:
 	if _level == null or not is_instance_valid(_level):
 		return

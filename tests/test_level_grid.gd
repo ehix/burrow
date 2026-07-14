@@ -47,3 +47,43 @@ func test_dev_remove_wall_out_of_bounds_is_a_noop() -> void:
 	var level := _make_level()
 	level.build()
 	assert_false(level.dev_remove_wall_at(Vector2i(-1, -1)))
+
+
+func test_dev_remove_wall_floods_the_new_opening_if_adjacent_to_water() -> void:
+	var level := _make_level()
+	level.build()
+	# Find a wall tile with an open, non-boundary neighbor to flood.
+	var target := Vector2i(-1, -1)
+	var wet_neighbor := Vector2i(-1, -1)
+	for y in range(1, level.maze.height - 1):
+		for x in range(1, level.maze.width - 1):
+			if level.maze.is_open(x, y):
+				continue
+			var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+			for dir in dirs:
+				var neighbor := Vector2i(x, y) + dir
+				if level.maze.is_open(neighbor.x, neighbor.y) and not level.is_boundary(neighbor):
+					target = Vector2i(x, y)
+					wet_neighbor = neighbor
+					break
+			if target != Vector2i(-1, -1):
+				break
+		if target != Vector2i(-1, -1):
+			break
+	assert_ne(target, Vector2i(-1, -1), "found a wall tile with an open neighbor to flood")
+	level.set_water_at(wet_neighbor, true)
+
+	level.dev_remove_wall_at(target)
+
+	assert_true(level.is_water_at(target),
+		"a wall carved open right next to an active flood is flooded too, not left dry in the middle of it")
+
+
+func test_dev_remove_wall_does_not_flood_a_new_opening_away_from_water() -> void:
+	var level := _make_level()
+	level.build()
+	assert_false(level.maze.is_open(0, 0))
+
+	level.dev_remove_wall_at(Vector2i(0, 0))
+
+	assert_false(level.is_water_at(Vector2i(0, 0)), "no flood nearby -- stays dry")
