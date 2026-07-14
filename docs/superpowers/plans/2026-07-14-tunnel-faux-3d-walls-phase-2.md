@@ -4,7 +4,7 @@
 
 **Goal:** Give the ceiling plane its own inverse wall treatment (front faces hang down instead of rising up) and make the ground floor read as a hazy, out-of-focus background layer while the player is on the ceiling, instead of the current flat floor-color swap.
 
-**Architecture:** `MazeRenderer` (`world/maze/maze_renderer.gd`) gets a per-plane wall-drawing variant — `_draw_wall_ground()`/`_draw_wall_ceiling()` — driven by its existing `_active_plane`, with a mirrored `wall_occludes_position_ceiling()` fade check alongside Phase 1's ground-plane one. Floor rendering moves out of `MazeRenderer` entirely into a new `FloorRenderer` node living inside a new `GroundLayer` (`CanvasGroup`), which carries a small new hand-written shader (`assets/shaders/ground_dim.gdshader`, this project's second shader after `outline.gdshader`) doing a cheap desaturate+darken pass — no blur, no `SubViewport`, matching the design doc's own recommendation to start simple. This retires `MazeRenderer.ceiling_floor_color` (shipped in sub-project F): a real background layer that dims independently makes the old floor-recolor trick for "which plane am I on" redundant. `GroundLayer` also absorbs every always-ground entity (larvae, `WorldItemPickup`, hazard markers, both Centipede types) that today gets parented under `Entities`/`Level` directly — confirmed via grep that none of them carry a `PlaneComponent`, so this only changes where they're parented for rendering, not any plane-aware behavior. `Player`/`Enemy` (and anything they can place on either plane) stay under the existing `Entities` node, keeping their current per-entity `body_alpha` dimming exactly as sub-project F shipped it. Full design: `docs/superpowers/specs/2026-07-14-tunnel-visual-rework-design.md`'s Phase 2 section (revised 2026-07-14 after Phase 1 shipped).
+**Architecture:** `MazeRenderer` (`world/maze/maze_renderer.gd`) gets a per-plane wall-drawing variant — `_draw_wall_ground()`/`_draw_wall_ceiling()` — driven by its existing `_active_plane`, with a mirrored `wall_occludes_position_ceiling()` fade check alongside Phase 1's ground-plane one. Floor rendering moves out of `MazeRenderer` entirely into a new `FloorRenderer` node living inside a new `GroundLayer` (`CanvasGroup`), which carries a small new hand-written shader (`assets/shaders/ground_dim.gdshader`, this project's second shader after `outline.gdshader`) doing a cheap desaturate+darken pass — no blur, no `SubViewport`, matching the design doc's own recommendation to start simple. This retires `MazeRenderer.ceiling_floor_color` (shipped in sub-project F): a real background layer that dims independently makes the old floor-recolor trick for "which plane am I on" redundant. `GroundLayer` also absorbs always-ground entities that today get parented under `Entities`/`Level` directly — larvae, `WorldItemPickup`, and hazard markers — confirmed via grep that none carry a `PlaneComponent`, so this only changes where they're parented for rendering, not any plane-aware behavior. Both Centipede types (the obstacle `Centipede` and `CentipedeExpressRider`) are deliberately excluded from `GroundLayer`: a Centipede's body is the same width as the tunnel itself, so it must read identically regardless of which plane the player is viewing from, unlike a loose larva or item — both stay parented under `Entities`, undimmed. `Player`/`Enemy` (and anything they can place on either plane) also stay under the existing `Entities` node, keeping their current per-entity `body_alpha` dimming exactly as sub-project F shipped it. Full design: `docs/superpowers/specs/2026-07-14-tunnel-visual-rework-design.md`'s Phase 2 section (revised 2026-07-14 after Phase 1 shipped, then corrected the same day on Centipede scope).
 
 **Tech Stack:** Godot 4.7, GDScript, GUT for tests.
 
@@ -325,16 +325,18 @@ extends CanvasGroup
 ## Everything ground-resident that should read as a hazy background layer
 ## while the player is on the ceiling (tunnel visual rework Phase 2, design:
 ## docs/superpowers/specs/2026-07-14-tunnel-visual-rework-design.md) --
-## FloorRenderer's floor tiles, hazard markers (pits/water), larvae, items,
-## and both Centipede types all get parented here (see Level's spawn
-## methods). A CanvasGroup flattens all of that into one texture so a
-## single shader pass can desaturate/darken it as a unit, rather than
-## tinting each child individually. Plane-aware entities (Player/Enemy and
-## anything they can place on either plane) stay outside this node --
-## they already have their own per-entity dimming
-## (Level._refresh_plane_focus's body_alpha), a different question ("is
-## this specific entity on the off-plane") from "is this static ground
-## content in the background right now."
+## FloorRenderer's floor tiles, hazard markers (pits/water), larvae, and
+## items all get parented here (see Level's spawn methods). A CanvasGroup
+## flattens all of that into one texture so a single shader pass can
+## desaturate/darken it as a unit, rather than tinting each child
+## individually. Plane-aware entities (Player/Enemy and anything they can
+## place on either plane) stay outside this node -- they already have
+## their own per-entity dimming (Level._refresh_plane_focus's body_alpha),
+## a different question ("is this specific entity on the off-plane") from
+## "is this static ground content in the background right now." Both
+## Centipede types stay outside this node too, for a different reason:
+## a Centipede's body is the same width as the tunnel itself, so it must
+## read identically regardless of plane, unlike a loose larva or item.
 
 const GroundDimShader := preload("res://assets/shaders/ground_dim.gdshader")
 
@@ -622,13 +624,16 @@ Create `tests/test_level_ground_layer_parenting.gd`:
 ```gdscript
 extends GutTest
 ## Ground-only content parenting (tunnel visual rework Phase 2): larvae,
-## world items, hazard markers (see test_level_hazard_helpers.gd), and both
-## Centipede types all get parented under GroundLayer instead of
-## Entities/Level directly, so they read as part of the dimmable "hazy
-## background" while the player is on the ceiling (see
-## docs/superpowers/specs/2026-07-14-tunnel-visual-rework-design.md).
-## Player/Enemy (plane-aware, dimmed individually via body_alpha instead)
-## stay under Entities, unaffected.
+## world items, and hazard markers (see test_level_hazard_helpers.gd) get
+## parented under GroundLayer instead of Entities/Level directly, so they
+## read as part of the dimmable "hazy background" while the player is on
+## the ceiling (see docs/superpowers/specs/2026-07-14-tunnel-visual-rework-
+## design.md). Player/Enemy (plane-aware, dimmed individually via
+## body_alpha instead) stay under Entities, unaffected -- and so do both
+## Centipede types (correction, 2026-07-14): a Centipede's body is the same
+## width as the tunnel itself, so it must read identically regardless of
+## plane, unlike a loose larva or item -- dimming it as "background" would
+## be wrong.
 
 func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
@@ -651,16 +656,17 @@ func test_spawned_world_item_is_parented_under_ground_layer() -> void:
 	assert_eq((items[0] as Node2D).get_parent(), level._ground_layer)
 
 
-func test_spawned_centipede_is_parented_under_ground_layer_when_one_exists() -> void:
+func test_spawned_centipede_stays_parented_under_entities_not_ground_layer() -> void:
 	var level := _make_level()
 	var centipedes := level.get_tree().get_nodes_in_group("centipedes")
 	if centipedes.is_empty():
 		pending("no valid chain existed on this maze seed -- not exercised this run")
 		return
-	assert_eq((centipedes[0] as Node2D).get_parent(), level._ground_layer)
+	assert_eq((centipedes[0] as Node2D).get_parent(), level._entities,
+		"a Centipede's body spans the tunnel width -- it must read the same on both planes, not dim as background")
 
 
-func test_centipede_express_rider_is_parented_under_ground_layer() -> void:
+func test_centipede_express_rider_stays_parented_under_entities_not_ground_layer() -> void:
 	var level := _make_level()
 	var entry: Vector2i = level.maze.open_cells()[0]
 
@@ -668,7 +674,7 @@ func test_centipede_express_rider_is_parented_under_ground_layer() -> void:
 
 	var riders := level.get_tree().get_nodes_in_group("centipede_express_riders")
 	assert_eq(riders.size(), 1)
-	assert_eq((riders[0] as Node2D).get_parent(), level._ground_layer)
+	assert_eq((riders[0] as Node2D).get_parent(), level._entities)
 
 
 func test_player_and_enemy_stay_parented_under_entities() -> void:
@@ -680,7 +686,7 @@ func test_player_and_enemy_stay_parented_under_entities() -> void:
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `~/.local/bin/godot --headless --path . -s addons/gut/gut_cmdln.gd -gexit 2>&1 | grep -A10 "test_level_hazard_helpers\|test_level_ground_layer_parenting"`
-Expected: the new parenting assertions fail (everything is currently parented under `Entities`/`Level` directly, not `_ground_layer`).
+Expected: the two new `test_level_hazard_helpers.gd` assertions and the `larva`/`world_item` assertions in `test_level_ground_layer_parenting.gd` fail (everything is currently parented under `Entities`/`Level` directly, not `_ground_layer`); the two Centipede tests and the player/enemy test already pass as written (nothing changes for them) — they're here as regression guards against a future change accidentally moving Centipedes into `GroundLayer`.
 
 - [ ] **Step 3: Reparent the spawn call sites**
 
@@ -713,23 +719,7 @@ to:
 	_ground_layer.add_child(pickup)
 ```
 
-In `spawn_centipede_express_rider()`, change:
-```gdscript
-	_entities.add_child(rider)
-```
-to:
-```gdscript
-	_ground_layer.add_child(rider)
-```
-
-In `_seed_centipedes()`, change:
-```gdscript
-		_entities.add_child(centipede)
-```
-to:
-```gdscript
-		_ground_layer.add_child(centipede)
-```
+Leave `spawn_centipede_express_rider()` and `_seed_centipedes()` untouched — both Centipede types stay parented under `_entities` (see this task's header note on why).
 
 In `_spawn_larva_at()`, change:
 ```gdscript
@@ -750,7 +740,7 @@ Expected: `test_level_hazard_helpers.gd` shows `21/21 passed.` (19 pre-existing 
 - [ ] **Step 5: Run the full suite to check for regressions**
 
 Run: `~/.local/bin/godot --headless --path . -s addons/gut/gut_cmdln.gd -gexit 2>&1 | tail -20`
-Expected: no new failures beyond the known pre-existing `test_larva_hazards.gd` flake. Pay particular attention to any test that assumed larvae/items/centipedes were children of `Entities` — none were found in this plan's own research (`grep` across `tests/*.gd` for `_entities`/`$Entities`/`Entities` turned up no such assumption), but a regression here would show up as a new failure in this run.
+Expected: no new failures beyond the known pre-existing `test_larva_hazards.gd` flake. Pay particular attention to any test that assumed larvae/items were children of `Entities` — none were found in this plan's own research (`grep` across `tests/*.gd` for `_entities`/`$Entities`/`Entities` turned up no such assumption), but a regression here would show up as a new failure in this run.
 
 - [ ] **Step 6: Headless boot check**
 
@@ -763,7 +753,7 @@ Expected: no output (clean boot).
 ~/.local/bin/godot --headless --path . --import
 git add world/level.gd tests/test_level_hazard_helpers.gd \
 	tests/test_level_ground_layer_parenting.gd tests/test_level_ground_layer_parenting.gd.uid
-git commit -m "Level: reparent ground-only content (larvae, items, hazards, centipedes) under GroundLayer"
+git commit -m "Level: reparent ground-only content (larvae, items, hazards) under GroundLayer"
 ```
 
 - [ ] **Step 8: Manual playtest verification**

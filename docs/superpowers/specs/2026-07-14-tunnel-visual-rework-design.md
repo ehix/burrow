@@ -175,29 +175,38 @@ reads from wall orientation + whether the floor is dimmed, not a color
 swap.
 
 **Ground-layer scope covers everything ground-resident, not just
-tiles.** `GroundLayer` also gets the hazard markers (pit/water `Polygon2D`
-nodes, currently `add_child()`'d directly onto `Level`) and every
-always-ground entity currently parented under `Entities`: larvae,
-`WorldItemPickup`, the obstacle `Centipede`, and `CentipedeExpressRider`.
-None of these carry a `PlaneComponent` today (confirmed by grep — only
-`Player`, `Enemy`, and the skills that can be cast from either plane
-(`EggMineSkill`, `BlockadeSkill`, `CocoonMine`) do), so moving them under
-`GroundLayer` doesn't change any plane-aware behavior, only where they're
-parented for rendering purposes. `Player`/`Enemy`/mines/blockades stay
-under the existing `Entities` node, unaffected, keeping their current
-per-entity `body_alpha` dimming exactly as sub-project F shipped it — that
-mechanism already handles "is this specific plane-aware entity on the
-off-plane," which is a different question from "is this static
-ground-only content in the background right now."
+tiles — except the Centipedes.** `GroundLayer` gets the hazard markers
+(pit/water `Polygon2D` nodes, currently `add_child()`'d directly onto
+`Level`) and always-ground entities currently parented under `Entities`:
+larvae and `WorldItemPickup`. Neither carries a `PlaneComponent` today
+(confirmed by grep — only `Player`, `Enemy`, and the skills that can be
+cast from either plane (`EggMineSkill`, `BlockadeSkill`, `CocoonMine`) do),
+so moving them under `GroundLayer` doesn't change any plane-aware
+behavior, only where they're parented for rendering purposes.
+
+**Both Centipede types (the obstacle `Centipede` and
+`CentipedeExpressRider`) are deliberately excluded** (correction, post-
+Phase-1-brainstorm follow-up, 2026-07-14): a Centipede's body is the same
+width as the tunnel itself, so it must read identically regardless of
+which plane the player is viewing from — dimming it along with the actual
+floor content would be wrong, since it's not "background" the way a loose
+larva or item is. Both Centipede types stay parented under `Entities`
+(undimmed), same as `Player`/`Enemy`. `Player`/`Enemy`/mines/blockades
+also stay under the existing `Entities` node, unaffected, keeping their
+current per-entity `body_alpha` dimming exactly as sub-project F shipped
+it — that mechanism already handles "is this specific plane-aware entity
+on the off-plane" (still applies normally to `Enemy`), a different
+question from "is this static ground-only content in the background
+right now" (which never applies to either Centipede type).
 
 **New scene tree order** (`world/level.tscn`): `GroundLayer` (floor +
-hazards + larvae/items/centipedes) draws first, then `Renderer`
-(`MazeRenderer`, walls only) on top of it, then `Walls`/`Occluders`
-(collision/light geometry, unchanged), then `Entities`
-(player/enemy/mines/blockades) on top of everything, then `SenseLayer`.
-This preserves the existing "entities always draw on top" guarantee while
-adding the new layer: crisp ceiling walls compositing over the hazy
-ground-layer background when viewed from the ceiling.
+hazards + larvae/items) draws first, then `Renderer` (`MazeRenderer`,
+walls only) on top of it, then `Walls`/`Occluders` (collision/light
+geometry, unchanged), then `Entities`
+(player/enemy/mines/blockades/centipedes) on top of everything, then
+`SenseLayer`. This preserves the existing "entities always draw on top"
+guarantee while adding the new layer: crisp ceiling walls compositing
+over the hazy ground-layer background when viewed from the ceiling.
 
 **Underside sprite — deferred.** No belly/underside art exists for either
 class yet (confirmed via `spritecook-assets.json`). Not built this phase;
