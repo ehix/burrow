@@ -51,3 +51,37 @@ func test_occludes_at_the_exact_tile_top_boundary() -> void:
 	var position := Vector2(120.0, 144.0) # exactly the wall's own tile_top
 
 	assert_true(MazeRenderer.wall_occludes_position(wall_tile, position, TILE_SIZE, OVERDRAW))
+
+
+func _make_renderer() -> MazeRenderer:
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	var maze := MazeGenerator.generate(3, 3, 1)
+	renderer.setup(maze, 48)
+	return renderer
+
+
+func test_set_fade_focus_stores_the_position() -> void:
+	var renderer := _make_renderer()
+
+	renderer.set_fade_focus(Vector2(100.0, 200.0))
+
+	assert_eq(renderer.fade_focus_position, Vector2(100.0, 200.0))
+
+
+func test_defaults_to_a_fade_focus_that_never_occludes_anything() -> void:
+	var renderer := _make_renderer()
+
+	# The default must never accidentally fade a wall before Level ever
+	# calls set_fade_focus() -- Vector2.INF can't fall inside any tile's
+	# finite x range, so wall_occludes_position() always returns false.
+	assert_false(MazeRenderer.wall_occludes_position(Vector2i(1, 1), renderer.fade_focus_position, 48, 16.0))
+
+
+func test_draw_does_not_error_with_walls_and_a_fade_focus_present() -> void:
+	var renderer := _make_renderer()
+	renderer.set_fade_focus(Vector2(24.0, 24.0))
+
+	await get_tree().process_frame
+
+	assert_true(true, "reached this point without erroring")
