@@ -93,8 +93,46 @@ func _nearest_boundary_tile() -> Vector2i:
 	return best_tile
 
 
+## Boxed-in fallback (design §6): if no open+dry path exists, carve the
+## single adjacent non-boundary wall tile that most shortens the remaining
+## distance to `target`, then retry. If even that finds no candidate (fully
+## enclosed by the map boundary -- extremely unlikely), _path stays empty;
+## _crawl_step()'s own empty-path branch retries this same search again
+## next tick rather than freezing or falsely "arriving".
 func _start_crawl() -> void:
 	_path = _find_path(_tiles[0], _target)
+	if _path.is_empty() and _tunnel_toward(_target):
+		_path = _find_path(_tiles[0], _target)
+
+
+## Finds the adjacent (4-directional from the current head) wall tile that
+## minimizes remaining Manhattan distance to `target`, excluding any
+## boundary tile from candidacy -- the same caller-side guardrail check
+## RemoveWallsSkill/SeismicCompaction both perform before touching wall
+## geometry (Level.dev_remove_wall_at() itself enforces no such
+## restriction; it's the unrestricted dev cheat). Carves the chosen tile
+## open. Returns false if no non-boundary wall candidate exists.
+func _tunnel_toward(target: Vector2i) -> bool:
+	var head: Vector2i = _tiles[0]
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	var best_tile := Vector2i.ZERO
+	var best_dist := INF
+	var found := false
+	for dir in dirs:
+		var candidate: Vector2i = head + dir
+		if _level.is_boundary(candidate):
+			continue
+		if _level.maze.is_open(candidate.x, candidate.y):
+			continue
+		var dist := absi(candidate.x - target.x) + absi(candidate.y - target.y)
+		if dist < best_dist:
+			best_dist = dist
+			best_tile = candidate
+			found = true
+	if not found:
+		return false
+	_level.dev_remove_wall_at(best_tile)
+	return true
 
 
 ## Schedules one crawl tick crawl_step_time seconds from now, real-timer-
