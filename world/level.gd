@@ -515,6 +515,7 @@ func set_water_at(tile: Vector2i, value: bool) -> void:
 			_water_nodes[tile] = _spawn_water_marker(tile)
 		_drown_traps_at(tile)
 		_submerge_items_at(tile)
+		_flood_centipedes_at(tile)
 	else:
 		_water_tiles.erase(tile)
 		# A natural pit shares this same overlay flag (design §7) — if this
@@ -575,6 +576,15 @@ func _resurface_items_at(tile: Vector2i) -> void:
 		var item := node as WorldItemPickup
 		if item != null and tile_of(item.global_position) == tile:
 			item.resurface()
+
+
+## Sweeps active Centipedes for one occupying `tile` and tells it the tile
+## just flooded -- mirrors _drown_traps_at()/_submerge_items_at()'s shape,
+## called from set_water_at()'s flood branch alongside them.
+func _flood_centipedes_at(tile: Vector2i) -> void:
+	var centipede := Centipede.segment_at_tile(get_tree(), tile)
+	if centipede != null:
+		centipede.notify_flooded()
 
 
 ## BlockadeSkill: patch a hazard tile (pit or water) for ground traversal by

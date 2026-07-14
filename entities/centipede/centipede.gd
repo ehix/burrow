@@ -184,6 +184,47 @@ func _arrive() -> void:
 		state = State.BLOCKING
 
 
+## Called by Level (via _flood_centipedes_at()) when a tile this body
+## occupies just got flooded. A no-op unless currently BLOCKING -- already
+## FLEEING/RELOCATING takes priority, mirrors take_hit()'s own guard.
+func notify_flooded() -> void:
+	if state != State.BLOCKING:
+		return
+	var destination := _pick_relocate_target()
+	if destination == _tiles[0]:
+		return # nowhere dry to go -- stay put, a later flood event will try again
+	state = State.RELOCATING
+	_target = destination
+	_start_crawl()
+	_schedule_next_step()
+
+
+## A random open, dry, non-boundary tile not already part of this body --
+## the crawl stepper naturally reforms the body as the tail of whatever
+## path the head walks to reach it (snake-style), so this only needs to
+## pick a single destination tile, not a pre-formed chain (unlike the
+## initial spawn placement in Level._seed_centipedes(), which does need a
+## pre-formed chain since there's no crawl to lay one out at spawn time).
+## Returns the current head tile itself if nothing valid is found --
+## notify_flooded() reads that as "stay put".
+func _pick_relocate_target() -> Vector2i:
+	var head: Vector2i = _tiles[0]
+	var occupied := {}
+	for tile in _tiles:
+		occupied[tile] = true
+	var candidates: Array[Vector2i] = _level.maze.open_cells().duplicate()
+	candidates.shuffle()
+	for candidate in candidates:
+		if occupied.has(candidate):
+			continue
+		if _level.is_water_at(candidate):
+			continue
+		if _level.is_boundary(candidate):
+			continue
+		return candidate
+	return head
+
+
 func _sync_segments() -> void:
 	for i in _segments.size():
 		if i < _tiles.size():
