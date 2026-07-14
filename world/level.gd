@@ -24,6 +24,8 @@ const NATURAL_PIT_COUNT := 2
 const ITEM_SPAWN_COUNT := 3
 ## Earthworm obstacles seeded per depth (design §6).
 const EARTHWORM_COUNT := 1
+const CENTIPEDE_COUNT := 1
+const CentipedeScene := preload("res://entities/centipede/centipede.tscn")
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
@@ -188,6 +190,7 @@ func build() -> void:
 	_seed_natural_pits()
 	_seed_world_items()
 	_seed_earthworms()
+	_seed_centipedes()
 	apply_darkness()
 	_hazard_director = HazardDirector.new()
 	add_child(_hazard_director)
@@ -808,6 +811,61 @@ func _seed_earthworms() -> void:
 		worm.bind_level(self)
 		_entities.add_child(worm)
 		placed += 1
+
+
+## Seed a Centipede obstacle (sub-project H): a connected, in-bounds,
+## non-boundary chain of body_length open tiles, reserved away from both
+## spawns. Skips spawning entirely if no valid chain exists (graceful
+## degradation, matching WaterIngress's own no-op-on-empty-maze precedent)
+## -- this can legitimately happen on a very cramped maze.
+func _seed_centipedes() -> void:
+	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
+	for i in CENTIPEDE_COUNT:
+		var centipede: Centipede = CentipedeScene.instantiate()
+		var chain := _find_open_chain(centipede.body_length, reserved)
+		if chain.is_empty():
+			centipede.free()
+			continue
+		_entities.add_child(centipede)
+		centipede.bind_level(self)
+		centipede.spawn_at(chain)
+		for tile in chain:
+			reserved[tile] = true
+
+
+## A randomized-walk search for a connected chain of `length` open,
+## non-boundary tiles, none of which are in `reserved`. Backtracks (starts
+## a fresh walk from a new candidate) on a dead end rather than giving up
+## immediately -- a single greedy walk from an unlucky starting tile could
+## dead-end long before reaching `length` even in a maze with plenty of
+## room elsewhere. Returns [] if no candidate start produces a full chain.
+func _find_open_chain(length: int, reserved: Dictionary) -> Array[Vector2i]:
+	var starts := maze.open_cells()
+	starts.shuffle()
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	for start in starts:
+		if reserved.has(start) or maze.is_boundary(start.x, start.y):
+			continue
+		var chain: Array[Vector2i] = [start]
+		var in_chain := {start: true}
+		while chain.size() < length:
+			var options: Array[Vector2i] = []
+			for dir in dirs:
+				var candidate: Vector2i = chain[chain.size() - 1] + dir
+				if in_chain.has(candidate) or reserved.has(candidate):
+					continue
+				if not maze.is_open(candidate.x, candidate.y) or maze.is_boundary(candidate.x, candidate.y):
+					continue
+				options.append(candidate)
+			if options.is_empty():
+				break
+			options.shuffle()
+			var next: Vector2i = options[0]
+			chain.append(next)
+			in_chain[next] = true
+		if chain.size() == length:
+			return chain
+	return []
 
 
 func _spawn_larvae(reserved: Array) -> void:
