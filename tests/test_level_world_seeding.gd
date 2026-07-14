@@ -13,7 +13,6 @@ func _make_level() -> Level:
 	return level
 
 
-
 func test_seeds_the_expected_number_of_world_items() -> void:
 	var level := _make_level()
 	var items := level.get_tree().get_nodes_in_group("world_items")
