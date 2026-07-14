@@ -32,9 +32,8 @@ func test_refresh_plane_focus_keeps_full_brightness_when_planes_match() -> void:
 	level._refresh_plane_focus() # both default GROUND
 
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
-	var mat := enemy_sprite.material as ShaderMaterial
-	if mat != null: # no material yet is equally valid — body_alpha defaults to 1.0
-		assert_almost_eq(mat.get_shader_parameter("body_alpha"), 1.0, 0.001)
+	assert_null(enemy_sprite.material,
+		"matching planes never need the dim shader at all -- no material is ever created")
 
 
 func test_plane_changed_event_triggers_a_focus_refresh() -> void:

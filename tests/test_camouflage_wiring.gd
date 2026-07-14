@@ -53,8 +53,12 @@ func test_break_camouflage_disables_the_outline_shader() -> void:
 
 	camo.break_camouflage()
 
-	var mat := (entity.get_node("Sprite") as CanvasItem).material as ShaderMaterial
-	assert_false(mat.get_shader_parameter("outline_enabled"))
+	# Outline off, and (see the next test) body_alpha already back to 1.0 --
+	# fully neutral, so OutlineFx releases the material entirely rather than
+	# leaving it attached-but-neutral (playtest fix: a shader that doesn't
+	# come off). No material left to ask outline_enabled of.
+	var sprite := entity.get_node("Sprite") as CanvasItem
+	assert_null(sprite.material)
 
 
 func test_break_camouflage_resets_body_alpha_to_one() -> void:
@@ -64,8 +68,10 @@ func test_break_camouflage_resets_body_alpha_to_one() -> void:
 
 	camo.break_camouflage()
 
-	var mat := (entity.get_node("Sprite") as CanvasItem).material as ShaderMaterial
-	assert_almost_eq(mat.get_shader_parameter("body_alpha"), 1.0, 0.001)
+	# body_alpha back to 1.0, and (see the previous test) outline already
+	# off -- fully neutral, so the material is released entirely.
+	var sprite := entity.get_node("Sprite") as CanvasItem
+	assert_null(sprite.material)
 
 
 func test_camouflage_breaks_when_the_camouflaged_spider_is_the_victim() -> void:
