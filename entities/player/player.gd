@@ -371,14 +371,6 @@ func _melee() -> void:
 		centipede.take_hit()
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
-	for node in get_tree().get_nodes_in_group("earthworms"):
-		var worm := node as Node2D
-		if worm == null or worm.global_position.distance_to(target) > melee_range:
-			continue
-		if worm.has_method("take_hit"):
-			worm.take_hit()
-		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
-		return
 
 
 ## A step landed on a larva's tile — give a tiny visual shunt (juice only).

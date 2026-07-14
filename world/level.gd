@@ -22,15 +22,12 @@ const NATURAL_PIT_COUNT := 2
 ## World items seeded per depth (design §5): a mix of Fungus Poison/Sense,
 ## Seed Pod, and Lure pickups — all picked up the same way now.
 const ITEM_SPAWN_COUNT := 3
-## Earthworm obstacles seeded per depth (design §6).
-const EARTHWORM_COUNT := 1
 const CENTIPEDE_COUNT := 1
 const CentipedeScene := preload("res://entities/centipede/centipede.tscn")
 
 const PlayerScene := preload("res://entities/player/player.tscn")
 const EnemyScene := preload("res://entities/enemy/enemy.tscn")
 const LarvaScene := preload("res://entities/larva/larva.tscn")
-const EarthwormScene := preload("res://entities/earthworm/earthworm.tscn")
 const WorldItemPickupScene := preload("res://entities/items/world_item_pickup.tscn")
 
 ## Fog-of-war ambient when darkness is on. White (no darkening) when off.
@@ -39,8 +36,9 @@ const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 ## spiders/larvae/traps get the real outline shader; walls/pits (no per-tile
 ## sprite to shader-outline — the whole maze is one batched MazeRenderer
 ## draw) get a hand-drawn boundary trace in the same colour; items/
-## earthworms (placeholder `_draw()`-only visuals, no sprite either) get a
-## hand-drawn box outline in the same colour. One visual language, not three.
+## Centipede segments (placeholder `_draw()`-only visuals, no sprite either)
+## get a hand-drawn box outline in the same colour. One visual language, not
+## three.
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
 ## Ceiling/plane mechanics rework: body_alpha for whichever of Player/Enemy
@@ -87,9 +85,10 @@ class SenseStructureOutline:
 				draw_line(centre + Vector2(half, -half), centre + Vector2(half, half), line_color, 2.0)
 
 
-## Sense's point-entity outline (items, earthworms — placeholder `_draw()`-
-## only visuals with no sprite for the shader technique): a simple box
-## stroke, parented directly to the sensed entity so it moves for free.
+## Sense's point-entity outline (items, Centipede segments — placeholder
+## `_draw()`-only visuals with no sprite for the shader technique): a
+## simple box stroke, parented directly to the sensed entity so it moves
+## for free.
 class SensePointOutline:
 	extends Node2D
 
@@ -159,8 +158,8 @@ var _sense_radius: float = 0.0
 ## true, so entry/exit toggles the refcounted OutlineFx on/off exactly once
 ## each, not every frame.
 var _sense_outlined: Dictionary = {}
-## Point entity (item/earthworm) currently highlighted via Sense -> its
-## highlight node (a child of the entity itself, so it moves for free).
+## Point entity (item/Centipede segment) currently highlighted via Sense ->
+## its highlight node (a child of the entity itself, so it moves for free).
 var _sense_point_highlights: Dictionary = {}
 ## Single shared node that draws the wall/pit boundary trace — lazily
 ## created, redrawn from scratch each frame while Sense is active rather
@@ -189,7 +188,6 @@ func build() -> void:
 	_spawn_entities()
 	_seed_natural_pits()
 	_seed_world_items()
-	_seed_earthworms()
 	_seed_centipedes()
 	apply_darkness()
 	_hazard_director = HazardDirector.new()
@@ -252,8 +250,8 @@ func apply_darkness() -> void:
 
 ## SenseSkill's outline cue (design round 2): "sensed", not "seen" — every
 ## spider/larva/trap within `radius` of the player gets the shared outline
-## shader; wall/pit tiles get a hand-drawn boundary trace; item/earthworm
-## placeholders get a hand-drawn box outline. Everything Sense reveals reads
+## shader; wall/pit tiles get a hand-drawn boundary trace; item/Centipede-
+## segment placeholders get a hand-drawn box outline. Everything Sense reveals reads
 ## as an outline, not a lit-up patch — no more light-through-walls (the old
 ## set_sense_active()). Continuous while active: _process() re-syncs every
 ## frame as the player moves, so entering/leaving the radius toggles the
@@ -333,13 +331,13 @@ func _sense_sprite_of(node: Node) -> CanvasItem:
 ## each placeholder's own `_draw()` shape.
 const SENSE_POINT_HALF_SIZE := {
 	"world_items": Vector2(9, 9),
-	"earthworms": Vector2(18, 8),
 	"centipede_segments": Vector2(20, 20),
 }
 
 
-## World items and earthworms are placeholder `_draw()`-only visuals (no
-## sprite/texture for the shader technique) — they get a hand-drawn box
+## World items and Centipede segments are placeholder `_draw()`-only
+## visuals (no sprite/texture for the shader technique) — they get a
+## hand-drawn box
 ## outline instead, parented under the un-darkened _sense_layer (not the
 ## entity itself, which lives in the normal, darkened tree) and re-synced
 ## to the entity's position every frame while it stays in range.
@@ -792,25 +790,6 @@ func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 	pickup.item = item
 	_entities.add_child(pickup)
 	pickup.global_position = world_pos
-
-
-## Seed a handful of Earthworm obstacles (design §6) across random open,
-## non-spawn tiles.
-func _seed_earthworms() -> void:
-	var reserved := {tile_of(player.global_position): true, tile_of(enemy.global_position): true}
-	var cells := maze.open_cells()
-	cells.shuffle()
-	var placed := 0
-	for cell in cells:
-		if placed >= EARTHWORM_COUNT:
-			break
-		if reserved.has(cell):
-			continue
-		var worm := EarthwormScene.instantiate()
-		worm.global_position = _tile_centre(cell.x, cell.y)
-		worm.bind_level(self)
-		_entities.add_child(worm)
-		placed += 1
 
 
 ## Seed a Centipede obstacle (sub-project H): a connected, in-bounds,

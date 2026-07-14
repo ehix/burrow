@@ -114,17 +114,6 @@ func test_set_sense_outline_boxes_a_nearby_world_item() -> void:
 	assert_false(level._sense_point_highlights.has(pickup))
 
 
-func test_set_sense_outline_boxes_a_nearby_earthworm() -> void:
-	var level := _make_level()
-	var worm: Earthworm = preload("res://entities/earthworm/earthworm.tscn").instantiate()
-	level.add_child(worm)
-	worm.global_position = level.player.global_position
-
-	level.set_sense_outline(true, 50.0)
-
-	assert_true(level._sense_point_highlights.has(worm))
-
-
 func test_set_sense_outline_outlines_a_nearby_trap() -> void:
 	var level := _make_level()
 	var trap: WebTrap = preload("res://entities/web/web_trap.tscn").instantiate()
