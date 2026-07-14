@@ -1,8 +1,10 @@
 extends GutTest
-## MazeRenderer's per-plane floor color (ceiling/plane mechanics rework):
-## replaces the old ceiling sprite tint with a floor re-color, so the ground
-## renders in floor_color and the ceiling in ceiling_floor_color — the
-## roadmap's literal "floor re-colors (not spider)" requirement.
+## MazeRenderer's per-plane wall orientation (tunnel visual rework Phase 2):
+## _active_plane now drives which way a wall's front face renders (see
+## _draw_wall_ground()/_draw_wall_ceiling()) rather than a floor recolor --
+## floor rendering moved to FloorRenderer/GroundLayer, which handles "which
+## plane am I on" via dimming instead (see test_ground_layer.gd,
+## test_level_plane_focus.gd).
 
 func _make_renderer() -> MazeRenderer:
 	var renderer := MazeRenderer.new()
@@ -33,9 +35,3 @@ func test_set_active_plane_back_to_ground_switches_back() -> void:
 	renderer.set_active_plane(Level.Layer.GROUND)
 
 	assert_eq(renderer._active_plane, Level.Layer.GROUND)
-
-
-func test_floor_and_ceiling_colors_are_distinct() -> void:
-	var renderer := _make_renderer()
-
-	assert_ne(renderer.floor_color, renderer.ceiling_floor_color)

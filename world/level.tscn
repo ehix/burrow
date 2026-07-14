@@ -1,13 +1,21 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://world/level.gd" id="1_level"]
 [ext_resource type="Script" path="res://world/maze/maze_renderer.gd" id="2_renderer"]
+[ext_resource type="Script" path="res://world/ground_layer.gd" id="3_ground_layer"]
+[ext_resource type="Script" path="res://world/maze/floor_renderer.gd" id="4_floor_renderer"]
 
 [node name="Level" type="Node2D"]
 script = ExtResource("1_level")
 
 [node name="CanvasModulate" type="CanvasModulate" parent="."]
 color = Color(0.05, 0.05, 0.07, 1)
+
+[node name="GroundLayer" type="CanvasGroup" parent="."]
+script = ExtResource("3_ground_layer")
+
+[node name="FloorRenderer" type="Node2D" parent="GroundLayer"]
+script = ExtResource("4_floor_renderer")
 
 [node name="Renderer" type="Node2D" parent="."]
 script = ExtResource("2_renderer")

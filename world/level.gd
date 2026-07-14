@@ -126,6 +126,8 @@ class SenseGhost:
 @onready var _walls: StaticBody2D = $Walls
 @onready var _occluders: Node2D = $Occluders
 @onready var _renderer: MazeRenderer = $Renderer
+@onready var _ground_layer: GroundLayer = $GroundLayer
+@onready var _floor_renderer: FloorRenderer = $GroundLayer/FloorRenderer
 @onready var _entities: Node2D = $Entities
 ## Sense's overlays live here, not under Level directly: CanvasModulate
 ## darkens the whole default canvas and no per-CanvasItem shader can opt
@@ -191,6 +193,7 @@ func build() -> void:
 	maze = MazeGenerator.generate(MAZE_COLS, MAZE_ROWS, GameState.maze_seed(), LOOP_CHANCE)
 	ceiling = CeilingData.new(maze)
 	_renderer.setup(maze, TILE_SIZE)
+	_floor_renderer.setup(maze, TILE_SIZE)
 	_build_collision_and_occluders()
 	_astar = GridNav.build(maze, TILE_SIZE)
 	_larva_cap = mini(LARVA_CAP_MAX, maxi(LARVA_COUNT, maze.open_cells().size() / LARVA_TILES_PER_CAP))
@@ -455,6 +458,7 @@ func dev_remove_wall_at(tile: Vector2i) -> bool:
 	if _astar != null:
 		_astar.set_point_solid(tile, false)
 	_renderer.queue_redraw()
+	_floor_renderer.queue_redraw()
 	for flood in _active_floods:
 		if flood.absorb_new_opening(self, tile):
 			break
@@ -667,6 +671,7 @@ func collapse_tile_at(tile: Vector2i) -> bool:
 	if _astar != null:
 		_astar.set_point_solid(tile, true)
 	_renderer.queue_redraw()
+	_floor_renderer.queue_redraw()
 	return true
 
 
@@ -744,6 +749,7 @@ func _refresh_plane_focus() -> void:
 	if player == null or enemy == null:
 		return
 	var focus_plane := PlaneComponent.effective_plane(player)
+	_ground_layer.set_dimmed(focus_plane == Layer.CEILING)
 	for node in [player, enemy]:
 		if not is_instance_valid(node):
 			continue

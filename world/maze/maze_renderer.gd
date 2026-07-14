@@ -13,19 +13,16 @@ extends Node2D
 ## SpriteCook art exists; the collision/occluder/navigation pipeline is
 ## built separately by Level, so it's unaffected either way.
 ##
-## Ceiling/plane mechanics rework: open tiles render in floor_color or
-## ceiling_floor_color depending on which plane the player currently
-## occupies (set_active_plane(), driven by Level) — replaces the old
-## per-sprite ceiling tint entirely. Wall rendering is unchanged on both
-## planes for now: walls exist identically on both layers (CeilingData
-## mirrors MazeData's wall geometry 1:1), and the ceiling-plane inverse
-## wall treatment (front face hanging down
-## instead of rising up) is implemented via _draw_wall_ceiling().
+## Tunnel visual rework Phase 2: floor rendering (including the old
+## per-plane ceiling_floor_color recolor) has moved to FloorRenderer/
+## GroundLayer, which reads "which plane am I on" via dimming instead of a
+## color swap -- see docs/superpowers/specs/2026-07-14-tunnel-visual-
+## rework-design.md. This class now draws walls only. set_active_plane()
+## still drives which way a wall's front face renders (_draw_wall_ground()
+## vs _draw_wall_ceiling()).
 
 var _maze: MazeData
 var _tile_size := 48
-var floor_color := Color(0.17, 0.15, 0.13)
-var ceiling_floor_color := Color(0.13, 0.17, 0.24)
 var wall_top_face_color := Color(0.36, 0.31, 0.26)
 var wall_front_face_color := Color(0.2, 0.16, 0.12)
 ## Grid lines on top of open floor tiles, so the tile-stepped movement reads
@@ -81,12 +78,9 @@ func set_fade_focus(world_position: Vector2) -> void:
 func _draw() -> void:
 	if _maze == null:
 		return
-	var open_color := floor_color if _active_plane == Level.Layer.GROUND else ceiling_floor_color
 	for y in _maze.height:
 		for x in _maze.width:
-			if _maze.is_open(x, y):
-				draw_rect(Rect2(x * _tile_size, y * _tile_size, _tile_size, _tile_size), open_color)
-			else:
+			if not _maze.is_open(x, y):
 				_draw_wall(Vector2i(x, y))
 	_draw_grid_lines()
 
