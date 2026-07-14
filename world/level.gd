@@ -532,7 +532,7 @@ func _spawn_pit_marker(tile: Vector2i) -> Node2D:
 		Vector2(half, half), Vector2(-half, half)])
 	poly.color = Color(0.15, 0.08, 0.05, 0.85)
 	poly.position = _tile_centre(tile.x, tile.y)
-	add_child(poly)
+	_ground_layer.add_child(poly)
 	return poly
 
 
@@ -585,7 +585,7 @@ func _spawn_water_marker(tile: Vector2i) -> Node2D:
 		Vector2(half, half), Vector2(-half, half)])
 	poly.color = WATER_MARKER_COLOR
 	poly.position = _tile_centre(tile.x, tile.y)
-	add_child(poly)
+	_ground_layer.add_child(poly)
 	return poly
 
 
@@ -827,7 +827,7 @@ func _spawn_random_item_at(cell: Vector2i) -> void:
 func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 	var pickup := WorldItemPickupScene.instantiate()
 	pickup.item = item
-	_entities.add_child(pickup)
+	_ground_layer.add_child(pickup)
 	pickup.global_position = world_pos
 
 
@@ -941,7 +941,7 @@ func _spawn_larva_at_random() -> void:
 func _spawn_larva_at(cell: Vector2i) -> void:
 	var larva := LarvaScene.instantiate()
 	larva.position = _tile_centre(cell.x, cell.y)
-	_entities.add_child(larva)
+	_ground_layer.add_child(larva)
 	larva.bind_level(self)
 	if larva.has_method("set_facing"):
 		larva.set_facing(TileTypes.default_facing(maze.classify(cell.x, cell.y)))

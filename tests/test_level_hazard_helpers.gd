@@ -209,3 +209,23 @@ func test_collapse_tile_at_clears_water_state_on_a_flooded_tile() -> void:
 	assert_false(level._water_nodes.has(interior_cell), "no dangling water marker on the new wall")
 	assert_false(level._water_tiles.has(interior_cell), "no dangling water tracking on the new wall")
 	assert_false(level.maze.is_open(interior_cell.x, interior_cell.y), "the tile really did become a wall")
+
+
+func test_pit_marker_is_parented_under_ground_layer() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+
+	level.set_pit_at(open_cell, true)
+
+	var marker: Node2D = level._pit_nodes[open_cell]
+	assert_eq(marker.get_parent(), level._ground_layer)
+
+
+func test_water_marker_is_parented_under_ground_layer() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+
+	level.set_water_at(open_cell, true)
+
+	var marker: Node2D = level._water_nodes[open_cell]
+	assert_eq(marker.get_parent(), level._ground_layer)
