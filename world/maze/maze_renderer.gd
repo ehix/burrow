@@ -57,3 +57,18 @@ func _draw_grid_lines() -> void:
 	for y in (_maze.height + 1):
 		var py := y * _tile_size
 		draw_line(Vector2(0, py), Vector2(width_px, py), grid_line_color)
+
+
+## True if a wall at `wall_tile` (tile coordinates) would visually overlap
+## `position` (world-space) given its rendered block pokes `overdraw`
+## pixels above its own tile into the tile north of it -- anything
+## standing in that northern sliver would otherwise be hidden behind the
+## wall's own rendered height. A pure function (no scene tree needed) so
+## it's directly unit-testable -- see docs/superpowers/specs/2026-07-14-
+## tunnel-visual-rework-design.md.
+static func wall_occludes_position(wall_tile: Vector2i, position: Vector2, tile_size: int, overdraw: float) -> bool:
+	var tile_left := float(wall_tile.x) * tile_size
+	var tile_top := float(wall_tile.y) * tile_size
+	if position.x < tile_left or position.x > tile_left + tile_size:
+		return false
+	return position.y >= tile_top - overdraw and position.y <= tile_top
