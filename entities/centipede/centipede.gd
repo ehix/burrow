@@ -71,25 +71,38 @@ func _begin_flee() -> void:
 	_schedule_next_step()
 
 
-## Closest of the four map edges to the current head, as a real tile
-## coordinate (not a raw direction -- unlike Earthworm's own
-## _direction_to_nearest_boundary(), which moved in a straight line that
-## could clip through walls, this feeds a real wall-aware BFS target).
+## The open, non-boundary tile closest to the current head that itself
+## touches the map's boundary ring -- the nearest real "edge of the maze"
+## the body can actually stand on and "burrow out" from. Deliberately NOT a
+## literal boundary tile (x/y == 0 or width-1/height-1): MazeGenerator
+## always leaves that outermost ring solid (MazeData.is_boundary()'s own
+## doc comment), and _tunnel_toward() deliberately refuses to ever carve it
+## (the same guardrail RemoveWallsSkill/SeismicCompaction honor) -- so a
+## literal boundary tile is permanently unreachable by construction, which
+## would leave FLEEING never able to arrive. Searches every open cell
+## (not a fixed coordinate formula) because the tile directly "one step
+## in" from the edge on the head's own row/column isn't itself guaranteed
+## open -- only true cell-centres are guaranteed open, and which cells are
+## boundary-adjacent depends on the generated maze, not a fixed offset.
 func _nearest_boundary_tile() -> Vector2i:
 	var head: Vector2i = _tiles[0]
-	var maze: Object = _level.maze
-	var candidates: Dictionary = {
-		Vector2i(0, head.y): head.x,
-		Vector2i(maze.width - 1, head.y): maze.width - 1 - head.x,
-		Vector2i(head.x, 0): head.y,
-		Vector2i(head.x, maze.height - 1): maze.height - 1 - head.y,
-	}
-	var best_tile: Vector2i = Vector2i(0, head.y)
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	var best_tile: Vector2i = head
 	var best_dist := INF
-	for tile in candidates:
-		if candidates[tile] < best_dist:
-			best_dist = candidates[tile]
-			best_tile = tile
+	for cell in _level.maze.open_cells():
+		if _level.is_boundary(cell):
+			continue
+		var touches_boundary := false
+		for dir in dirs:
+			if _level.is_boundary(cell + dir):
+				touches_boundary = true
+				break
+		if not touches_boundary:
+			continue
+		var dist := absi(cell.x - head.x) + absi(cell.y - head.y)
+		if dist < best_dist:
+			best_dist = dist
+			best_tile = cell
 	return best_tile
 
 
