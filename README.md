@@ -78,6 +78,9 @@ flat floor/wall rects (`world/maze/maze_renderer.gd`) — swap in a `TileMapLaye
 once the tileset exists; the collision / occluder / navigation pipeline is built
 separately from the maze grid, so it is unaffected.
 
+World/character/creature/item reference for art generation:
+[`docs/art-bible.md`](docs/art-bible.md).
+
 ### Tests
 
 Pure-logic tests (maze generation, tile classification, health, hunger, trap

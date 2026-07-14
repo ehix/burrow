@@ -26,3 +26,6 @@ Thumbs.db
 
 # Claude Code local session/tooling state (worktrees, job scratch dirs, local settings)
 .claude/
+
+# Superpowers brainstorming-companion session state (local-only mockups/screens)
+.superpowers/
