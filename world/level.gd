@@ -47,14 +47,6 @@ const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 ## three.
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
-## Ceiling/plane mechanics rework: body_alpha for whichever of Player/Enemy
-## is off the other's plane — "less in focus," per the user's own framing
-## during brainstorming. Deliberately scoped to just these two (the only
-## entities that track a plane at all); larvae/hatchlings/decoys/traps
-## always render at full brightness regardless of plane (design's explicit
-## out-of-scope call).
-const OFF_PLANE_ALPHA := 0.35
-
 ## Dual-Plane Map Architecture (design §1): the ground floor and the inverted
 ## ceiling floor directly above it. A spider's PlaneComponent tracks which one
 ## it currently occupies; `is_blocked()` is the single seam both planes'
@@ -732,9 +724,11 @@ func _on_plane_changed(who: Node, plane: int) -> void:
 
 
 ## Dims whichever of Player/Enemy is off the other's plane via the shared
-## outline shader's body_alpha uniform (already shipped for Camouflage) —
-## the floor re-color (above) tells you which plane *you're* on; this tells
-## you which other spider is or isn't reachable from here.
+## outline shader's dim_enabled uniform (tunnel visual rework Phase 2 --
+## previously a flat body_alpha fade, switched to match GroundLayer's own
+## hazy/desaturated "background" look for visual consistency) -- the
+## floor dim (above, GroundLayer) tells you which plane *you're* on; this
+## tells you which other spider is or isn't reachable from here.
 ##
 ## Camouflage guardrail: body_alpha isn't reference-counted (last caller
 ## wins, by design — see OutlineFx.set_body_alpha's own doc comment), so a
@@ -758,8 +752,7 @@ func _refresh_plane_focus() -> void:
 		var vis := node.get_node_or_null("Sprite") as CanvasItem
 		if vis == null:
 			continue
-		var alpha := 1.0 if PlaneComponent.effective_plane(node) == focus_plane else OFF_PLANE_ALPHA
-		OutlineFx.set_body_alpha(vis, alpha)
+		OutlineFx.set_dimmed(vis, PlaneComponent.effective_plane(node) != focus_plane)
 
 
 ## True if `entity` has a currently-active CamouflageSkill child, found by

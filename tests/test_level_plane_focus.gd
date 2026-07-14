@@ -22,8 +22,7 @@ func test_refresh_plane_focus_dims_the_enemy_when_only_it_is_on_the_ceiling() ->
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 	var mat := enemy_sprite.material as ShaderMaterial
 	assert_not_null(mat)
-	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001,
-		"enemy is off the player's plane, so it dims")
+	assert_true(mat.get_shader_parameter("dim_enabled"), "enemy is off the player's plane, so it reads hazy/desaturated")
 
 
 func test_refresh_plane_focus_keeps_full_brightness_when_planes_match() -> void:
@@ -45,7 +44,7 @@ func test_plane_changed_event_triggers_a_focus_refresh() -> void:
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 	var mat := enemy_sprite.material as ShaderMaterial
 	assert_not_null(mat)
-	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001)
+	assert_true(mat.get_shader_parameter("dim_enabled"))
 
 
 ## Camouflage conflict guardrail (design's explicit judgment call): body_alpha
