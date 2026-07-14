@@ -19,8 +19,8 @@ extends Node2D
 ## per-sprite ceiling tint entirely. Wall rendering is unchanged on both
 ## planes for now: walls exist identically on both layers (CeilingData
 ## mirrors MazeData's wall geometry 1:1), and the ceiling-plane inverse
-## wall treatment (front face hanging down instead of rising up) is a
-## later phase, not yet built.
+## wall treatment (front face hanging down
+## instead of rising up) is implemented via _draw_wall_ceiling().
 
 var _maze: MazeData
 var _tile_size := 48
@@ -91,11 +91,19 @@ func _draw() -> void:
 	_draw_grid_lines()
 
 
-## Draws one wall tile's block: a shorter, darker front face anchored to
-## the tile's own bottom edge, with a taller, lighter top face above it
-## poking up into the tile north of it. Fades both faces together if this
-## wall currently occludes fade_focus_position (see wall_occludes_position).
+## Draws one wall tile's block, dispatching to the plane-appropriate
+## orientation -- see _draw_wall_ground()/_draw_wall_ceiling().
 func _draw_wall(tile: Vector2i) -> void:
+	if _active_plane == Level.Layer.GROUND:
+		_draw_wall_ground(tile)
+	else:
+		_draw_wall_ceiling(tile)
+
+
+## Ground-plane wall: front face anchored to the tile's own bottom edge,
+## top face poking up into the tile north of it. Fades both faces together
+## if this wall currently occludes fade_focus_position.
+func _draw_wall_ground(tile: Vector2i) -> void:
 	var alpha := wall_fade_alpha if wall_occludes_position(tile, fade_focus_position, _tile_size, wall_overdraw_height) else 1.0
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
@@ -105,6 +113,23 @@ func _draw_wall(tile: Vector2i) -> void:
 	draw_rect(Rect2(tile_left, block_top, _tile_size, front_face_top - block_top),
 		Color(wall_top_face_color, wall_top_face_color.a * alpha))
 	draw_rect(Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height),
+		Color(wall_front_face_color, wall_front_face_color.a * alpha))
+
+
+## Ceiling-plane wall: mirrored -- front face anchored to the tile's own
+## top edge, hanging down; top face pokes down into the tile south of it
+## (tunnel visual rework Phase 2). Fades both faces together if this wall
+## currently occludes fade_focus_position via the ceiling-mirrored check.
+func _draw_wall_ceiling(tile: Vector2i) -> void:
+	var alpha := wall_fade_alpha if wall_occludes_position_ceiling(tile, fade_focus_position, _tile_size, wall_overdraw_height) else 1.0
+	var tile_left := tile.x * _tile_size
+	var tile_top := tile.y * _tile_size
+	var tile_bottom := tile_top + _tile_size
+	var block_bottom := tile_bottom + wall_overdraw_height
+	var front_face_bottom := tile_top + wall_front_face_height
+	draw_rect(Rect2(tile_left, front_face_bottom, _tile_size, block_bottom - front_face_bottom),
+		Color(wall_top_face_color, wall_top_face_color.a * alpha))
+	draw_rect(Rect2(tile_left, tile_top, _tile_size, wall_front_face_height),
 		Color(wall_front_face_color, wall_front_face_color.a * alpha))
 
 
@@ -121,6 +146,18 @@ static func wall_occludes_position(wall_tile: Vector2i, position: Vector2, tile_
 	if position.x < tile_left or position.x > tile_left + tile_size:
 		return false
 	return position.y >= tile_top - overdraw and position.y <= tile_top
+
+
+## Ceiling-plane mirror of wall_occludes_position(): the ceiling variant's
+## rendered block pokes `overdraw` pixels below its own tile into the tile
+## south of it (front face hangs down instead of rising up -- see
+## _draw_wall_ceiling()) -- same occlusion idiom, opposite direction.
+static func wall_occludes_position_ceiling(wall_tile: Vector2i, position: Vector2, tile_size: int, overdraw: float) -> bool:
+	var tile_left := float(wall_tile.x) * tile_size
+	var tile_bottom := float(wall_tile.y) * tile_size + tile_size
+	if position.x < tile_left or position.x > tile_left + tile_size:
+		return false
+	return position.y >= tile_bottom and position.y <= tile_bottom + overdraw
 
 
 func _draw_grid_lines() -> void:

@@ -53,6 +53,48 @@ func test_occludes_at_the_exact_tile_top_boundary() -> void:
 	assert_true(MazeRenderer.wall_occludes_position(wall_tile, position, TILE_SIZE, OVERDRAW))
 
 
+func test_occludes_ceiling_a_position_in_the_overdraw_band_directly_below_it() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# tile (2,3) spans x=[96,144], y=[144,192]; its ceiling overdraw band is
+	# y=[192, 192+16] = [192, 208] in the tile south of it (2,4).
+	var position := Vector2(120.0, 200.0)
+
+	assert_true(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
+
+
+func test_does_not_occlude_ceiling_a_position_below_the_overdraw_band() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# y=220 is further south than the 16px overdraw band reaches (192-208).
+	var position := Vector2(120.0, 220.0)
+
+	assert_false(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
+
+
+func test_does_not_occlude_ceiling_a_position_north_of_the_wall() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# y=160 is inside/north of the wall's own tile -- the ceiling front face
+	# only ever reads as hanging down, never occludes anything north of it.
+	var position := Vector2(120.0, 160.0)
+
+	assert_false(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
+
+
+func test_does_not_occlude_ceiling_a_position_outside_its_column() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# Same y as the first (passing) test, but x=200 is a full tile-width
+	# outside wall_tile's own column (x=[96,144]).
+	var position := Vector2(200.0, 200.0)
+
+	assert_false(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
+
+
+func test_occludes_ceiling_at_the_exact_tile_bottom_boundary() -> void:
+	var wall_tile := Vector2i(2, 3)
+	var position := Vector2(120.0, 192.0) # exactly the wall's own tile_bottom
+
+	assert_true(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
+
+
 func _make_renderer() -> MazeRenderer:
 	var renderer := MazeRenderer.new()
 	add_child_autofree(renderer)
@@ -80,6 +122,16 @@ func test_defaults_to_a_fade_focus_that_never_occludes_anything() -> void:
 
 func test_draw_does_not_error_with_walls_and_a_fade_focus_present() -> void:
 	var renderer := _make_renderer()
+	renderer.set_fade_focus(Vector2(24.0, 24.0))
+
+	await get_tree().process_frame
+
+	assert_true(true, "reached this point without erroring")
+
+
+func test_draw_does_not_error_on_ceiling_plane_with_walls_and_a_fade_focus() -> void:
+	var renderer := _make_renderer()
+	renderer.set_active_plane(Level.Layer.CEILING)
 	renderer.set_fade_focus(Vector2(24.0, 24.0))
 
 	await get_tree().process_frame
