@@ -674,7 +674,7 @@ func _melee_nearby_centipede() -> void:
 	if centipede == null:
 		return
 	_melee_left = melee_cooldown
-	centipede.take_hit()
+	centipede.hit_segment_at(target_tile, facing)
 	HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 
 

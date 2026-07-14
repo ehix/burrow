@@ -17,10 +17,13 @@ func _draw() -> void:
 
 
 ## Forwards to the owning Centipede's shared counter -- called by WebShot
-## (physics overlap) and by Player/Enemy's melee (exact-tile lookup via
-## Centipede.segment_at_tile()) identically; the segment itself never tracks
-## a hit count.
-func take_hit() -> void:
+## (physics overlap) and, via Centipede.hit_segment_at(), by Player/Enemy's
+## melee too; the segment itself never tracks a hit count. `hit_direction`
+## gives this segment the same nudge-and-slide-back bump Blockade.take_hit()
+## uses (CombatFx.shunt) -- a hit visibly registers on the exact segment
+## struck even though intact segments don't otherwise react.
+func take_hit(hit_direction: Vector2 = Vector2.ZERO) -> void:
+	CombatFx.shunt(self, hit_direction * 5.0)
 	var parent := get_parent()
 	if parent != null and parent.has_method("take_hit"):
 		parent.take_hit()

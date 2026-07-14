@@ -43,3 +43,16 @@ func test_take_hit_forwards_every_time_not_just_once() -> void:
 	segment.take_hit()
 	segment.take_hit()
 	assert_eq(body.hits, 3, "a segment holds no state of its own -- every hit forwards")
+
+
+func test_take_hit_nudges_itself_in_the_given_direction() -> void:
+	var body := FakeCentipedeBody.new()
+	add_child_autofree(body)
+	var segment := _make_segment(body)
+	var rest := segment.position
+
+	segment.take_hit(Vector2.RIGHT)
+
+	assert_ne(segment.position, rest,
+		"a hit visibly nudges the segment (CombatFx.shunt), mirroring Blockade.take_hit()'s own bump")
+	assert_eq(body.hits, 1, "still forwards the hit to the parent's shared counter")

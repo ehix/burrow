@@ -61,8 +61,16 @@ func test_a_full_flee_eventually_despawns_the_centipede() -> void:
 
 	assert_eq(centipede.state, Centipede.State.FLEEING)
 	var ticks := 0
+	var exiting := false
 	while is_instance_valid(centipede) and not centipede.is_queued_for_deletion() and ticks < 200:
-		centipede._crawl_step()
+		if exiting:
+			centipede._exit_step()
+		else:
+			centipede._crawl_step()
+			# Arriving begins a body_length-step exit crawl through the
+			# boundary (see _begin_exit()) rather than freeing on the spot --
+			# switch to pumping that stepper the moment it kicks in.
+			exiting = centipede._exit_steps_remaining > 0
 		ticks += 1
 
 	assert_true(centipede.is_queued_for_deletion(),
@@ -78,8 +86,13 @@ func test_a_full_flee_never_carves_more_than_a_handful_of_walls() -> void:
 
 	centipede.take_hit()
 	var ticks := 0
+	var exiting := false
 	while is_instance_valid(centipede) and not centipede.is_queued_for_deletion() and ticks < 200:
-		centipede._crawl_step()
+		if exiting:
+			centipede._exit_step()
+		else:
+			centipede._crawl_step()
+			exiting = centipede._exit_steps_remaining > 0
 		ticks += 1
 
 	var carved := level.maze.open_cells().size() - open_before

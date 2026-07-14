@@ -88,6 +88,31 @@ func test_segment_at_tile_returns_null_for_an_unoccupied_tile() -> void:
 	assert_null(found)
 
 
+func test_hit_segment_at_registers_a_hit_on_the_shared_counter() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1), Vector2i(1, 2)])
+	centipede.hits_to_flee = 4
+	centipede.hit_segment_at(Vector2i(1, 2))
+	centipede.hit_segment_at(Vector2i(1, 1))
+	centipede.hit_segment_at(Vector2i(1, 2))
+	assert_eq(centipede._hits, 3)
+
+
+func test_hit_segment_at_nudges_only_the_exact_segment_struck() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1), Vector2i(1, 2)])
+	var struck := centipede._segments[1]
+	var untouched := centipede._segments[0]
+	var struck_rest := struck.position
+	var untouched_rest := untouched.position
+
+	centipede.hit_segment_at(Vector2i(1, 2), Vector2.RIGHT)
+
+	assert_ne(struck.position, struck_rest,
+		"the exact segment struck visibly nudges on a hit -- reuses Blockade.take_hit()'s own CombatFx.shunt")
+	assert_eq(untouched.position, untouched_rest, "an untouched segment doesn't nudge")
+
+
 func test_level_is_blocked_true_on_a_centipede_tile_for_both_planes() -> void:
 	var level := _make_level()
 	_make_centipede(level, [Vector2i(3, 3)])

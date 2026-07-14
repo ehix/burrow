@@ -368,7 +368,7 @@ func _melee() -> void:
 		return
 	var centipede := Centipede.segment_at_tile(get_tree(), target_tile)
 	if centipede != null:
-		centipede.take_hit()
+		centipede.hit_segment_at(target_tile, facing)
 		HungerComponent.charge_all(get_tree(), melee_hunger_cost)
 		return
 

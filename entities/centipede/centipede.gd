@@ -26,6 +26,8 @@ var _level: Node
 var _segments: Array[CentipedeSegment] = []
 var _target: Vector2i
 var _path: Array[Vector2i] = []
+var _exit_direction := Vector2i.ZERO
+var _exit_steps_remaining := 0
 
 
 func _ready() -> void:
@@ -62,6 +64,19 @@ func take_hit() -> void:
 	_hits += 1
 	if _hits >= hits_to_flee:
 		_begin_flee()
+
+
+## Melee's exact-tile lookup (Player/Enemy) only ever has the Centipede
+## itself in hand (via segment_at_tile()), never the specific
+## CentipedeSegment node WebShot's physics overlap already holds directly --
+## this re-derives which segment sits at `tile` so a melee hit gets the same
+## per-segment shunt CentipedeSegment.take_hit() gives a web-shot hit, then
+## registers the hit exactly like take_hit() always has.
+func hit_segment_at(tile: Vector2i, hit_direction: Vector2 = Vector2.ZERO) -> void:
+	var idx := _tiles.find(tile)
+	if idx != -1 and idx < _segments.size():
+		CombatFx.shunt(_segments[idx], hit_direction * 5.0)
+	take_hit()
 
 
 func _begin_flee() -> void:
@@ -207,6 +222,7 @@ func _crawl_step() -> void:
 		_start_crawl()
 		_schedule_next_step()
 		return
+	_shove_spiders_out_of(next_tile, next_tile - _tiles[0])
 	_level._destroy_occupants_at(next_tile)
 	_tiles.push_front(next_tile)
 	_tiles.pop_back()
@@ -218,11 +234,94 @@ func _crawl_step() -> void:
 		_schedule_next_step()
 
 
+## Any spider (Player/Enemy) currently standing on `tile` gets shoved out of
+## it in `push_dir` before the body's head moves there. Level.is_blocked()
+## already stops a spider from stepping ONTO an occupied Centipede tile, but
+## nothing stopped the body itself from crawling into a spider already
+## standing there -- a strong physical boundary shouldn't ever overlap a
+## spider, fleeing or not, so every crawl step clears its own way first.
+## Reuses GridMover.knockback() (the same forced-shove primitive a landed
+## combat hit already uses): tries straight along the body's own travel
+## direction first, then falls back to the other three cardinal directions
+## so a spider caught against a wall still gets bumped sideways onto open
+## floor instead of getting walked through -- a genuine "rock and hard
+## place" would need all four directions blocked simultaneously.
+func _shove_spiders_out_of(tile: Vector2i, push_dir: Vector2i) -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	for node in tree.get_nodes_in_group("spiders"):
+		var spider := node as Node2D
+		if spider == null:
+			continue
+		var mover := spider.get_node_or_null("GridMover") as GridMover
+		if mover == null or mover.committed_tile() != tile:
+			continue
+		if mover.knockback(push_dir):
+			continue
+		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			if dir != push_dir and mover.knockback(dir):
+				break
+
+
 func _arrive() -> void:
 	if state == State.FLEEING:
-		queue_free()
+		_begin_exit()
 	elif state == State.RELOCATING:
 		state = State.BLOCKING
+
+
+## Once a FLEEING body's head reaches its boundary-adjacent target, it
+## doesn't just vanish -- it keeps crawling straight out through the
+## boundary ring for body_length more steps (the same push_front/pop_back
+## mechanic every ordinary crawl step already uses), so the whole segmented
+## body visibly recedes off the edge of the map tile-by-tile, exactly like
+## it crawled in, instead of the entire node popping out of existence at
+## once. body_length steps is exactly how many it takes for the tail to
+## also clear the target tile in a straight line.
+func _begin_exit() -> void:
+	_exit_direction = _direction_off_the_map(_tiles[0])
+	_exit_steps_remaining = body_length
+	_schedule_next_exit_step()
+
+
+## The direction from `tile` (assumed boundary-ring-adjacent -- exactly what
+## _nearest_boundary_tile() picks) toward whichever neighboring boundary-ring
+## tile it touches: "out of the map" from here.
+func _direction_off_the_map(tile: Vector2i) -> Vector2i:
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if _level.is_boundary(tile + dir):
+			return dir
+	return Vector2i.ZERO
+
+
+func _schedule_next_exit_step() -> void:
+	if _level == null or not is_instance_valid(_level):
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
+	tree.create_timer(crawl_step_time).timeout.connect(_exit_step)
+
+
+## Continues the crawl straight through the boundary and off the map --
+## deliberately skips every ordinary crawl guard (is_open/is_water/tunnel):
+## past the target these tiles are the solid boundary ring and beyond, by
+## design never carved or walkable, so treating them as ordinary crawl
+## destinations would wrongly reroute or tunnel. `_exit_steps_remaining`
+## counts down from body_length; once it hits 0 the tail has cleared the
+## target tile too and the whole body is gone.
+func _exit_step() -> void:
+	if _level == null or not is_instance_valid(_level):
+		return
+	_tiles.push_front(_tiles[0] + _exit_direction)
+	_tiles.pop_back()
+	_sync_segments()
+	_exit_steps_remaining -= 1
+	if _exit_steps_remaining <= 0:
+		queue_free()
+	else:
+		_schedule_next_exit_step()
 
 
 ## Called by Level (via _flood_centipedes_at()) when a tile this body
