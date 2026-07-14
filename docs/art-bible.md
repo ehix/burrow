@@ -34,10 +34,11 @@ style. Match this, don't reinvent it:
   anti-aliased outlines, not blocky 8-bit/retro pixel art. Fine linework
   (see `web_trap.png`'s hand-drawn web strand detail) is in-style.
 - **Real arachnid/invertebrate anatomy**, not a cartoon/mascot reinterpretation
-  — correct leg count and joints, correct body segmentation. The rival
-  spider is explicitly a **trapdoor spider** silhouette
-  (`enemy_trapdoor_spider.png`); the Wolf Spider class sprite
-  (`player_wolf_spider.png`) is a recognizable, naturalistic wolf spider.
+  — correct leg count and joints, correct body segmentation. The existing
+  `enemy_trapdoor_spider.png` (a naturalistic trapdoor spider) and
+  `player_wolf_spider.png` (a naturalistic wolf spider) are both good style
+  anchors — the former is now Warden's own reference art (see §5), not a
+  separate "enemy" species.
 - **Muted, earthy, desaturated palette** on the creatures themselves — browns,
   tans, near-blacks, olive. Saturated color is reserved for *meaning*
   (class identity, status effects, hazards — see §3) rather than the base
@@ -84,12 +85,12 @@ without reading text.
 
 ### Class identity colors (spider tint)
 
-| Class | RGB (float) | Hex |
+| Character | RGB (float) | Hex |
 |---|---|---|
-| Net-Caster | `0.85, 0.75, 0.35` | `#D9BF59` gold/amber |
-| Wolf Spider | `0.85, 0.4, 0.25` | `#D96640` orange-red |
-| Weaver | `0.4, 0.75, 0.45` | `#66BF73` green |
-| Decoy | `0.65, 0.45, 0.85` | `#A673D9` purple |
+| Wolf | `0.85, 0.4, 0.25` | `#D96640` orange-red |
+| Warden | `0.4, 0.75, 0.45` | `#66BF73` green |
+| Ogre | `0.85, 0.75, 0.35` | `#D9BF59` gold/amber |
+| Echo | `0.65, 0.45, 0.85` | `#A673D9` purple |
 
 ### Item / status-effect colors (one hue, two contexts)
 
@@ -99,17 +100,17 @@ without reading text.
 | Poison damage-over-time | `0.5, 0.8, 0.3` | `#80CC4C` yellow-green | DoT tick status icon |
 | Sense (Fungus Sense) | `0.3, 0.75, 0.55` | `#4CBF8C` teal | item pickup + "sense" status icon |
 | Haste / speed (Seed Pod) | `0.85, 0.7, 0.25` | `#D9B240` mustard/gold | item pickup + "seed_haste" status icon |
-| Silk haste (Weaver self-buff) | `0.6, 0.85, 1.0` | `#99D9FF` pale sky blue | status icon only |
+| Silk haste (Warden self-buff) | `0.6, 0.85, 1.0` | `#99D9FF` pale sky blue | status icon only |
 | Lure | `0.6, 0.85, 1.0` | `#99D9FF` pale sky blue | pulsing ring + pickup |
 | Camouflage | `0.6, 0.75, 1.0` | `#99BFFF` pale blue | outline while active |
-| Decoy effigy | `0.6, 0.6, 0.65` | `#9999A6` grey-lavender | translucent silhouette |
+| Echo's decoy effigy | `0.6, 0.6, 0.65` | `#9999A6` grey-lavender | translucent silhouette |
 
 ### Other
 
 | Element | RGB (float) | Hex |
 |---|---|---|
 | Centipede body segment | `0.3, 0.45, 0.2` | `#4C7333` dark olive-green |
-| Blockade (Weaver's rock/dirt barrier) | `0.35, 0.25, 0.15` | `#594026` dark dirt brown |
+| Blockade (Warden's rock/dirt barrier) | `0.35, 0.25, 0.15` | `#594026` dark dirt brown |
 | Damage flash | `1.0, 0.35, 0.35` | red |
 | Melee slash VFX | `1.0, 0.95, 0.85` | warm near-white |
 
@@ -149,61 +150,67 @@ unelaborated visually, but worth leaning into for UI/currency iconography
 **Tone in one line:** dim, dirt-brown, dangerous, and quietly hostile — nature
 red in tooth and claw, not spooky-cute.
 
-## 5. Spiders — player classes & the rival
+## 5. Spiders — the four characters
 
-Every spider (player or rival) is the same underlying creature type,
-distinguished by a **class** (their species/build) and a **class tint**
-(§3) applied to their sprite. The rival spider is mechanically identical
-to the player — same four classes, same skills, same stat kit — so it
-should read as a *mirror*, not a separate monster. It's currently anchored
-to a **trapdoor spider** silhouette in the one reference sprite that exists
-(`enemy_trapdoor_spider.png`) — apt, since trapdoor spiders are real
-burrow-and-ambush predators.
+Four named characters, not four palette-swapped copies of one body. Each
+gets its own species, silhouette, and design language grounded in its kit
+— the class tint (§3) still applies as an accent, but it should read as
+"this character's signature color," not the *only* thing telling them
+apart. The rival is not a separate creature: it rolls one of these same
+four characters at spawn, same as the player picks one — there's no
+separate "enemy species" anymore (the old `enemy_trapdoor_spider.png`
+reference sprite predates this and is superseded by Warden's own art, see
+below).
 
-Each class in the fiction is one specific real spider species/archetype
-(**suggested direction** — the code only fixes color + mechanics, not
-species; adjust if you want, but keep it consistent across all art for that
-class once chosen):
+### Wolf — female — orange-red `#D96640`
+**Species: wolf spider (*Lycosa*).** Real wolf spiders carry their egg
+sac, then their newly-hatched spiderlings, riding on their back/abdomen —
+a direct match for her kit: she **plants a hidden egg-sac mine** that
+bursts into a swarm of tiny spiderlings on trigger, and can **summon a
+small escort of aggressive hatchling spiderlings** that scout ahead and
+attack. Silhouette: robust, bristly, mottled-brown body, noticeably
+stockier/more grounded than the other three — the "brawler" build.
+Hatchlings/mine burst are small bright-red dots (`#D94D4D`); the mine
+itself is a small drawn cocoon, brown (`#7F5933`).
 
-### Net-Caster — male — gold `#D9BF59`
-**Suggested species: net-casting / ogre-faced spider** (real-world
-*Deinopis*) — huge forward-facing eyes, holds a small rectangular web
-between its front legs and throws it over prey. This maps directly onto its
-kit: it can't fire a normal web shot at all, and instead **picks up any
-placed trap and throws it as a fast, hard-hitting capture net**
-(`Net Hold` / `Net Shot`). Heaviest melee hitter of the four classes.
-Visual language for its net/projectile: a woven diamond, off-white fill
-with a darker grey crosshatch (`#BFBFB2` fill, `#666659` lines).
-
-### Wolf Spider — female — orange-red `#D96640`
-Already explicitly a **wolf spider** (*Lycosidae*) in name — real wolf
-spiders are famous for carrying their egg sac, then their newly-hatched
-spiderlings, riding on their back/abdomen. That's a direct visual match for
-her kit: she **plants a hidden egg-sac mine** that bursts into a swarm of
-tiny spiderlings on trigger, and can **summon a small escort of aggressive
-hatchling spiderlings** that scout ahead and attack. The hatchlings/mine
-burst are small bright-red dots (`#D94D4D`); the mine itself is a small
-drawn cocoon, brown (`#7F5933`).
-
-### Weaver — male — green `#66BF73`
-Code already calls this the **Funnel/Weaver spider** — real funnel-web
-weavers spin a broad sheet web that narrows into a funnel retreat. Slower,
-more deliberate web use than the others, but **immune to getting slowed by
-webs himself**. His kit is architectural: **lays a line of web across
-several tiles** (a literal funnel-web tunnel) and **drops a solid rock/dirt
-barricade** to physically block a corridor. Barricade color: dark dirt-brown
+### Warden — male — green `#66BF73`
+**Species: trapdoor spider.** Real trapdoor spiders dig a burrow, silk-line
+it, and seal it behind a hinged silk-and-soil door — a much closer match
+for his kit than the old "funnel weaver" framing: **lays a line of web
+across several tiles** (the silk-lined tunnel) and **drops a solid
+rock/dirt barricade** to physically block a corridor (the door, generalized
+to any corridor). Also **immune to getting slowed by webs himself** — he
+lives in one. Silhouette: thick, shovel-like front legs (real trapdoor
+spiders use these to dig), a squat, low-slung, burrow-dwelling body —
+reads as a digger/builder, not a hunter. Barricade color: dark dirt-brown
 (`#594026`).
 
-### Decoy — female — purple `#A673D9`
-The glass cannon: weakest melee, fastest/most frequent web-shooter, and
-**pays her own health to fire**. Kit is stealth/misdirection: **turns
-near-invisible** for a few seconds (breaks on landing or taking a hit), and
-**drops a static decoy effigy** that draws rival aggro. **Suggested
-species:** a spider built around camouflage/mimicry in real life — e.g. a
-crab spider (ambush camouflage) or a ghost/huntsman spider (pale,
-translucent-looking) would fit; avoid a species already used for another
-class. Camouflage outline while active: pale blue (`#99BFFF`); the decoy
-effigy itself is a dim, translucent grey-lavender silhouette (`#9999A6`).
+### Ogre — male — gold `#D9BF59`
+**Species: ogre-faced / net-casting spider (*Deinopis*).** Real ogre-faced
+spiders hold a small rectangular net between their front legs and throw it
+over prey — not a metaphor, literally his kit: can't fire a normal web
+shot at all, instead **picks up any placed trap and throws it as a fast,
+hard-hitting capture net** (`Net Hold` / `Net Shot`). Heaviest melee hitter
+of the four. Silhouette: the species' namesake huge forward-facing eyes
+(best night vision of any spider — he hunts in total darkness) and long,
+stick-thin legs — should read as unmistakably different from Wolf's stocky
+build even in silhouette alone. Net/projectile visual language: a woven
+diamond, off-white fill with a darker grey crosshatch (`#BFBFB2` fill,
+`#666659` lines).
+
+### Echo — female — purple `#A673D9`
+**Species: trashline/decoy orb-weaver (*Cyclosa*).** Real *Cyclosa* build
+a life-sized fake decoy of themselves out of silk and debris in their web
+so predators attack the decoy instead — literally her kit, not an
+analogy: **drops a static decoy effigy** that draws rival aggro, and
+**turns near-invisible** for a few seconds (breaks on landing or taking a
+hit). Glass cannon: weakest melee, fastest/most frequent web-shooter, and
+**pays her own health to fire**. Silhouette: many *Cyclosa* have unusual
+spiky, elongated abdomens wrapped in silk-and-debris — lean into that for
+a shape unlike any of the other three's normal round-bodied spider
+silhouette, reinforcing that she's built around not-quite-being-there.
+Camouflage outline while active: pale blue (`#99BFFF`); the decoy effigy
+itself is a dim, translucent grey-lavender silhouette (`#9999A6`).
 
 ## 6. Creatures
 
@@ -323,22 +330,26 @@ color:
 ## 11. Asset inventory
 
 **Exist already** (`assets/sprites/`) — treat as the style anchor:
-`player_wolf_spider.png` (92×92), `enemy_trapdoor_spider.png` (92×92),
-`larva.png` (48×48), `web_shot.png` (40×40), `web_shot_spent.png` (76×76),
-`web_trap.png` (116×116), `web_trap_spent.png` (126×126).
+`player_wolf_spider.png` (92×92, now Wolf's reference art),
+`enemy_trapdoor_spider.png` (92×92, now Warden's reference art — no longer
+a separate "enemy" species), `larva.png` (48×48), `web_shot.png` (40×40),
+`web_shot_spent.png` (76×76), `web_trap.png` (116×116),
+`web_trap_spent.png` (126×126).
 
 **Not yet made** (roughly in priority order for a maze that currently has
 no tileset at all):
 1. Floor/wall/pit/water tileset (§8) — biggest visible gap, everything else
    renders as flat rectangles right now.
-2. The other three player/rival class sprites (Net-Caster, Weaver, Decoy) —
-   only Wolf Spider exists.
+2. Ogre and Echo's own sprites, each with a distinct silhouette per §5 (not
+   a recolor of Wolf/Warden's body) — Wolf and Warden already have
+   reference art (see above), Ogre and Echo don't yet.
 3. Centipede body segment tile.
 4. Item icons (Fungus Poison, Fungus Sense, Seed Pod, Lure) — currently
    plain colored dots.
 5. Prey variants (Fungal Larva, Beetle, Ant, Cicada Nymph) — currently all
    render as the plain larva.
-6. Skill VFX: Blockade barrier, Camouflage outline, Decoy effigy, Net
-   Hold/Shot projectile, egg-mine cocoon, hatchling/mine-burst spiderlings.
+6. Skill VFX: Warden's barricade, Echo's camouflage outline + decoy effigy,
+   Ogre's Net Hold/Shot projectile, Wolf's egg-mine cocoon and
+   hatchling/mine-burst spiderlings.
 7. Hazard VFX polish: flood water texture, compaction dust, Express
    carve-burst.
