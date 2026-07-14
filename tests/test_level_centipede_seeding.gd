@@ -41,6 +41,35 @@ func test_seeded_centipede_is_away_from_both_spawns() -> void:
 		assert_ne(tile, enemy_tile)
 
 
+func test_spawn_larva_at_random_never_lands_on_a_centipede_tile() -> void:
+	var level := _make_level()
+	for node in level.get_tree().get_nodes_in_group("centipedes"):
+		node.free()
+	var player_tile := level.tile_of(level.player.global_position)
+	var enemy_tile := level.tile_of(level.enemy.global_position)
+	var eligible: Array[Vector2i] = []
+	for cell in level.maze.open_cells():
+		if not level.is_boundary(cell) and cell != player_tile and cell != enemy_tile:
+			eligible.append(cell)
+	# Reserve every eligible cell except one for a Centipede body -- the
+	# single remaining cell is the only place a new larva could legally land.
+	var free_cell: Vector2i = eligible[0]
+	var body: Array[Vector2i] = eligible.slice(1)
+	var centipede := Centipede.new()
+	level.add_child(centipede)
+	centipede.bind_level(level)
+	centipede.spawn_at(body)
+	for node in level.get_tree().get_nodes_in_group("larvae"):
+		node.free()
+
+	level._spawn_larva_at_random()
+
+	var larvae := level.get_tree().get_nodes_in_group("larvae")
+	assert_eq(larvae.size(), 1, "still finds the one legal cell, not stuck refusing to spawn at all")
+	assert_eq(level.tile_of((larvae[0] as Node2D).global_position), free_cell,
+		"a new larva never lands on a tile a Centipede body already occupies")
+
+
 func test_find_open_chain_never_includes_a_boundary_tile() -> void:
 	var level := _make_level()
 	var chain := level._find_open_chain(4, {})

@@ -792,6 +792,50 @@ func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 	pickup.global_position = world_pos
 
 
+## Sends a fresh apex Centipede down `line` (the already-open, in-order
+## tiles CentipedeExpress just carved) -- an express-carved corridor gets
+## an express rider. Finds any contiguous run of body_length tiles along
+## the line that isn't boundary and isn't already a spider's tile or
+## another Centipede's own body (segment_at_tile(), the same occupancy
+## check Level.is_blocked() and Seismic Compaction's own guard both use).
+## Silently does nothing if no such run exists anywhere along the line --
+## graceful degradation, same precedent as _seed_centipedes()'s own
+## empty-chain case.
+func spawn_centipede_along(line: Array[Vector2i]) -> void:
+	var centipede: Centipede = CentipedeScene.instantiate()
+	var chain := _find_chain_in_line(line, centipede.body_length)
+	if chain.is_empty():
+		centipede.free()
+		return
+	_entities.add_child(centipede)
+	centipede.bind_level(self)
+	centipede.spawn_at(chain)
+
+
+func _find_chain_in_line(line: Array[Vector2i], length: int) -> Array[Vector2i]:
+	if line.size() < length:
+		return []
+	var starts: Array = range(line.size() - length + 1)
+	starts.shuffle()
+	for start in starts:
+		var run: Array[Vector2i] = line.slice(start, start + length)
+		if _line_run_is_clear(run):
+			return run
+	return []
+
+
+func _line_run_is_clear(run: Array[Vector2i]) -> bool:
+	for tile in run:
+		if maze.is_boundary(tile.x, tile.y) or not maze.is_open(tile.x, tile.y):
+			return false
+		for spider in get_tree().get_nodes_in_group("spiders"):
+			if tile_of((spider as Node2D).global_position) == tile:
+				return false
+		if Centipede.segment_at_tile(get_tree(), tile) != null:
+			return false
+	return true
+
+
 ## Seed a Centipede obstacle (sub-project H): a connected, in-bounds,
 ## non-boundary chain of body_length open tiles, reserved away from both
 ## spawns. Skips spawning entirely if no valid chain exists (graceful
@@ -860,7 +904,10 @@ func _spawn_larvae(reserved: Array) -> void:
 		placed += 1
 
 
-## Spawn one larva at a random open cell that no spider is standing on.
+## Spawn one larva at a random open cell that no spider is standing on and
+## no Centipede body occupies -- otherwise a larva could spawn sitting
+## inside an already-BLOCKING Centipede, stuck there indefinitely since a
+## stationary body never crawls over its own tiles to squash it away.
 func _spawn_larva_at_random() -> void:
 	var cells := maze.open_cells()
 	if cells.is_empty():
@@ -872,9 +919,12 @@ func _spawn_larva_at_random() -> void:
 			occupied[tile_of(s.global_position)] = true
 	cells.shuffle()
 	for cell in cells:
-		if not occupied.has(cell):
-			_spawn_larva_at(cell)
-			return
+		if occupied.has(cell):
+			continue
+		if Centipede.segment_at_tile(get_tree(), cell) != null:
+			continue
+		_spawn_larva_at(cell)
+		return
 
 
 func _spawn_larva_at(cell: Vector2i) -> void:

@@ -39,6 +39,34 @@ func test_spawn_at_positions_each_segment_at_its_tile_centre() -> void:
 	assert_eq(centipede._segments[1].global_position, level.tile_centre(Vector2i(1, 2)))
 
 
+func test_spawn_at_destroys_a_larva_already_sitting_on_a_claimed_tile() -> void:
+	var level := _make_level()
+	var tile := Vector2i(1, 2)
+	var larva := Node2D.new()
+	larva.add_to_group("larvae")
+	level.add_child(larva)
+	larva.global_position = level.tile_centre(tile)
+
+	_make_centipede(level, [Vector2i(1, 1), tile])
+
+	assert_true(larva.is_queued_for_deletion(),
+		"a body materializing on top of a larva squashes it, same as crawling into one")
+
+
+func test_spawn_at_destroys_a_world_item_already_sitting_on_a_claimed_tile() -> void:
+	var level := _make_level()
+	var tile := Vector2i(1, 2)
+	var item := Node2D.new()
+	item.add_to_group("world_items")
+	level.add_child(item)
+	item.global_position = level.tile_centre(tile)
+
+	_make_centipede(level, [Vector2i(1, 1), tile])
+
+	assert_true(item.is_queued_for_deletion(),
+		"a body materializing on top of an item destroys it, same as crawling into one")
+
+
 func test_joins_the_centipedes_group() -> void:
 	var level := _make_level()
 	var centipede := _make_centipede(level, [Vector2i(1, 1)])

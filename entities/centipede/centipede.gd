@@ -39,8 +39,12 @@ func bind_level(level: Node) -> void:
 
 
 ## Lays out the body at `tiles` (head first) and (re)builds its segment
-## visuals to match. Called once by Level._seed_centipedes() right after
-## instancing and bind_level().
+## visuals to match. Called right after instancing and bind_level(), by
+## Level._seed_centipedes() (initial seeding) and CentipedeExpress (an apex
+## centipede riding its own freshly-carved corridor). Claims each tile the
+## same way a crawl step claims a new one -- destroying whatever's already
+## there (larva, trap, item) -- so a body never materializes silently
+## overlapping something instead of squashing/eating it.
 func spawn_at(tiles: Array[Vector2i]) -> void:
 	_tiles = tiles.duplicate()
 	for segment in _segments:
@@ -48,6 +52,7 @@ func spawn_at(tiles: Array[Vector2i]) -> void:
 			segment.queue_free()
 	_segments.clear()
 	for tile in _tiles:
+		_level._destroy_occupants_at(tile)
 		var segment: CentipedeSegment = SegmentScene.instantiate()
 		add_child(segment)
 		segment.global_position = _level.tile_centre(tile)
