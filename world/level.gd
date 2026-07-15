@@ -120,6 +120,13 @@ class SenseGhost:
 @onready var _renderer: MazeRenderer = $Renderer
 @onready var _ground_layer: GroundLayer = $GroundLayer
 @onready var _floor_renderer: FloorRenderer = $GroundLayer/FloorRenderer
+## Screen-space blur overlay for the ceiling-focus hazy background (see
+## assets/shaders/ground_blur.gdshader's own doc comment for why this is a
+## BackBufferCopy + blur shader rather than something GroundLayer itself
+## composites) -- hidden whenever the ground is the plane in focus, shown
+## alongside GroundLayer's own desaturate/darken dim whenever it isn't.
+@onready var _ground_blur: Node2D = $GroundBlur
+@onready var _ground_blur_overlay: ColorRect = $GroundBlur/Overlay
 @onready var _entities: Node2D = $Entities
 ## Sense's overlays live here, not under Level directly: CanvasModulate
 ## darkens the whole default canvas and no per-CanvasItem shader can opt
@@ -186,6 +193,7 @@ func build() -> void:
 	ceiling = CeilingData.new(maze)
 	_renderer.setup(maze, TILE_SIZE)
 	_floor_renderer.setup(maze, TILE_SIZE)
+	_ground_blur_overlay.size = map_pixel_size()
 	_build_collision_and_occluders()
 	_astar = GridNav.build(maze, TILE_SIZE)
 	_larva_cap = mini(LARVA_CAP_MAX, maxi(LARVA_COUNT, maze.open_cells().size() / LARVA_TILES_PER_CAP))
@@ -525,6 +533,7 @@ func _spawn_pit_marker(tile: Vector2i) -> Node2D:
 	poly.color = Color(0.15, 0.08, 0.05, 0.85)
 	poly.position = _tile_centre(tile.x, tile.y)
 	_ground_layer.add_child(poly)
+	poly.material = _ground_layer.dim_material()
 	return poly
 
 
@@ -578,6 +587,7 @@ func _spawn_water_marker(tile: Vector2i) -> Node2D:
 	poly.color = WATER_MARKER_COLOR
 	poly.position = _tile_centre(tile.x, tile.y)
 	_ground_layer.add_child(poly)
+	poly.material = _ground_layer.dim_material()
 	return poly
 
 
@@ -743,7 +753,9 @@ func _refresh_plane_focus() -> void:
 	if player == null or enemy == null:
 		return
 	var focus_plane := PlaneComponent.effective_plane(player)
-	_ground_layer.set_dimmed(focus_plane == Layer.CEILING)
+	var ceiling_focus := focus_plane == Layer.CEILING
+	_ground_layer.set_dimmed(ceiling_focus)
+	_ground_blur.visible = ceiling_focus
 	for node in [player, enemy]:
 		if not is_instance_valid(node):
 			continue
@@ -821,6 +833,7 @@ func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 	var pickup := WorldItemPickupScene.instantiate()
 	pickup.item = item
 	_ground_layer.add_child(pickup)
+	pickup.material = _ground_layer.dim_material()
 	pickup.global_position = world_pos
 
 
@@ -935,6 +948,7 @@ func _spawn_larva_at(cell: Vector2i) -> void:
 	var larva := LarvaScene.instantiate()
 	larva.position = _tile_centre(cell.x, cell.y)
 	_ground_layer.add_child(larva)
+	larva.get_node("Sprite").material = _ground_layer.dim_material()
 	larva.bind_level(self)
 	if larva.has_method("set_facing"):
 		larva.set_facing(TileTypes.default_facing(maze.classify(cell.x, cell.y)))

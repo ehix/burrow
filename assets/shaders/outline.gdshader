@@ -18,7 +18,7 @@ shader_type canvas_item;
 // desaturate).
 uniform vec4 outline_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float outline_width : hint_range(0.0, 4.0) = 2.0;
-uniform bool outline_enabled = true;
+uniform bool outline_enabled = false;
 uniform float body_alpha : hint_range(0.0, 1.0) = 1.0;
 uniform float saturation : hint_range(0.0, 1.0) = 0.6;
 uniform float brightness : hint_range(0.0, 1.0) = 0.75;

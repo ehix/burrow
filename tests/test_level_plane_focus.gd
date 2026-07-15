@@ -100,7 +100,7 @@ func test_refresh_plane_focus_dims_ground_layer_when_player_is_on_ceiling() -> v
 
 	level._refresh_plane_focus()
 
-	var mat := level._ground_layer.material as ShaderMaterial
+	var mat := level._ground_layer.dim_material()
 	assert_true(mat.get_shader_parameter("dim_enabled"), "ground is background while the player is on the ceiling")
 
 
@@ -109,5 +109,5 @@ func test_refresh_plane_focus_keeps_ground_layer_undimmed_when_player_is_on_grou
 
 	level._refresh_plane_focus() # default GROUND
 
-	var mat := level._ground_layer.material as ShaderMaterial
+	var mat := level._ground_layer.dim_material()
 	assert_false(mat.get_shader_parameter("dim_enabled"), "ground is the plane in focus, not background")
