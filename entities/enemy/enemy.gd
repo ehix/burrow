@@ -88,6 +88,12 @@ var _state_lock_left := 0.0
 ## counter rather than wall-clock time, so it's deterministic and testable.
 var _tile_last_visited: Dictionary = {}
 var _patrol_tick := 0
+## True while the enemy has deliberately climbed to the ceiling for exactly
+## one step to bypass a pit blocking its ground path (see
+## _step_or_cross_pit()) -- suppresses _update_state()'s own "always settle
+## back to ground unless chasing" rule until that one step actually lands,
+## so the climb isn't undone before it's used.
+var _crossing_pit := false
 var active_class: int = SpiderClassData.SpiderClass.WOLF
 var _class_data_by_id: Dictionary = {}
 var _active_class_data: SpiderClassData
@@ -288,7 +294,7 @@ func _update_state() -> void:
 
 	if next == State.CHASE and _current_target != null:
 		_match_plane_to(_current_target)
-	elif _plane.current_plane == Level.Layer.CEILING:
+	elif _plane.current_plane == Level.Layer.CEILING and not _crossing_pit:
 		_plane.transition() # settle back to ground: not actively chasing anymore
 
 
@@ -316,6 +322,41 @@ func _fire_web(direction: Vector2) -> void:
 func _match_plane_to(target: Node2D) -> void:
 	if PlaneComponent.effective_plane(target) != _plane.current_plane:
 		_plane.transition()
+
+
+## Steps `dir` normally; if that's blocked specifically by a pit (not a
+## wall) while the enemy is on the ground, climbs to the ceiling for exactly
+## this one step instead — pits don't reach up there at all (design §1), so
+## the same tile is always open from above — then settles back to the
+## ground the instant that step lands. Without this, patrol/food-seeking/
+## fleeing could never cross a pit with no ground-only detour, leaving
+## whatever's past it permanently unreachable even though the player can
+## just climb over the same pit. CHASE benefits too via _follow_path(), but
+## never conflicts with _match_plane_to()'s own ceiling use: that already
+## puts the enemy on whichever plane the target occupies, so this helper's
+## GROUND-only guard below simply never triggers while already up there.
+func _step_or_cross_pit(dir: Vector2i) -> bool:
+	if _mover.try_step(dir):
+		return true
+	if _plane.current_plane != Level.Layer.GROUND or _level == null:
+		return false
+	var target: Vector2i = _tile_of(global_position) + dir
+	if not _level.maze.is_pit(target.x, target.y):
+		return false
+	_crossing_pit = true
+	_plane.transition()
+	if not _mover.try_step(dir):
+		# Something else (e.g. a ceiling-side obstacle) still blocks it --
+		# bail back to the ground immediately rather than getting stuck up
+		# there for no reason.
+		_plane.transition()
+		_crossing_pit = false
+		return false
+	_mover.step_finished.connect(func() -> void:
+		_plane.transition()
+		_crossing_pit = false
+	, CONNECT_ONE_SHOT)
+	return true
 
 
 func _do_chase() -> void:
@@ -379,11 +420,11 @@ func _do_flee() -> void:
 	if away == Vector2.ZERO:
 		away = Vector2.RIGHT
 	var dir := _dominant(away)
-	if _mover.try_step(dir):
+	if _step_or_cross_pit(dir):
 		_face(dir)
 		return
 	var perpendicular := _dominant(Vector2(away.y, -away.x))
-	if _mover.try_step(perpendicular):
+	if _step_or_cross_pit(perpendicular):
 		_face(perpendicular)
 		return
 	_fight_back()
@@ -481,7 +522,7 @@ func _do_patrol() -> void:
 	options.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		return _tick_last_visited(my_tile + a) < _tick_last_visited(my_tile + b))
 	for d in options:
-		if _mover.try_step(d):
+		if _step_or_cross_pit(d):
 			_face(d)
 			return
 
@@ -500,6 +541,13 @@ func _set_path_to(target_tile: Vector2i) -> void:
 	_path_i = 0
 
 
+## _step_or_cross_pit() here is mostly defensive, not a full fix for CHASE/
+## SEEK_FOOD: the AStarGrid2D this path was computed from already marks
+## every pit tile solid (GridNav.build()), so a normal path never routes
+## across one in the first place — a target genuinely reachable only via a
+## ceiling crossing still needs a dual-plane-aware pathfinder, which is a
+## bigger job than this fix. This only helps a tile that turned into a pit
+## *after* the path was computed (e.g. mid-chase flooding/collapse).
 func _follow_path() -> void:
 	if _mover.is_moving() or _path.is_empty() or _path_i >= _path.size():
 		return
@@ -508,7 +556,7 @@ func _follow_path() -> void:
 	if dir == Vector2i.ZERO:
 		_path_i += 1
 		return
-	if _mover.try_step(dir):
+	if _step_or_cross_pit(dir):
 		_face(dir)
 		_path_i += 1
 	else:

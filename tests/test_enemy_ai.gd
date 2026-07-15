@@ -147,3 +147,60 @@ func test_enemy_settles_back_to_ground_when_state_leaves_chase() -> void:
 	enemy._update_state()
 
 	assert_eq(enemy._plane.current_plane, Level.Layer.GROUND, "not chasing anymore, so it climbs back down")
+
+
+# --- pit crossing via the ceiling (patrol/food-seeking/flee can't otherwise
+# reach anything past a pit with no ground-only detour, unlike the player) ---
+
+func _make_bound_level() -> Level:
+	var level: Level = preload("res://world/level.tscn").instantiate()
+	add_child_autofree(level)
+	level.build()
+	return level
+
+
+func test_step_or_cross_pit_climbs_the_ceiling_and_settles_back_down_on_landing() -> void:
+	var level := _make_bound_level()
+	var enemy := _make_enemy()
+	enemy.bind_level(level)
+	var tile := enemy._tile_of(enemy.global_position)
+	var target := tile + Vector2i.RIGHT
+	level.dev_remove_wall_at(target) # guarantee it's open regardless of maze seed
+	level.set_pit_at(target, true)
+
+	assert_true(enemy._step_or_cross_pit(Vector2i.RIGHT), "climbs the ceiling to cross the pit")
+	assert_eq(enemy._plane.current_plane, Level.Layer.CEILING, "mid-crossing, still up there")
+	assert_true(enemy._crossing_pit)
+
+	enemy._mover.tick(1.0) # finishes the crossing step -- fires step_finished
+	assert_eq(enemy._plane.current_plane, Level.Layer.GROUND, "settles back down once landed")
+	assert_false(enemy._crossing_pit)
+	assert_eq(enemy._mover.committed_tile(), target, "actually ended up across the pit")
+
+
+func test_step_or_cross_pit_never_climbs_for_a_plain_dead_end() -> void:
+	var level := _make_bound_level()
+	var enemy := _make_enemy()
+	enemy.bind_level(level)
+	var tile := enemy._tile_of(enemy.global_position)
+	# A direction that's simply blocked (no pit at all) must never trigger a
+	# climb -- only a pit specifically is crossable via the ceiling.
+	enemy._mover.block_check = func(_d: Vector2i) -> bool: return true
+
+	assert_false(enemy._step_or_cross_pit(Vector2i.RIGHT), "nothing to climb over here")
+	assert_eq(enemy._plane.current_plane, Level.Layer.GROUND, "never climbed")
+	assert_eq(enemy._tile_of(enemy.global_position), tile, "never moved")
+
+
+func test_step_or_cross_pit_steps_normally_when_nothing_blocks_it() -> void:
+	var enemy := _make_enemy()
+	# Isolates _step_or_cross_pit()'s delegation behavior from real physics
+	# entirely (unlike the pit/dead-end tests above, this one doesn't care
+	# *why* a step succeeds) -- a freshly-added CharacterBody2D's test_move()
+	# isn't reliable before the physics server has run a frame, which a
+	# synchronous GUT test never does.
+	enemy._mover.block_check = func(_d: Vector2i) -> bool: return false
+
+	assert_true(enemy._step_or_cross_pit(Vector2i.RIGHT), "an ordinary open tile just steps normally")
+	assert_eq(enemy._plane.current_plane, Level.Layer.GROUND, "no reason to ever leave the ground")
+	assert_false(enemy._crossing_pit)
