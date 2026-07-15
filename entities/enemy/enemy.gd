@@ -343,7 +343,7 @@ func _do_seek_food() -> void:
 	# Lay a web across its own tile now and then — a placed web catches wandering
 	# larvae on the enemy's behalf (feeding it) even when it can't chase them all.
 	if _trap_left <= 0.0 and not _mover.is_moving() and trap_placer.can_place():
-		trap_placer.place(global_position, self)
+		trap_placer.place(global_position, self, _plane.current_plane)
 		_trap_left = trap_interval
 	if _repath_left <= 0.0:
 		_set_path_to(_tile_of(larva.global_position))

@@ -21,16 +21,18 @@ func active_count() -> int:
 	return _active.size()
 
 
-## Place a trap at a world position, owned by `placer`. Returns the trap, or
-## null if at the active cap / unconfigured.
-func place(at_position: Vector2, placer: Node) -> Node:
+## Place a trap at a world position, owned by `placer`, on `plane` (the plane
+## `placer` occupied at the moment of placement — WebTrap uses this so a
+## ceiling-laid web never catches a ground larva or entangles a ground
+## spider). Returns the trap, or null if at the active cap / unconfigured.
+func place(at_position: Vector2, placer: Node, plane: Level.Layer = Level.Layer.GROUND) -> Node:
 	if not can_place():
 		return null
 	var trap := trap_scene.instantiate()
 	_spawn_parent(placer).add_child(trap)
 	trap.global_position = at_position
 	if trap.has_method("setup"):
-		trap.setup(placer)
+		trap.setup(placer, plane)
 	_active.append(trap)
 	HungerComponent.charge_all(placer.get_tree(), hunger_cost)
 	return trap

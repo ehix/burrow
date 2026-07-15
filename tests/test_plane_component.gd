@@ -80,3 +80,49 @@ func test_apply_hit_fall_is_a_noop_while_already_on_the_ground() -> void:
 
 	assert_eq(plane_comp.current_plane, Level.Layer.GROUND)
 	assert_almost_eq(health.current_health, 50.0, 0.001, "no extra damage from the ground")
+
+
+## Playtest fix: a ground spider and a ceiling spider never contest a tile
+## (GridMover.spider_tile_contested), but transition() swaps the owner's
+## plane *in place* — landing it on a tile another spider already occupies
+## on that same plane, an overlap nothing previously prevented. Reuses
+## GridMover.knockback() (see Centipede.shove_spiders_out_of for the same
+## primitive) rather than blocking the transition outright.
+func _make_level() -> Level:
+	var level: Level = preload("res://world/level.tscn").instantiate()
+	add_child_autofree(level)
+	level.build()
+	return level
+
+
+func test_transition_shoves_the_other_spider_off_the_landing_tile() -> void:
+	var level := _make_level()
+	var tile := level.tile_of(level.player.global_position)
+	# Guarantee an open cardinal neighbor regardless of maze seed, so the
+	# shove always has somewhere to land.
+	level.maze.set_open(tile.x + 1, tile.y)
+
+	level.enemy.global_position = level.player.global_position
+	var enemy_plane := level.enemy.get_node("PlaneComponent") as PlaneComponent
+	enemy_plane.current_plane = Level.Layer.CEILING
+
+	enemy_plane.transition() # CEILING -> GROUND, landing on the player's tile
+
+	var player_mover := level.player.get_node("GridMover") as GridMover
+	assert_ne(player_mover.committed_tile(), tile,
+		"the player got shoved off the tile the enemy just landed on")
+
+
+func test_transition_does_not_shove_a_spider_left_on_a_different_plane() -> void:
+	var level := _make_level()
+	var tile := level.tile_of(level.player.global_position)
+	level.enemy.global_position = level.player.global_position
+	var enemy_plane := level.enemy.get_node("PlaneComponent") as PlaneComponent
+
+	# enemy starts GROUND (default); transitioning it to CEILING leaves the
+	# player alone on GROUND -- different planes never contest a tile.
+	enemy_plane.transition()
+
+	var player_mover := level.player.get_node("GridMover") as GridMover
+	assert_eq(player_mover.committed_tile(), tile,
+		"different planes never contest a tile -- no shove needed")

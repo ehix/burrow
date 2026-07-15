@@ -23,6 +23,12 @@ uniform float body_alpha : hint_range(0.0, 1.0) = 1.0;
 uniform float saturation : hint_range(0.0, 1.0) = 0.6;
 uniform float brightness : hint_range(0.0, 1.0) = 0.75;
 uniform bool dim_enabled = false;
+// Blur radius, in texels of this sprite's own bound texture -- unlike
+// GroundLayer's ground_blur.gdshader (which has to blur a screen-space
+// backbuffer copy, since GroundLayer has no single real texture of its own
+// to sample), Player/Enemy sprites are real bound textures, so a plain
+// multi-tap TEXTURE blur works directly, no BackBufferCopy needed.
+uniform float blur_radius : hint_range(0.0, 6.0) = 2.0;
 
 void fragment() {
 	// No early `return` in fragment() — this project's renderer rejects it
@@ -30,6 +36,22 @@ void fragment() {
 	// is incorrect."), silently failing the whole shader's compilation.
 	// Every branch below funnels into one COLOR assignment instead.
 	vec4 tex_color = texture(TEXTURE, UV);
+	if (dim_enabled) {
+		// Single-pass 9-tap "tent" blur (center 4, cardinals 2, diagonals 1,
+		// /16 total) -- same weighting as ground_blur.gdshader, just sourced
+		// from TEXTURE directly instead of a screen-texture copy.
+		vec2 texel = blur_radius / vec2(textureSize(TEXTURE, 0));
+		vec4 blurred = tex_color * 4.0;
+		blurred += texture(TEXTURE, UV + vec2(texel.x, 0.0)) * 2.0;
+		blurred += texture(TEXTURE, UV - vec2(texel.x, 0.0)) * 2.0;
+		blurred += texture(TEXTURE, UV + vec2(0.0, texel.y)) * 2.0;
+		blurred += texture(TEXTURE, UV - vec2(0.0, texel.y)) * 2.0;
+		blurred += texture(TEXTURE, UV + texel);
+		blurred += texture(TEXTURE, UV - texel);
+		blurred += texture(TEXTURE, UV + vec2(texel.x, -texel.y));
+		blurred += texture(TEXTURE, UV + vec2(-texel.x, texel.y));
+		tex_color = blurred / 16.0;
+	}
 	vec3 body_rgb = tex_color.rgb;
 	if (dim_enabled) {
 		float luminance = dot(body_rgb, vec3(0.299, 0.587, 0.114));

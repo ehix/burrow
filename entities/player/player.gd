@@ -133,7 +133,7 @@ func _physics_process(delta: float) -> void:
 		if shot != null and _active_class_data.web_fire_health_cost > 0.0:
 			health.take_damage(_active_class_data.web_fire_health_cost)
 	if Input.is_action_just_pressed("place_trap"):
-		trap_placer.place(global_position, self)
+		trap_placer.place(global_position, self, _plane.current_plane)
 	if Input.is_action_just_pressed("melee"):
 		_melee()
 	if Input.is_action_just_pressed("toggle_plane"):

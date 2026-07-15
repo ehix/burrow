@@ -31,8 +31,42 @@ func _ready() -> void:
 
 func transition() -> void:
 	current_plane = Level.Layer.CEILING if current_plane == Level.Layer.GROUND else Level.Layer.GROUND
+	_shove_occupant_out_of_the_way()
 	plane_changed.emit(current_plane)
 	EventBus.plane_changed.emit(get_parent(), current_plane)
+
+
+## A transition swaps which plane the owner sits on *in place* -- a ground
+## spider and a ceiling spider normally never contest a tile at all (see
+## GridMover.spider_tile_contested), but the instant this owner arrives on
+## the new plane it can find itself standing on the exact tile another
+## spider already occupies there (e.g. the enemy has been holding position
+## on the ground the whole time the player was up on the ceiling overhead).
+## Shoves that occupant out of the way instead of letting them overlap or
+## silently blocking the transition — reuses GridMover.knockback(), the same
+## forced-shove primitive a landed combat hit or a crawling Centipede body
+## already uses (see Centipede.shove_spiders_out_of), trying all four
+## cardinal directions since there's no natural "push direction" here (both
+## bodies start from the same point).
+func _shove_occupant_out_of_the_way() -> void:
+	if level == null:
+		return
+	var owner := get_parent() as Node2D
+	if owner == null:
+		return
+	var tile := level.tile_of(owner.global_position)
+	for node in owner.get_tree().get_nodes_in_group("spiders"):
+		if node == owner:
+			continue
+		var other := node as Node2D
+		if other == null or effective_plane(other) != current_plane:
+			continue
+		var other_mover := other.get_node_or_null("GridMover") as GridMover
+		if other_mover == null or other_mover.committed_tile() != tile:
+			continue
+		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			if other_mover.knockback(dir):
+				break
 
 
 ## Blocking seam: whether stepping from `tile` in `dir` is blocked on

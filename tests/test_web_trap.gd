@@ -246,3 +246,58 @@ func test_force_destroy_is_a_noop_on_an_already_spent_trap() -> void:
 	assert_true(trap.spent)
 	trap.force_destroy() # must not error or double-free
 	assert_true(trap.spent)
+
+
+## Plane-aware WebTrap: a larva has no PlaneComponent, so it's always
+## effectively GROUND (PlaneComponent.effective_plane()'s own default) — a
+## trap set up on the CEILING plane physically sits above the floor and
+## can't catch it.
+class PlaneTrackedSpider:
+	extends Node2D
+	var _plane: PlaneComponent
+
+
+func _make_plane_tracked_spider(plane: Level.Layer) -> Node2D:
+	var spider := PlaneTrackedSpider.new()
+	spider.add_to_group("spiders")
+	var pc := PlaneComponent.new()
+	pc.current_plane = plane
+	autofree(pc)
+	spider._plane = pc
+	autofree(spider)
+	return spider
+
+
+func test_ceiling_trap_does_not_catch_a_ground_larva() -> void:
+	var trap := _make_trap()
+	trap.setup(_make_plane_tracked_spider(Level.Layer.GROUND), Level.Layer.CEILING)
+	trap.catch_larva(_make_larva())
+	assert_null(trap.caught_larva, "a larva is always ground-only -- a ceiling web can't reach it")
+
+
+func test_ground_trap_still_catches_a_larva() -> void:
+	var trap := _make_trap()
+	trap.setup(_make_plane_tracked_spider(Level.Layer.GROUND), Level.Layer.GROUND)
+	trap.catch_larva(_make_larva())
+	assert_not_null(trap.caught_larva, "a ground web still catches a ground larva as normal")
+
+
+func test_ceiling_trap_does_not_entangle_a_ground_spider() -> void:
+	var trap := _make_trap()
+	trap.setup(_make_plane_tracked_spider(Level.Layer.CEILING), Level.Layer.CEILING)
+	trap._entangle_armed = true
+	var crossing := _make_plane_tracked_spider(Level.Layer.GROUND)
+	trap._on_body_entered(crossing)
+	assert_null(trap.caught_larva)
+	assert_false(trap.spent, "a ground spider crossing beneath a ceiling web is unaffected by it")
+
+
+func test_ground_trap_still_entangles_a_ground_spider() -> void:
+	var trap := _make_trap()
+	trap.setup(_make_plane_tracked_spider(Level.Layer.GROUND), Level.Layer.GROUND)
+	trap._entangle_armed = true
+	var crossing := RecordingSpider.new()
+	crossing.add_to_group("spiders")
+	autofree(crossing)
+	trap._on_body_entered(crossing)
+	assert_eq(crossing.hits.size(), 1, "a same-plane spider crossing an empty web is still entangled")
