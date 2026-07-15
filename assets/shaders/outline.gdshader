@@ -27,8 +27,15 @@ uniform bool dim_enabled = false;
 // GroundLayer's ground_blur.gdshader (which has to blur a screen-space
 // backbuffer copy, since GroundLayer has no single real texture of its own
 // to sample), Player/Enemy sprites are real bound textures, so a plain
-// multi-tap TEXTURE blur works directly, no BackBufferCopy needed.
-uniform float blur_radius : hint_range(0.0, 6.0) = 2.0;
+// multi-tap TEXTURE blur works directly, no BackBufferCopy needed. A
+// texel-space blur's on-screen strength scales with the sprite's own
+// `scale` (screen_blur_px = blur_radius * scale * camera_zoom) -- Player/
+// Enemy's Sprite both use scale = 0.45 (player.tscn/enemy.tscn), so 22.0
+// here lands at roughly the same ~10px on-screen blur as ground_blur.
+// gdshader's own blur_radius_px default, matching strength across the two
+// techniques as intended (revisit this default if that sprite scale ever
+// changes).
+uniform float blur_radius : hint_range(0.0, 30.0) = 22.0;
 
 void fragment() {
 	// No early `return` in fragment() — this project's renderer rejects it
