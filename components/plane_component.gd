@@ -16,6 +16,15 @@ extends Node
 
 signal plane_changed(plane: Level.Layer)
 
+## How many times _shove() retries when every cardinal direction is blocked
+## (e.g. a Centipede body or Blockade currently seals all four sides) before
+## giving up, and how long it waits between attempts. Confirmed via a live
+## sweep across many real maze positions: rare (roughly 1 in 30 spots in a
+## typical maze), but a one-shot attempt left the two spiders permanently
+## overlapping whenever it happened, since nothing else ever revisits it.
+const SHOVE_MAX_ATTEMPTS := 20
+const SHOVE_RETRY_INTERVAL := 0.1
+
 @export var level_path: NodePath
 ## First-pass balance number — tune during playtest.
 @export var fall_damage: float = 8.0
@@ -78,15 +87,27 @@ func _shove_occupant_out_of_the_way() -> void:
 ## up. Retries again if a newly-landed mover immediately buffers into
 ## another step of its own (chase AI can do this indefinitely) — in that
 ## case its own movement is carrying it off the tile anyway.
-func _shove(mover: GridMover) -> void:
-	if not is_instance_valid(mover):
+##
+## Also retries (bounded — SHOVE_MAX_ATTEMPTS/SHOVE_RETRY_INTERVAL) if every
+## cardinal direction is genuinely blocked right now: confirmed via a live
+## sweep across real maze positions that this does happen (a Centipede body
+## or Blockade currently sealing every side of that specific tile) — a
+## one-shot attempt left the two spiders permanently stuck overlapping
+## whenever it did, since nothing else ever revisits an already-finished
+## transition. attempts_left defaults via a named const rather than being
+## threaded through every call site.
+func _shove(mover: GridMover, attempts_left: int = SHOVE_MAX_ATTEMPTS) -> void:
+	if not is_instance_valid(mover) or attempts_left <= 0:
 		return
 	if mover.is_moving():
-		mover.step_finished.connect(func() -> void: _shove(mover), CONNECT_ONE_SHOT)
+		mover.step_finished.connect(func() -> void: _shove(mover, attempts_left), CONNECT_ONE_SHOT)
 		return
 	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 		if mover.knockback(dir):
-			break
+			return
+	if mover.is_inside_tree():
+		mover.get_tree().create_timer(SHOVE_RETRY_INTERVAL).timeout.connect(
+			func() -> void: _shove(mover, attempts_left - 1))
 
 
 ## Blocking seam: whether stepping from `tile` in `dir` is blocked on

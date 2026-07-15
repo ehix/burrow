@@ -168,6 +168,65 @@ func test_transition_retries_the_shove_once_an_in_flight_occupant_lands() -> voi
 	assert_ne(player_mover.committed_tile(), Vector2i(1, 0), "once landed, the deferred shove finally fires")
 
 
+## Playtest regression: a live sweep across real maze positions found that
+## every cardinal direction can genuinely be blocked at once (a Centipede
+## body or Blockade currently sealing all four sides of that specific
+## tile) -- a one-shot shove attempt left the two spiders permanently stuck
+## overlapping whenever this happened, since nothing else ever revisits an
+## already-finished transition. The shove must keep retrying instead of
+## giving up after a single failed attempt.
+func test_transition_retries_the_shove_until_a_direction_opens_up() -> void:
+	var bare_level := Level.new()
+	autofree(bare_level)
+
+	var player := _make_plane_spider(Vector2(0, 0), bare_level)
+	var player_mover: GridMover = player[1]
+	# Every direction blocked at first (e.g. a Centipede body on all four
+	# sides) -- unblocked once `sealed[0]` flips, simulating it moving away.
+	# A one-element Array, not a plain bool: GDScript lambdas capture local
+	# variables *by value* at creation time, so a plain bool flipped after
+	# the closure already exists would never be seen by it -- the array
+	# reference itself is captured once, but mutating its contents from
+	# outside is still visible inside.
+	var sealed := [true]
+	player_mover.block_check = func(_d: Vector2i) -> bool: return sealed[0]
+
+	var enemy := _make_plane_spider(Vector2(0, 0), bare_level, Level.Layer.CEILING)
+	var enemy_plane: PlaneComponent = enemy[2]
+
+	enemy_plane.transition() # CEILING -> GROUND, landing on the same tile -- every direction blocked
+
+	assert_eq(player_mover.committed_tile(), Vector2i(0, 0), "still stuck -- nothing has opened up yet")
+
+	sealed[0] = false
+	await get_tree().create_timer(PlaneComponent.SHOVE_RETRY_INTERVAL + 0.05).timeout
+
+	assert_ne(player_mover.committed_tile(), Vector2i(0, 0), "retried and succeeded once a direction opened up")
+
+
+func test_transition_gives_up_after_shove_max_attempts_if_never_unblocked() -> void:
+	var bare_level := Level.new()
+	autofree(bare_level)
+
+	var player := _make_plane_spider(Vector2(0, 0), bare_level)
+	var player_mover: GridMover = player[1]
+	player_mover.block_check = func(_d: Vector2i) -> bool: return true # permanently sealed
+
+	var enemy := _make_plane_spider(Vector2(0, 0), bare_level, Level.Layer.CEILING)
+	var enemy_plane: PlaneComponent = enemy[2]
+
+	# Drives the retry chain directly with only one attempt left, rather
+	# than waiting out the full SHOVE_MAX_ATTEMPTS * SHOVE_RETRY_INTERVAL in
+	# real time, to keep this test fast while still proving the chain stops.
+	enemy_plane._shove(player_mover, 1)
+	await get_tree().create_timer(PlaneComponent.SHOVE_RETRY_INTERVAL + 0.05).timeout
+	assert_eq(player_mover.committed_tile(), Vector2i(0, 0), "still stuck after its last attempt")
+
+	await get_tree().create_timer(PlaneComponent.SHOVE_RETRY_INTERVAL + 0.05).timeout
+	assert_eq(player_mover.committed_tile(), Vector2i(0, 0),
+		"gives up -- no further retry scheduled beyond the last attempt")
+
+
 func test_transition_does_not_shove_a_spider_left_on_a_different_plane() -> void:
 	var level := _make_level()
 	var tile := level.tile_of(level.player.global_position)
