@@ -199,3 +199,32 @@ func test_spider_tile_contested_ignores_a_node_on_a_different_plane() -> void:
 
 	assert_false(GridMover.spider_tile_contested(player_mover, player_pair[0], Vector2i.RIGHT),
 		"the enemy committed to (5,5), but it's on a different plane — never contests")
+
+
+# --- tile_shared_with_another (playtest fix: overlap must always be escapable) --
+
+func test_tile_shared_with_another_true_when_overlapping_a_same_plane_spider() -> void:
+	var a := _make_spider(Vector2(96, 96)) # tile (2,2)
+	var b := _make_spider(Vector2(96, 96)) # same tile, same default (GROUND) plane
+
+	assert_true(GridMover.tile_shared_with_another(a[1], a[0]))
+	assert_true(GridMover.tile_shared_with_another(b[1], b[0]), "symmetric -- either one reports the overlap")
+
+
+func test_tile_shared_with_another_false_when_alone() -> void:
+	var a := _make_spider(Vector2(96, 96))
+	var b := _make_spider(Vector2(288, 240)) # a different tile entirely
+
+	assert_false(GridMover.tile_shared_with_another(a[1], a[0]))
+
+
+func test_tile_shared_with_another_ignores_a_node_on_a_different_plane() -> void:
+	var a := _make_spider(Vector2(96, 96))
+	var b := _make_spider(Vector2(96, 96)) # same tile...
+	var b_plane := PlaneComponent.new()
+	b_plane.name = "PlaneComponent"
+	(b[0] as Node2D).add_child(b_plane)
+	b_plane.current_plane = Level.Layer.CEILING # ...but a different plane
+
+	assert_false(GridMover.tile_shared_with_another(a[1], a[0]),
+		"a ground spider and a ceiling spider sharing (x,y) never count as overlapping")

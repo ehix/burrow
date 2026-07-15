@@ -285,6 +285,8 @@ func _blocked(dir: Vector2i) -> bool:
 			return _level.is_blocked(target, Level.Layer.CEILING)
 		if _level.is_blocked(target, Level.Layer.GROUND):
 			return true
+	if GridMover.tile_shared_with_another(_mover, self):
+		return false # already overlapping someone here -- always escapable on foot
 	return test_move(global_transform, Vector2(dir) * float(_mover.tile_size))
 
 

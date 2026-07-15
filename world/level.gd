@@ -517,11 +517,35 @@ func set_pit_at(tile: Vector2i, value: bool) -> void:
 	if value:
 		if not _pit_nodes.has(tile):
 			_pit_nodes[tile] = _spawn_pit_marker(tile)
+		_shove_ground_spiders_off(tile)
 	else:
 		var marker = _pit_nodes.get(tile)
 		if marker != null and is_instance_valid(marker):
 			marker.queue_free()
 		_pit_nodes.erase(tile)
+
+
+## A pit only blocks GROUND movement (design §1: pits don't reach the
+## ceiling at all), so a spider standing on `tile` on the ground the instant
+## a pit opens there gets shoved off it, rather than being left stranded
+## exactly on the hole. Reuses GridMover.knockback() -- the same forced-
+## shove primitive PlaneComponent's own transition-onto-an-occupied-tile
+## shove and a crawling Centipede body already use. One-shot, not a full
+## retry chain like PlaneComponent's: if every direction happens to be
+## blocked (e.g. shoved into another spider), GridMover.tile_shared_with_
+## another() already guarantees neither spider is trapped by the resulting
+## overlap -- they can still walk away from it normally.
+func _shove_ground_spiders_off(tile: Vector2i) -> void:
+	for node in get_tree().get_nodes_in_group("spiders"):
+		var spider := node as Node2D
+		if spider == null or PlaneComponent.effective_plane(spider) != Layer.GROUND:
+			continue
+		var mover := spider.get_node_or_null("GridMover") as GridMover
+		if mover == null or mover.committed_tile() != tile:
+			continue
+		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			if mover.knockback(dir):
+				break
 
 
 func _spawn_pit_marker(tile: Vector2i) -> Node2D:

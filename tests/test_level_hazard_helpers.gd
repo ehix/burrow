@@ -211,6 +211,33 @@ func test_collapse_tile_at_clears_water_state_on_a_flooded_tile() -> void:
 	assert_false(level.maze.is_open(interior_cell.x, interior_cell.y), "the tile really did become a wall")
 
 
+## Playtest fix: a pit only blocks GROUND movement (design §1: it doesn't
+## reach the ceiling at all), so a spider standing on the tile the instant a
+## pit opens there must be shoved off it rather than left stranded exactly
+## on the hole.
+func test_set_pit_at_shoves_a_ground_spider_off_the_new_pit_tile() -> void:
+	var level := _make_level()
+	var tile := level.tile_of(level.player.global_position)
+	level.dev_remove_wall_at(tile + Vector2i.RIGHT) # guarantee somewhere to land
+
+	level.set_pit_at(tile, true)
+
+	var mover := level.player.get_node("GridMover") as GridMover
+	assert_ne(mover.committed_tile(), tile, "the player got shoved off the tile the new pit opened on")
+
+
+func test_set_pit_at_never_shoves_a_ceiling_spider() -> void:
+	var level := _make_level()
+	var tile := level.tile_of(level.player.global_position)
+	var player_plane := level.player.get_node("PlaneComponent") as PlaneComponent
+	player_plane.current_plane = Level.Layer.CEILING
+
+	level.set_pit_at(tile, true)
+
+	var mover := level.player.get_node("GridMover") as GridMover
+	assert_eq(mover.committed_tile(), tile, "a pit doesn't reach the ceiling -- nothing to shove up there")
+
+
 func test_pit_marker_is_parented_under_ground_layer() -> void:
 	var level := _make_level()
 	var open_cell: Vector2i = level.maze.open_cells()[0]
