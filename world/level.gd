@@ -527,15 +527,15 @@ func set_pit_at(tile: Vector2i, value: bool) -> void:
 
 
 ## A pit only blocks GROUND movement (design §1: pits don't reach the
-## ceiling at all), so a spider standing on `tile` on the ground the instant
-## a pit opens there gets shoved off it, rather than being left stranded
-## exactly on the hole. Reuses GridMover.knockback() -- the same forced-
-## shove primitive PlaneComponent's own transition-onto-an-occupied-tile
-## shove and a crawling Centipede body already use. One-shot, not a full
-## retry chain like PlaneComponent's: if every direction happens to be
-## blocked (e.g. shoved into another spider), GridMover.tile_shared_with_
-## another() already guarantees neither spider is trapped by the resulting
-## overlap -- they can still walk away from it normally.
+## ceiling at all), so a spider standing on `tile` on the ground -- or
+## already mid-step *toward* it, about to land there -- the instant a pit
+## opens gets shoved off it, rather than being left stranded exactly on the
+## hole. committed_tile() already reports a mid-step mover's in-flight
+## destination throughout its step (not its current interpolated position),
+## so "about to walk onto it" is caught the same way as already standing
+## there. Reuses GridMover.knockback() -- the same forced-shove primitive
+## PlaneComponent's own transition-onto-an-occupied-tile shove and a
+## crawling Centipede body already use.
 func _shove_ground_spiders_off(tile: Vector2i) -> void:
 	for node in get_tree().get_nodes_in_group("spiders"):
 		var spider := node as Node2D
@@ -544,20 +544,60 @@ func _shove_ground_spiders_off(tile: Vector2i) -> void:
 		var mover := spider.get_node_or_null("GridMover") as GridMover
 		if mover == null or mover.committed_tile() != tile:
 			continue
-		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-			if mover.knockback(dir):
-				break
+		_shove_off_pit(mover, tile)
+
+
+## knockback() refuses to interrupt an in-flight step (by design -- see its
+## own doc comment: "Ignored mid-step"), and a spider is rarely standing
+## still, so a one-shot attempt silently failed whenever the spider stepping
+## onto (or already committed to) this tile happened to be mid-step at the
+## exact moment the pit opened -- the same race PlaneComponent._shove() hit
+## and fixed for the plane-transition shove (see its own doc comment).
+## Mirrors that same wait-for-step_finished-then-retry pattern, reusing its
+## bounds (SHOVE_MAX_ATTEMPTS/SHOVE_RETRY_INTERVAL) rather than duplicating
+## new ones. Re-validates the tile is still actually a pit and the mover is
+## still on it before each attempt, so a pit dug and immediately filled
+## again doesn't leave a stale retry armed to shove someone for no reason
+## once their step lands.
+func _shove_off_pit(mover: GridMover, tile: Vector2i,
+		attempts_left: int = PlaneComponent.SHOVE_MAX_ATTEMPTS) -> void:
+	if not is_instance_valid(mover) or attempts_left <= 0:
+		return
+	if maze == null or not maze.is_pit(tile.x, tile.y) or mover.committed_tile() != tile:
+		return
+	if mover.is_moving():
+		mover.step_finished.connect(
+			func() -> void: _shove_off_pit(mover, tile, attempts_left), CONNECT_ONE_SHOT)
+		return
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if mover.knockback(dir):
+			return
+	if mover.is_inside_tree():
+		mover.get_tree().create_timer(PlaneComponent.SHOVE_RETRY_INTERVAL).timeout.connect(
+			func() -> void: _shove_off_pit(mover, tile, attempts_left - 1))
 
 
 ## A larva has no GridMover-blocking concept of "get shoved out of the way"
 ## (unlike a spider, it's not plane-aware and has no dedicated push
-## primitive) -- unlike the spider shove above, a pit opening directly
-## under one just kills it outright, mirroring _destroy_occupants_at()'s
-## identical plain queue_free() for a tile turning into a wall.
+## primitive) -- unlike the spider shove above, a pit opening directly under
+## one (or one already mid-step *toward* it, about to land there) just
+## kills it outright, mirroring _destroy_occupants_at()'s identical plain
+## queue_free() for a tile turning into a wall. Checks the GridMover's own
+## committed_tile() rather than raw global_position -- mid-step, that's the
+## larva's actual in-flight destination, not wherever the lerp animation
+## currently happens to be interpolated to; checking raw position let a
+## larva already committed to stepping onto the tile finish walking onto a
+## pit that opened moments into its step, unkilled. Killed immediately
+## regardless of is_moving() -- unlike the spider shove, there's no need to
+## wait for the step to land first; queue_free() doesn't care.
 func _kill_larvae_at(tile: Vector2i) -> void:
 	for node in get_tree().get_nodes_in_group("larvae"):
 		var larva := node as Node2D
-		if larva != null and tile_of(larva.global_position) == tile:
+		if larva == null:
+			continue
+		var mover := larva.get_node_or_null("GridMover") as GridMover
+		var larva_tile := mover.committed_tile() if mover != null else tile_of(larva.global_position)
+		if larva_tile == tile:
 			larva.queue_free()
 
 

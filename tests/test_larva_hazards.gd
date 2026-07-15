@@ -135,6 +135,26 @@ func test_set_pit_at_kills_a_larva_standing_on_the_new_pit_tile() -> void:
 	assert_true(larva.is_queued_for_deletion(), "a larva caught on the new pit tile is killed")
 
 
+## Playtest regression: checking raw global_position instead of the
+## GridMover's own committed_tile() let a larva already mid-step *toward*
+## the tile finish walking onto a pit that opened moments into its step,
+## since global_position mid-step is still interpolated mostly toward the
+## FROM tile, not the actual in-flight destination.
+func test_set_pit_at_kills_a_larva_mid_step_toward_the_new_pit_tile() -> void:
+	var level := _make_level()
+	var larva := _first_larva(level)
+	var tile := level.tile_of(larva.global_position)
+	var target := tile + Vector2i.RIGHT
+	level.dev_remove_wall_at(target)
+	var mover := larva.get_node("GridMover") as GridMover
+	assert_true(mover.try_step(Vector2i.RIGHT), "larva starts stepping toward the tile about to become a pit")
+	mover.tick(0.03) # partway through -- still is_moving(), position still mostly in the FROM tile
+
+	level.set_pit_at(target, true)
+
+	assert_true(larva.is_queued_for_deletion(), "killed immediately even though its step animation hadn't landed yet")
+
+
 func test_set_pit_at_leaves_a_larva_on_a_different_tile_alone() -> void:
 	var level := _make_level()
 	var larva := _first_larva(level)
