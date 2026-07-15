@@ -73,7 +73,7 @@ func _shove_occupant_out_of_the_way() -> void:
 		var other_mover := other.get_node_or_null("GridMover") as GridMover
 		if other_mover == null or other_mover.committed_tile() != tile:
 			continue
-		_shove(other_mover)
+		_shove(other_mover, owner, tile, current_plane)
 
 
 ## knockback() refuses to interrupt an in-flight step (by design — see its
@@ -94,20 +94,37 @@ func _shove_occupant_out_of_the_way() -> void:
 ## or Blockade currently sealing every side of that specific tile) — a
 ## one-shot attempt left the two spiders permanently stuck overlapping
 ## whenever it did, since nothing else ever revisits an already-finished
-## transition. attempts_left defaults via a named const rather than being
-## threaded through every call site.
-func _shove(mover: GridMover, attempts_left: int = SHOVE_MAX_ATTEMPTS) -> void:
-	if not is_instance_valid(mover) or attempts_left <= 0:
+## transition.
+##
+## Playtest regression: every retry (whether waiting on step_finished or the
+## timer above) must re-validate the overlap is *still real* before ever
+## calling knockback() -- `owner`/`tile`/`plane` are the conditions snapshot
+## at the moment this shove was first scheduled. A quick ceiling -> ground ->
+## ceiling round trip (drop onto the enemy, then climb straight back up
+## before the deferred retry ever fires) leaves a stale retry armed with no
+## way to know the overlap it was scheduled for is no longer real; without
+## this check it fires later regardless — coinciding with, but with nothing
+## to do with, whatever the player happens to be doing at that later moment
+## — and shoves the enemy for no reason in whichever direction happens to
+## be tried first.
+func _shove(mover: GridMover, owner: Node2D, tile: Vector2i, plane: Level.Layer,
+		attempts_left: int = SHOVE_MAX_ATTEMPTS) -> void:
+	if not is_instance_valid(mover) or not is_instance_valid(owner) or attempts_left <= 0:
 		return
+	if effective_plane(owner) != plane or level.tile_of(owner.global_position) != tile:
+		return # owner already left this tile/plane -- the overlap is over, nothing to shove for
+	if mover.committed_tile() != tile:
+		return # no longer actually overlapping (already resolved some other way)
 	if mover.is_moving():
-		mover.step_finished.connect(func() -> void: _shove(mover, attempts_left), CONNECT_ONE_SHOT)
+		mover.step_finished.connect(
+			func() -> void: _shove(mover, owner, tile, plane, attempts_left), CONNECT_ONE_SHOT)
 		return
 	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 		if mover.knockback(dir):
 			return
 	if mover.is_inside_tree():
 		mover.get_tree().create_timer(SHOVE_RETRY_INTERVAL).timeout.connect(
-			func() -> void: _shove(mover, attempts_left - 1))
+			func() -> void: _shove(mover, owner, tile, plane, attempts_left - 1))
 
 
 ## Blocking seam: whether stepping from `tile` in `dir` is blocked on

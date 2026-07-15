@@ -168,6 +168,42 @@ func test_transition_retries_the_shove_once_an_in_flight_occupant_lands() -> voi
 	assert_ne(player_mover.committed_tile(), Vector2i(1, 0), "once landed, the deferred shove finally fires")
 
 
+## Playtest regression: a deferred shove (the occupant was mid-step, so the
+## retry waits on step_finished) must not fire blind once that step finally
+## lands -- if the owner has *already* left the tile or transitioned away
+## again in the meantime (e.g. drop onto the enemy, then climb straight
+## back to the ceiling before the deferred retry ever gets a chance to
+## run), the overlap it was scheduled for is no longer real. Without
+## re-validating first, the stale retry fires later regardless -- shoving
+## the enemy for no reason, coinciding with (but with nothing actually to
+## do with) whatever the player happens to be doing at that later moment.
+func test_transition_does_not_shove_once_the_owner_has_already_left() -> void:
+	var bare_level := Level.new()
+	autofree(bare_level)
+
+	# "Enemy" is mid-step INTO tile (0,0) from tile (-48,0) -- still
+	# is_moving() the instant "player" drops down onto that same tile.
+	var enemy := _make_plane_spider(Vector2(-48, 0), bare_level)
+	var enemy_mover: GridMover = enemy[1]
+	assert_true(enemy_mover.try_step(Vector2i.RIGHT), "nothing set up to block this step")
+	enemy_mover.tick(0.03) # partway through the step -- still is_moving()
+
+	var player := _make_plane_spider(Vector2(0, 0), bare_level, Level.Layer.CEILING)
+	var player_plane: PlaneComponent = player[2]
+
+	player_plane.transition() # CEILING -> GROUND, landing where the enemy is mid-step into -- shove deferred
+
+	# Climbs straight back to the ceiling before the deferred retry ever
+	# fires -- the exact playtest repro (drop onto the enemy, then
+	# immediately climb back up before it resolves).
+	player_plane.transition() # GROUND -> CEILING
+
+	enemy_mover.tick(1.0) # finishes the enemy's step -- fires step_finished, the deferred retry runs
+
+	assert_eq(enemy_mover.committed_tile(), Vector2i(0, 0),
+		"the stale retry must not shove the enemy -- the player already left this tile/plane")
+
+
 ## Playtest regression: a live sweep across real maze positions found that
 ## every cardinal direction can genuinely be blocked at once (a Centipede
 ## body or Blockade currently sealing all four sides of that specific
@@ -213,12 +249,15 @@ func test_transition_gives_up_after_shove_max_attempts_if_never_unblocked() -> v
 	player_mover.block_check = func(_d: Vector2i) -> bool: return true # permanently sealed
 
 	var enemy := _make_plane_spider(Vector2(0, 0), bare_level, Level.Layer.CEILING)
+	var enemy_node: Node2D = enemy[0]
 	var enemy_plane: PlaneComponent = enemy[2]
 
 	# Drives the retry chain directly with only one attempt left, rather
 	# than waiting out the full SHOVE_MAX_ATTEMPTS * SHOVE_RETRY_INTERVAL in
 	# real time, to keep this test fast while still proving the chain stops.
-	enemy_plane._shove(player_mover, 1)
+	# owner/tile/plane match enemy_node's own fixed position/plane so the
+	# re-validation check at the top of _shove() stays satisfied throughout.
+	enemy_plane._shove(player_mover, enemy_node, Vector2i(0, 0), Level.Layer.CEILING, 1)
 	await get_tree().create_timer(PlaneComponent.SHOVE_RETRY_INTERVAL + 0.05).timeout
 	assert_eq(player_mover.committed_tile(), Vector2i(0, 0), "still stuck after its last attempt")
 
