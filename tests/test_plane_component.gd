@@ -113,6 +113,61 @@ func test_transition_shoves_the_other_spider_off_the_landing_tile() -> void:
 		"the player got shoved off the tile the enemy just landed on")
 
 
+## Bare spider double (mirrors test_grid_mover.gd's own _make_spider): a
+## plain Node2D + unblocked GridMover (no block_check, no PhysicsBody2D
+## parent, so _is_blocked() always reports clear -- see GridMover._is_blocked)
+## plus a PlaneComponent, so this exercises PlaneComponent.transition()'s
+## shove logic without depending on a real Level's baked wall colliders
+## (maze.set_open() only flips MazeData's own flag; it doesn't retroactively
+## remove a StaticBody2D wall collider a real Level already built, which
+## made test_move() block a real Player/Enemy at a tile the test itself
+## just declared open).
+func _make_plane_spider(pos: Vector2, level: Level, plane: Level.Layer = Level.Layer.GROUND) -> Array:
+	var node := Node2D.new()
+	node.add_to_group("spiders")
+	node.global_position = pos
+	var mover := GridMover.new()
+	mover.name = "GridMover"
+	mover.tile_size = 48
+	node.add_child(mover)
+	var plane_comp := PlaneComponent.new()
+	plane_comp.name = "PlaneComponent"
+	plane_comp.level = level
+	plane_comp.current_plane = plane
+	node.add_child(plane_comp)
+	add_child_autofree(node)
+	mover.set_process(false) # drive tick() manually, deterministic
+	return [node, mover, plane_comp]
+
+
+## Playtest regression: knockback() refuses to interrupt an in-flight step
+## (by design), and the enemy is rarely standing still — it's almost always
+## mid-step from its own AI the instant a transition lands on its tile,
+## which silently dropped the shove every time this mattered in real play.
+## The shove must instead wait for that in-flight step to land and retry.
+func test_transition_retries_the_shove_once_an_in_flight_occupant_lands() -> void:
+	var bare_level := Level.new() # tile_of() only needs TILE_SIZE, not a built maze
+	autofree(bare_level)
+
+	# "Player" is mid-step INTO tile (1,0) from tile (0,0) -- still is_moving()
+	# the instant "enemy" transitions onto that same tile.
+	var player := _make_plane_spider(Vector2(0, 0), bare_level)
+	var player_mover: GridMover = player[1]
+	assert_true(player_mover.try_step(Vector2i.RIGHT), "nothing set up to block this step")
+	player_mover.tick(0.03) # partway through the step -- still is_moving()
+
+	var enemy := _make_plane_spider(Vector2(48, 0), bare_level, Level.Layer.CEILING)
+	var enemy_plane: PlaneComponent = enemy[2]
+
+	enemy_plane.transition() # CEILING -> GROUND, landing on the contested tile (1,0)
+
+	assert_true(player_mover.is_moving(), "the shove must not force-interrupt the in-flight step")
+	assert_eq(player_mover.committed_tile(), Vector2i(1, 0), "still mid-step toward its own tile, untouched so far")
+
+	player_mover.tick(1.0) # finishes the player's step -- fires step_finished, retrying the shove
+	assert_ne(player_mover.committed_tile(), Vector2i(1, 0), "once landed, the deferred shove finally fires")
+
+
 func test_transition_does_not_shove_a_spider_left_on_a_different_plane() -> void:
 	var level := _make_level()
 	var tile := level.tile_of(level.player.global_position)

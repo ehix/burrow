@@ -64,9 +64,29 @@ func _shove_occupant_out_of_the_way() -> void:
 		var other_mover := other.get_node_or_null("GridMover") as GridMover
 		if other_mover == null or other_mover.committed_tile() != tile:
 			continue
-		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-			if other_mover.knockback(dir):
-				break
+		_shove(other_mover)
+
+
+## knockback() refuses to interrupt an in-flight step (by design — see its
+## own doc comment: "Ignored mid-step"), but the enemy is rarely standing
+## still — it's almost always mid-step from its own chase/patrol AI the
+## instant a transition lands on its tile, which silently dropped the shove
+## every time this actually mattered in real play. committed_tile() already
+## reflects a mid-step mover's landing tile throughout its step, so the
+## contested tile was correctly detected either way; this just waits for
+## that in-flight step to actually land before retrying, rather than giving
+## up. Retries again if a newly-landed mover immediately buffers into
+## another step of its own (chase AI can do this indefinitely) — in that
+## case its own movement is carrying it off the tile anyway.
+func _shove(mover: GridMover) -> void:
+	if not is_instance_valid(mover):
+		return
+	if mover.is_moving():
+		mover.step_finished.connect(func() -> void: _shove(mover), CONNECT_ONE_SHOT)
+		return
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if mover.knockback(dir):
+			break
 
 
 ## Blocking seam: whether stepping from `tile` in `dir` is blocked on
