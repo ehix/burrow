@@ -518,6 +518,7 @@ func set_pit_at(tile: Vector2i, value: bool) -> void:
 		if not _pit_nodes.has(tile):
 			_pit_nodes[tile] = _spawn_pit_marker(tile)
 		_shove_ground_spiders_off(tile)
+		_kill_larvae_at(tile)
 	else:
 		var marker = _pit_nodes.get(tile)
 		if marker != null and is_instance_valid(marker):
@@ -546,6 +547,18 @@ func _shove_ground_spiders_off(tile: Vector2i) -> void:
 		for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 			if mover.knockback(dir):
 				break
+
+
+## A larva has no GridMover-blocking concept of "get shoved out of the way"
+## (unlike a spider, it's not plane-aware and has no dedicated push
+## primitive) -- unlike the spider shove above, a pit opening directly
+## under one just kills it outright, mirroring _destroy_occupants_at()'s
+## identical plain queue_free() for a tile turning into a wall.
+func _kill_larvae_at(tile: Vector2i) -> void:
+	for node in get_tree().get_nodes_in_group("larvae"):
+		var larva := node as Node2D
+		if larva != null and tile_of(larva.global_position) == tile:
+			larva.queue_free()
 
 
 func _spawn_pit_marker(tile: Vector2i) -> Node2D:
@@ -939,16 +952,19 @@ func _spawn_larvae(reserved: Array) -> void:
 	for cell in cells:
 		if placed >= LARVA_COUNT:
 			break
-		if cell in reserved:
+		if cell in reserved or maze.is_pit(cell.x, cell.y):
 			continue
 		_spawn_larva_at(cell)
 		placed += 1
 
 
-## Spawn one larva at a random open cell that no spider is standing on and
-## no Centipede body occupies -- otherwise a larva could spawn sitting
-## inside an already-BLOCKING Centipede, stuck there indefinitely since a
-## stationary body never crawls over its own tiles to squash it away.
+## Spawn one larva at a random open cell that no spider is standing on, no
+## Centipede body occupies, and isn't a pit/flood -- otherwise a larva could
+## spawn sitting inside an already-BLOCKING Centipede (stuck there
+## indefinitely since a stationary body never crawls over its own tiles to
+## squash it away) or directly on a hole it could never have walked onto
+## itself (its own _blocked() already refuses to step onto a pit exactly
+## like a wall, so spawning is the only way it could end up there).
 func _spawn_larva_at_random() -> void:
 	var cells := maze.open_cells()
 	if cells.is_empty():
@@ -963,6 +979,8 @@ func _spawn_larva_at_random() -> void:
 		if occupied.has(cell):
 			continue
 		if Centipede.segment_at_tile(get_tree(), cell) != null:
+			continue
+		if maze.is_pit(cell.x, cell.y):
 			continue
 		_spawn_larva_at(cell)
 		return
