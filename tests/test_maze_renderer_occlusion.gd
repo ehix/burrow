@@ -95,6 +95,29 @@ func test_occludes_ceiling_at_the_exact_tile_bottom_boundary() -> void:
 	assert_true(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
 
 
+# --- overdraw_for (playtest fix: a pit is a hole, not solid ground -- the
+# wall's fake-3D overdraw shouldn't hang solid material over one) -----------
+
+func test_overdraw_for_is_the_full_height_over_open_ground() -> void:
+	var maze := MazeGenerator.generate(5, 5, 1)
+	var open_cell: Vector2i = maze.open_cells()[0]
+	maze.set_pit(open_cell.x, open_cell.y, false)
+
+	assert_eq(MazeRenderer.overdraw_for(maze, open_cell, OVERDRAW), OVERDRAW)
+
+
+func test_overdraw_for_clips_to_zero_over_a_pit() -> void:
+	var maze := MazeGenerator.generate(5, 5, 1)
+	var open_cell: Vector2i = maze.open_cells()[0]
+	maze.set_pit(open_cell.x, open_cell.y, true)
+
+	assert_eq(MazeRenderer.overdraw_for(maze, open_cell, OVERDRAW), 0.0)
+
+
+func test_overdraw_for_defaults_to_full_height_with_no_maze() -> void:
+	assert_eq(MazeRenderer.overdraw_for(null, Vector2i(2, 2), OVERDRAW), OVERDRAW)
+
+
 func _make_renderer() -> MazeRenderer:
 	var renderer := MazeRenderer.new()
 	add_child_autofree(renderer)
