@@ -95,27 +95,46 @@ func test_occludes_ceiling_at_the_exact_tile_bottom_boundary() -> void:
 	assert_true(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
 
 
-# --- overdraw_for (playtest fix: a pit is a hole, not solid ground -- the
-# wall's fake-3D overdraw shouldn't hang solid material over one) -----------
+# --- neither plane ever clips its overdraw for an adjacent pit or flooded
+# tile (playtest fix: a hole is meant to partially disappear behind a
+# wall's overdraw silhouette, same as anything else in the tile the
+# overdraw pokes into -- shrinking the wall's own geometry near a pit
+# produced a visible notch instead, see _draw_wall_ground()'s doc comment)
+# -- both hand-built mazes below use set_pit() directly, which is also
+# exactly how a flooded tile is flagged (Level.set_water_at()), so this
+# covers water tiles too, not just natural pits. --------------------------
 
-func test_overdraw_for_is_the_full_height_over_open_ground() -> void:
-	var maze := MazeGenerator.generate(5, 5, 1)
-	var open_cell: Vector2i = maze.open_cells()[0]
-	maze.set_pit(open_cell.x, open_cell.y, false)
+func test_draw_does_not_error_on_ground_plane_with_a_pit_north_of_a_wall() -> void:
+	# Hand-built 1x2 maze (not MazeGenerator's random layout) so the pit at
+	# (0,0) is guaranteed to sit directly north of the wall at (0,1) -- the
+	# exact adjacency _draw_wall_ground()'s (now-removed) pit clip used to
+	# key off.
+	var maze := MazeData.new(PackedByteArray([1, 0]), 1, 2)
+	maze.set_pit(0, 0, true)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, TILE_SIZE)
 
-	assert_eq(MazeRenderer.overdraw_for(maze, open_cell, OVERDRAW), OVERDRAW)
+	await get_tree().process_frame
+
+	assert_true(true, "reached this point without erroring")
 
 
-func test_overdraw_for_clips_to_zero_over_a_pit() -> void:
-	var maze := MazeGenerator.generate(5, 5, 1)
-	var open_cell: Vector2i = maze.open_cells()[0]
-	maze.set_pit(open_cell.x, open_cell.y, true)
+func test_draw_does_not_error_on_ceiling_plane_with_a_pit_south_of_a_wall() -> void:
+	# Hand-built 1x2 maze (not MazeGenerator's random layout) so the pit at
+	# (0,1) is guaranteed to sit directly south of the wall at (0,0) -- the
+	# exact adjacency _draw_wall_ceiling()'s (now-removed) pit clip used to
+	# key off.
+	var maze := MazeData.new(PackedByteArray([0, 1]), 1, 2)
+	maze.set_pit(0, 1, true)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, TILE_SIZE)
+	renderer.set_active_plane(Level.Layer.CEILING)
 
-	assert_eq(MazeRenderer.overdraw_for(maze, open_cell, OVERDRAW), 0.0)
+	await get_tree().process_frame
 
-
-func test_overdraw_for_defaults_to_full_height_with_no_maze() -> void:
-	assert_eq(MazeRenderer.overdraw_for(null, Vector2i(2, 2), OVERDRAW), OVERDRAW)
+	assert_true(true, "reached this point without erroring")
 
 
 func _make_renderer() -> MazeRenderer:

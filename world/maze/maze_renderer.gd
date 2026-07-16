@@ -94,30 +94,21 @@ func _draw_wall(tile: Vector2i) -> void:
 		_draw_wall_ceiling(tile)
 
 
-## The overdraw height a wall should actually render with, given `neighbor`
-## (the tile its rendered block would poke into -- north for ground, south
-## for ceiling). Clipped to 0 when that neighbor is a pit (or flooded tile
-## -- same MazeData overlay): a hole is not solid ground, so the wall's
-## fake-3D overdraw shouldn't appear to hang solid material over it --
-## confirmed via a direct pixel sample that the overdraw band painted
-## wall_top_face_color squarely over the pit's own near edge, cutting its
-## marker short right where it meets the wall. A pure function (maze-data
-## -only, no scene tree) so it's directly unit-testable alongside
-## wall_occludes_position().
-static func overdraw_for(maze: MazeData, neighbor: Vector2i, full_overdraw: float) -> float:
-	if maze != null and maze.is_pit(neighbor.x, neighbor.y):
-		return 0.0
-	return full_overdraw
-
-
 ## Ground-plane wall: front face anchored to the tile's own bottom edge,
 ## top face poking up into the tile north of it. Fades both faces together
-## if this wall currently occludes fade_focus_position. See overdraw_for()
-## for why the overdraw itself can clip to 0 -- reused for the occlusion-
-## fade check too, so a wall that no longer visually reaches into that tile
-## doesn't still fade based on a now-nonexistent overdraw band there.
+## if this wall currently occludes fade_focus_position. Always renders at
+## full height, even when a pit or flooded tile (same MazeData overlay --
+## see MazeData.is_pit()) sits in the tile north of it (playtest fix,
+## mirrors _draw_wall_ceiling()): the overdraw represents the wall's own
+## height occluding whatever's behind it from the viewer's perspective, and
+## a hole is no exception to that -- its near edge should partially
+## disappear behind the wall's silhouette, not the wall shrinking to avoid
+## touching it. An earlier version clipped the overdraw to 0 next to a pit;
+## that produced a visible notch in the wall's own silhouette right where a
+## consistent block was expected, which is a worse look than the wall
+## simply doing what it does everywhere else.
 func _draw_wall_ground(tile: Vector2i) -> void:
-	var overdraw := overdraw_for(_maze, Vector2i(tile.x, tile.y - 1), wall_overdraw_height)
+	var overdraw := wall_overdraw_height
 	var alpha := wall_fade_alpha if wall_occludes_position(tile, fade_focus_position, _tile_size, overdraw) else 1.0
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
@@ -134,10 +125,11 @@ func _draw_wall_ground(tile: Vector2i) -> void:
 ## top edge, hanging down; top face pokes down into the tile south of it
 ## (tunnel visual rework Phase 2). Fades both faces together if this wall
 ## currently occludes fade_focus_position via the ceiling-mirrored check.
-## Same pit-adjacent overdraw clip as _draw_wall_ground() (mirrored to the
-## south neighbor) -- see overdraw_for()'s own doc comment.
+## Same full-height-always behavior as _draw_wall_ground() -- see its doc
+## comment for why a pit/flooded neighbor never clips the overdraw on
+## either plane.
 func _draw_wall_ceiling(tile: Vector2i) -> void:
-	var overdraw := overdraw_for(_maze, Vector2i(tile.x, tile.y + 1), wall_overdraw_height)
+	var overdraw := wall_overdraw_height
 	var alpha := wall_fade_alpha if wall_occludes_position_ceiling(tile, fade_focus_position, _tile_size, overdraw) else 1.0
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
