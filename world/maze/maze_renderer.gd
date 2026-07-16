@@ -75,6 +75,30 @@ func set_fade_focus(world_position: Vector2) -> void:
 	fade_focus_position = world_position
 
 
+## Read-only access to which plane is currently active -- WallOverdrawMask
+## needs this to know which neighbor direction (north for ground, south for
+## ceiling) a given entity's own wall-adjacency check should use.
+func active_plane() -> Level.Layer:
+	return _active_plane
+
+
+## The overdraw sliver's own rect in world space for `tile` (a wall tile),
+## matching whichever plane is currently active -- the exact patch
+## _draw_wall_ground()/_draw_wall_ceiling() paints for that wall's top face
+## poking into its neighbor. WallOverdrawMask paints this same patch again,
+## on top of Entities, whenever an entity (not the player) is standing
+## inside it -- see WallOverdrawMask's own doc comment for why a second pass
+## is needed instead of just relying on draw order once.
+func overdraw_rect_for(tile: Vector2i) -> Rect2:
+	var tile_left := float(tile.x) * _tile_size
+	if _active_plane == Level.Layer.GROUND:
+		var tile_top := float(tile.y) * _tile_size
+		return Rect2(tile_left, tile_top - wall_overdraw_height, _tile_size, wall_overdraw_height)
+	else:
+		var tile_bottom := float(tile.y) * _tile_size + _tile_size
+		return Rect2(tile_left, tile_bottom, _tile_size, wall_overdraw_height)
+
+
 func _draw() -> void:
 	if _maze == null:
 		return

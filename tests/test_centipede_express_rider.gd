@@ -184,6 +184,13 @@ func test_step_deflection_registers_a_hit_on_the_blocking_centipede() -> void:
 		"the segment it collided with visibly nudges (CombatFx.shunt), same as a melee/web-shot hit")
 
 
+func test_get_segments_returns_the_live_segment_array() -> void:
+	var level := _make_level()
+	var rider := _make_rider(level, Vector2i(1, 3), Vector2i.RIGHT)
+
+	assert_eq(rider.get_segments(), rider._segments)
+
+
 func test_run_frees_itself_once_the_tail_clears_the_boundary_ring_not_just_reaches_it() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)

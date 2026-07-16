@@ -38,6 +38,14 @@ func bind_level(level: Node) -> void:
 	_level = level
 
 
+## Read-only access to the body's visual segments (wall-occlusion masking,
+## tunnel visual rework Phase 2 follow-up: a Centipede's segments span
+## tunnel-width tiles just like Player/Enemy, so they need the same
+## wall-overdraw occlusion check).
+func get_segments() -> Array[CentipedeSegment]:
+	return _segments
+
+
 ## Lays out the body at `tiles` (head first) and (re)builds its segment
 ## visuals to match. Called right after instancing and bind_level(), by
 ## Level._seed_centipedes() (initial seeding) and CentipedeExpress (an apex

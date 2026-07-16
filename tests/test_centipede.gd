@@ -141,6 +141,13 @@ func test_hit_segment_at_nudges_only_the_exact_segment_struck() -> void:
 	assert_eq(untouched.position, untouched_rest, "an untouched segment doesn't nudge")
 
 
+func test_get_segments_returns_the_live_segment_array() -> void:
+	var level := _make_level()
+	var centipede := _make_centipede(level, [Vector2i(1, 1), Vector2i(1, 2)])
+
+	assert_eq(centipede.get_segments(), centipede._segments)
+
+
 func test_level_is_blocked_true_on_a_centipede_tile_for_both_planes() -> void:
 	var level := _make_level()
 	_make_centipede(level, [Vector2i(3, 3)])

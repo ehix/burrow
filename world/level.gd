@@ -120,6 +120,7 @@ class SenseGhost:
 @onready var _renderer: MazeRenderer = $Renderer
 @onready var _ground_layer: GroundLayer = $GroundLayer
 @onready var _floor_renderer: FloorRenderer = $GroundLayer/FloorRenderer
+@onready var _overdraw_mask: WallOverdrawMask = $OverdrawMask
 ## Screen-space blur overlay for the ceiling-focus hazy background (see
 ## assets/shaders/ground_blur.gdshader's own doc comment for why this is a
 ## BackBufferCopy + blur shader rather than something GroundLayer itself
@@ -193,6 +194,7 @@ func build() -> void:
 	ceiling = CeilingData.new(maze)
 	_renderer.setup(maze, TILE_SIZE)
 	_floor_renderer.setup(maze, TILE_SIZE)
+	_overdraw_mask.setup(self, _renderer)
 	_ground_blur_overlay.size = map_pixel_size()
 	_build_collision_and_occluders()
 	_astar = GridNav.build(maze, TILE_SIZE)
