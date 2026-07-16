@@ -84,6 +84,26 @@ func test_draw_does_not_error_with_an_enemy_inside_a_walls_overdraw_band() -> vo
 	assert_true(true, "reached this point without erroring")
 
 
+## Regression guard for the playtest finding wall_occludes_extent() fixes:
+## an entity resting at its own tile's centre (level.tile_centre(), exactly
+## where GridMover always leaves it -- never at the wall's exact edge) must
+## still be detected as occluded. The point-based check this replaced never
+## caught this: the "doesn't error" test above used this same resting
+## position all along and stayed green throughout, because it only ever
+## asserted "no crash," never "was actually occluded."
+func test_a_naturally_resting_enemy_is_actually_detected_as_occluded() -> void:
+	var level := _make_level()
+	var wall_tile := Vector2i(2, 2)
+	var entity_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
+	var resting_position := level.tile_centre(entity_tile)
+
+	var occludes := MazeRenderer.wall_occludes_extent(
+		wall_tile, resting_position, WallOverdrawMask.ENTITY_VISUAL_HALF_EXTENT,
+		Level.TILE_SIZE, level._renderer.wall_overdraw_height)
+
+	assert_true(occludes, "a normally-resting entity's sprite reaches into the band even though its centre point doesn't")
+
+
 func test_draw_does_not_error_on_ceiling_plane_with_a_centipede_segment_present() -> void:
 	var level := _make_level()
 	level._renderer.set_active_plane(Level.Layer.CEILING)

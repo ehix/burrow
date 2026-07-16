@@ -95,6 +95,55 @@ func test_occludes_ceiling_at_the_exact_tile_bottom_boundary() -> void:
 	assert_true(MazeRenderer.wall_occludes_position_ceiling(wall_tile, position, TILE_SIZE, OVERDRAW))
 
 
+# --- wall_occludes_extent()/_ceiling() (playtest fix: GridMover always rests
+# an entity at its own tile's centre -- 24px from any edge at this game's
+# 48px tile size -- so a plain point check (wall_occludes_position) never
+# fires for a resting entity even though its ~40-48px sprite visibly
+# reaches within a few pixels of the wall's edge either way; a WallOverdrawMask
+# using the point check silently never occluded anything in normal play) ----
+
+func test_occludes_extent_for_an_entity_resting_at_the_adjacent_tiles_own_centre() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# tile (2,2) is the tile north of the wall; GridMover would rest an
+	# entity there at its own tile centre: x=120, y=(2*48)+24=120.
+	var resting_position := Vector2(120.0, 120.0)
+
+	assert_true(MazeRenderer.wall_occludes_extent(wall_tile, resting_position, 24.0, TILE_SIZE, OVERDRAW),
+		"a normal resting position must be detected -- this is the exact case the point check missed")
+
+
+func test_does_not_occlude_extent_for_a_position_and_half_extent_that_cant_reach_the_band() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# tile (2,1) is two tiles north of the wall -- resting centre y=72, far
+	# enough that even a generous half-extent can't reach the overdraw band.
+	var far_position := Vector2(120.0, 72.0)
+
+	assert_false(MazeRenderer.wall_occludes_extent(wall_tile, far_position, 24.0, TILE_SIZE, OVERDRAW))
+
+
+func test_does_not_occlude_extent_outside_the_walls_column() -> void:
+	var wall_tile := Vector2i(2, 3)
+	var resting_position := Vector2(200.0, 120.0) # same y as the passing test, wrong column
+
+	assert_false(MazeRenderer.wall_occludes_extent(wall_tile, resting_position, 24.0, TILE_SIZE, OVERDRAW))
+
+
+func test_occludes_extent_ceiling_for_an_entity_resting_at_the_adjacent_tiles_own_centre() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# tile (2,4) is the tile south of the wall; resting centre: y=(4*48)+24=216.
+	var resting_position := Vector2(120.0, 216.0)
+
+	assert_true(MazeRenderer.wall_occludes_extent_ceiling(wall_tile, resting_position, 24.0, TILE_SIZE, OVERDRAW))
+
+
+func test_does_not_occlude_extent_ceiling_for_a_position_too_far_south() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# tile (2,5) is two tiles south of the wall -- resting centre y=264.
+	var far_position := Vector2(120.0, 264.0)
+
+	assert_false(MazeRenderer.wall_occludes_extent_ceiling(wall_tile, far_position, 24.0, TILE_SIZE, OVERDRAW))
+
+
 # --- neither plane ever clips its overdraw for an adjacent pit or flooded
 # tile (playtest fix: a hole is meant to partially disappear behind a
 # wall's overdraw silhouette, same as anything else in the tile the

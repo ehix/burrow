@@ -20,6 +20,13 @@ extends Node2D
 ## player, and that should stay a hard guarantee, not a coin-flip against
 ## whichever entity happens to draw last.
 
+## Assumed vertical half-extent of an occludable entity's visible sprite --
+## every entity this mask handles (Player/Enemy ~41px sprite, CentipedeSegment
+## ~40px collision box) is roughly tile-sized, so this is deliberately just
+## half a tile rather than a per-type measurement. See wall_occludes_extent()'s
+## own doc comment for why a plain position check can't substitute for this.
+const ENTITY_VISUAL_HALF_EXTENT := 24.0
+
 var _level: Level
 var _renderer: MazeRenderer
 
@@ -60,9 +67,9 @@ func _draw() -> void:
 		if painted.has(wall_tile):
 			continue
 		var occludes := (
-			MazeRenderer.wall_occludes_position(wall_tile, entity.global_position, Level.TILE_SIZE, overdraw)
+			MazeRenderer.wall_occludes_extent(wall_tile, entity.global_position, ENTITY_VISUAL_HALF_EXTENT, Level.TILE_SIZE, overdraw)
 			if plane == Level.Layer.GROUND
-			else MazeRenderer.wall_occludes_position_ceiling(wall_tile, entity.global_position, Level.TILE_SIZE, overdraw)
+			else MazeRenderer.wall_occludes_extent_ceiling(wall_tile, entity.global_position, ENTITY_VISUAL_HALF_EXTENT, Level.TILE_SIZE, overdraw)
 		)
 		if not occludes:
 			continue

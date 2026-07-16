@@ -193,6 +193,35 @@ static func wall_occludes_position_ceiling(wall_tile: Vector2i, position: Vector
 	return position.y >= tile_bottom and position.y <= tile_bottom + overdraw
 
 
+## Size-aware sibling of wall_occludes_position(): true if an entity centred
+## at `position` with vertical half-extent `half_extent` would visually
+## overlap the overdraw band, not just its exact centre point. Needed
+## because GridMover always rests an entity at its own tile's centre --
+## 24px from any tile edge at this project's 48px tile size -- while the
+## overdraw band is only ~16px deep, so a plain point check (wall_occludes_
+## position) can never be true for a resting entity even though its actual
+## sprite (roughly tile-sized, ~40-48px) visibly reaches within a few
+## pixels of the edge either way. Found via playtest: WallOverdrawMask
+## using the point check meant it essentially never fired in normal play --
+## entities always rested just outside the checked band while still
+## visibly overlapping the wall's rendered overdraw.
+static func wall_occludes_extent(wall_tile: Vector2i, position: Vector2, half_extent: float, tile_size: int, overdraw: float) -> bool:
+	var tile_left := float(wall_tile.x) * tile_size
+	var tile_top := float(wall_tile.y) * tile_size
+	if position.x < tile_left or position.x > tile_left + tile_size:
+		return false
+	return position.y + half_extent >= tile_top - overdraw and position.y - half_extent <= tile_top
+
+
+## Ceiling-plane mirror of wall_occludes_extent() -- see its own doc comment.
+static func wall_occludes_extent_ceiling(wall_tile: Vector2i, position: Vector2, half_extent: float, tile_size: int, overdraw: float) -> bool:
+	var tile_left := float(wall_tile.x) * tile_size
+	var tile_bottom := float(wall_tile.y) * tile_size + tile_size
+	if position.x < tile_left or position.x > tile_left + tile_size:
+		return false
+	return position.y - half_extent <= tile_bottom + overdraw and position.y + half_extent >= tile_bottom
+
+
 func _draw_grid_lines() -> void:
 	var width_px := _maze.width * _tile_size
 	var height_px := _maze.height * _tile_size
