@@ -36,12 +36,13 @@ var grid_line_color := Color(1, 1, 1, 0.08)
 var wall_overdraw_height := 16.0
 var wall_front_face_height := 16.0
 
-## How many tiles out from the fade centre (see set_fade_center()) a wall's
-## overdraw sliver keeps fading, and how transparent it gets at the centre
-## itself -- see overdraw_alpha_for()'s own doc comment for why only the
-## sliver fades, never the rest of the wall block. Placeholder numbers, easy
-## to retune once real tile art exists (see this file's own doc comment).
-var wall_fade_radius_tiles := 2.0
+## How many tile-columns either side of the fade centre (see set_fade_
+## center()) a wall's overdraw sliver softens, and how transparent it gets
+## there -- see overdraw_alpha_for()'s own doc comment for why this is a
+## flat window rather than a radius, and only ever touches the sliver, never
+## the rest of the wall block. Placeholder numbers, easy to retune once real
+## tile art exists (see this file's own doc comment).
+var wall_fade_span_tiles := 1
 var wall_fade_min_alpha := 0.25
 
 var _active_plane: Level.Layer = Level.Layer.GROUND
@@ -90,46 +91,64 @@ func active_plane() -> Level.Layer:
 ## Where "the viewer" currently is, in tile coordinates -- Level calls this
 ## every frame with the player's own tile (mirrors the old fade_focus_
 ## position idiom, see _draw_wall_ground()'s doc comment for why that
-## version was replaced). Drives overdraw_alpha_for(): every wall's overdraw
-## sliver fades toward transparent the closer it is to this tile, so a wall
-## about to swallow the player's own sprite doesn't actually hide it (the
-## playtest ask this restores), while walls elsewhere on the map stay fully
-## solid -- the illusion of depth is still consistent everywhere, just
-## biased toward staying visible right around the viewer.
+## version was replaced). Drives overdraw_alpha_for(): the handful of wall
+## tiles that could actually be occluding this tile right now soften toward
+## transparent, so a wall about to swallow the player's own sprite doesn't
+## actually hide it (the playtest ask this restores), while every other wall
+## on the map -- including ones further along the very same wall run --
+## stays fully solid.
 func set_fade_center(tile: Vector2i) -> void:
 	_fade_center_tile = tile
 	_has_fade_center = true
 
 
-## Alpha multiplier for a wall's overdraw sliver at `wall_tile`, given how
-## many tiles it is from `distance` away from the fade centre (Chebyshev/
-## grid-ring distance, so "N tiles out" reads as a square ring the way a
-## top-down grid naturally does) -- 1.0 (fully solid, matching every other
-## wall on the map) once `distance` reaches `radius`, ramping down linearly
-## to `min_alpha` at the centre tile itself. A pure function so it's
+## Alpha multiplier for a wall's overdraw sliver, given how many tile-
+## columns it is from the fade centre's own column (`column_offset`, signed:
+## negative is west, positive is east) -- `min_alpha` for every column
+## within `span` tiles either side (inclusive), 1.0 (fully solid, matching
+## every other wall on the map) beyond that. A pure function so it's
 ## directly unit-testable; see overdraw_alpha_for() for the wrapper that
-## supplies the live `distance` from this renderer's own fade centre.
-static func overdraw_alpha_for_distance(distance: float, radius: float, min_alpha: float) -> float:
-	if radius <= 0.0:
-		return 1.0
-	var t := clampf(distance / radius, 0.0, 1.0)
-	return lerpf(min_alpha, 1.0, t)
+## supplies the live `column_offset` from this renderer's own fade centre.
+##
+## Deliberately a flat step across the whole span, not a gradient: an
+## earlier version faded gradually by radial (Chebyshev) tile-distance, but
+## that meant two things at once: it reached tiles diagonally/vertically
+## off from the fade centre that were never actually in the same overdraw
+## row to begin with (the fade zone read as far larger than the handful of
+## tiles that could ever visually matter), and as the player moved, tiles
+## already inside the fade radius kept ramping toward different alpha
+## values than tiles that had just entered it -- neighbouring tiles never
+## agreeing on how transparent they should be at any given instant, reading
+## as a flicker rather than a smooth fade (playtest finding). A uniform
+## alpha across a narrow, row-correct span fixes both: only tiles that can
+## actually occlude something near the viewer ever fade, and every one of
+## them always reads exactly the same regardless of how long it's been in
+## range.
+static func overdraw_alpha_for_offset(column_offset: int, span: int, min_alpha: float) -> float:
+	if absi(column_offset) <= span:
+		return min_alpha
+	return 1.0
 
 
 ## Live alpha for `wall_tile`'s overdraw sliver right now -- 1.0 (no fade
-## centre set yet, e.g. before Level's first _process()) or the Chebyshev
-## tile-distance from the last set_fade_center() call fed through
-## overdraw_alpha_for_distance(). _draw_wall_ground()/_draw_wall_ceiling()
-## use this for the sliver only (never the front face or a wall's own-tile
-## top face -- see their own doc comments for why just the sliver), and
-## WallOverdrawMask's repaint pass calls this same function so a wall
-## fading near the viewer and its repaint-over-an-entity pass never
-## disagree about how transparent that tile currently is.
+## centre set yet, e.g. before Level's first _process()) unless `wall_tile`
+## sits in the one row that could actually be occluding the fade centre's
+## own tile (south of it on GROUND, north on CEILING -- the same row
+## WallOverdrawMask.wall_tile_for() computes), in which case it's
+## overdraw_alpha_for_offset() keyed off how many columns it is from the
+## fade centre. _draw_wall_ground()/_draw_wall_ceiling() use this for the
+## sliver only (never the front face or a wall's own-tile top face -- see
+## their own doc comments for why just the sliver), and WallOverdrawMask's
+## repaint pass calls this same function so a wall fading near the viewer
+## and its repaint-over-an-entity pass never disagree about how transparent
+## that tile currently is.
 func overdraw_alpha_for(wall_tile: Vector2i) -> float:
 	if not _has_fade_center:
 		return 1.0
-	var distance := float(maxi(absi(wall_tile.x - _fade_center_tile.x), absi(wall_tile.y - _fade_center_tile.y)))
-	return overdraw_alpha_for_distance(distance, wall_fade_radius_tiles, wall_fade_min_alpha)
+	var fade_row := _fade_center_tile.y + 1 if _active_plane == Level.Layer.GROUND else _fade_center_tile.y - 1
+	if wall_tile.y != fade_row:
+		return 1.0
+	return overdraw_alpha_for_offset(wall_tile.x - _fade_center_tile.x, wall_fade_span_tiles, wall_fade_min_alpha)
 
 
 ## The overdraw sliver's own rect in world space for `tile` (a wall tile),

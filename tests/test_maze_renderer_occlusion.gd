@@ -262,31 +262,23 @@ func test_draw_does_not_error_with_a_fade_center_set() -> void:
 	assert_true(true, "reached this point without erroring")
 
 
-# --- overdraw_alpha_for_distance()/overdraw_alpha_for() (playtest ask:
+# --- overdraw_alpha_for_offset()/overdraw_alpha_for() (playtest ask:
 # occlude the player exactly like every other entity, but fade nearby wall
 # overdraw so the player's own sprite doesn't vanish -- see WallOverdrawMask's
-# own doc comment for why this replaced the old per-entity-type special case)
-# -----------------------------------------------------------------------
+# own doc comment for why this replaced the old per-entity-type special case.
+# Playtest follow-up: a radial/gradient version of this fade reached tiles
+# that could never actually occlude the viewer and visibly flickered as the
+# player moved -- see overdraw_alpha_for_offset()'s own doc comment) --------
 
-func test_overdraw_alpha_for_distance_is_full_opacity_at_or_beyond_the_radius() -> void:
-	assert_eq(MazeRenderer.overdraw_alpha_for_distance(2.0, 2.0, 0.25), 1.0)
-	assert_eq(MazeRenderer.overdraw_alpha_for_distance(5.0, 2.0, 0.25), 1.0)
-
-
-func test_overdraw_alpha_for_distance_is_min_alpha_at_the_centre() -> void:
-	assert_eq(MazeRenderer.overdraw_alpha_for_distance(0.0, 2.0, 0.25), 0.25)
-
-
-func test_overdraw_alpha_for_distance_ramps_linearly_between() -> void:
-	# Halfway to the radius (distance=1, radius=2) should read halfway
-	# between min_alpha (0.25) and full opacity (1.0): 0.625.
-	assert_almost_eq(MazeRenderer.overdraw_alpha_for_distance(1.0, 2.0, 0.25), 0.625, 0.0001)
+func test_overdraw_alpha_for_offset_is_min_alpha_within_the_span() -> void:
+	assert_eq(MazeRenderer.overdraw_alpha_for_offset(0, 1, 0.25), 0.25)
+	assert_eq(MazeRenderer.overdraw_alpha_for_offset(1, 1, 0.25), 0.25)
+	assert_eq(MazeRenderer.overdraw_alpha_for_offset(-1, 1, 0.25), 0.25)
 
 
-func test_overdraw_alpha_for_distance_is_full_opacity_when_radius_is_zero_or_negative() -> void:
-	# A zero/negative radius means "fading is off" -- must not divide by zero.
-	assert_eq(MazeRenderer.overdraw_alpha_for_distance(0.0, 0.0, 0.25), 1.0)
-	assert_eq(MazeRenderer.overdraw_alpha_for_distance(0.0, -1.0, 0.25), 1.0)
+func test_overdraw_alpha_for_offset_is_full_opacity_beyond_the_span() -> void:
+	assert_eq(MazeRenderer.overdraw_alpha_for_offset(2, 1, 0.25), 1.0)
+	assert_eq(MazeRenderer.overdraw_alpha_for_offset(-2, 1, 0.25), 1.0)
 
 
 func test_overdraw_alpha_for_is_full_opacity_before_a_fade_center_is_ever_set() -> void:
@@ -295,15 +287,35 @@ func test_overdraw_alpha_for_is_full_opacity_before_a_fade_center_is_ever_set() 
 	assert_eq(renderer.overdraw_alpha_for(Vector2i(0, 0)), 1.0)
 
 
-func test_overdraw_alpha_for_uses_chebyshev_distance_from_the_fade_center() -> void:
+## Ground plane: the fade centre's own tile can only ever be occluded from
+## the wall row directly south of it (wall_tile_for()'s own ground-plane
+## rule) -- so only that row, within wall_fade_span_tiles columns, ever
+## softens; every other row (even the very next one further south, or the
+## centre's own row) stays full opacity regardless of column.
+func test_overdraw_alpha_for_only_softens_the_occluding_row_within_the_column_span() -> void:
 	var renderer := _make_renderer()
-	renderer.wall_fade_radius_tiles = 2.0
+	renderer.wall_fade_span_tiles = 1
+	renderer.wall_fade_min_alpha = 0.25
+	renderer.set_fade_center(Vector2i(5, 5)) # ground plane by default -- occluding row is y=6
+
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 6)), 0.25, "directly adjacent, same column")
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(4, 6)), 0.25, "one column to the west, still within the span")
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(6, 6)), 0.25, "one column to the east, still within the span")
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(3, 6)), 1.0, "two columns out -- beyond the span")
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(7, 6)), 1.0, "two columns out the other way -- beyond the span")
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 7)), 1.0, "one row further south -- not the occluding row")
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 5)), 1.0, "the fade centre's own tile isn't a wall row at all")
+
+
+## Ceiling plane mirror: the occluding row flips to north of the fade
+## centre (wall_tile_for()'s ceiling-plane rule) -- confirms overdraw_alpha_
+## for() actually reads active_plane() rather than assuming ground always.
+func test_overdraw_alpha_for_uses_the_north_row_on_the_ceiling_plane() -> void:
+	var renderer := _make_renderer()
+	renderer.set_active_plane(Level.Layer.CEILING)
+	renderer.wall_fade_span_tiles = 1
 	renderer.wall_fade_min_alpha = 0.25
 	renderer.set_fade_center(Vector2i(5, 5))
 
-	# (6,7) is 2 tiles away on the y axis -- Chebyshev distance is the max of
-	# the two axes (max(1,2)=2), matching a square "N tiles out" ring, not a
-	# circular one -- exactly at the radius, so still full opacity.
-	assert_eq(renderer.overdraw_alpha_for(Vector2i(6, 7)), 1.0)
-	# The centre tile itself reads at min_alpha.
-	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 5)), 0.25)
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 4)), 0.25, "north of the centre -- the ceiling-plane occluding row")
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 6)), 1.0, "south is the ground-plane occluding row, not ceiling")

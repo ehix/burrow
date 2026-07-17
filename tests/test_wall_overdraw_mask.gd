@@ -156,13 +156,15 @@ func test_paint_color_for_defaults_to_full_opacity_without_a_fade_center() -> vo
 
 func test_paint_color_for_uses_the_renderers_live_alpha_at_that_tile() -> void:
 	var level := _make_level()
-	level._renderer.set_fade_center(Vector2i(2, 2))
+	var wall_tile := Vector2i(2, 2)
+	var entity_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
+	level._renderer.set_fade_center(entity_tile)
 	level._renderer.wall_fade_min_alpha = 0.25
 
-	var color: Color = _mask_of(level)._paint_color_for(Vector2i(2, 2))
+	var color: Color = _mask_of(level)._paint_color_for(wall_tile)
 
 	assert_eq(color.a, level._renderer.wall_top_face_color.a * 0.25,
-		"the fade centre tile itself should read at wall_fade_min_alpha")
+		"the wall tile directly adjacent to the fade centre should read at wall_fade_min_alpha")
 
 
 ## Playtest ask: the player should be occluded exactly like every other
