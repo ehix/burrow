@@ -128,12 +128,49 @@ func test_does_not_occlude_extent_outside_the_walls_column() -> void:
 	assert_false(MazeRenderer.wall_occludes_extent(wall_tile, resting_position, 24.0, TILE_SIZE, OVERDRAW))
 
 
+## Playtest fix: an entity mid-step, straddling a column boundary next to a
+## wall run, has its sprite's near edge already inside the neighboring
+## column even though its centre x hasn't crossed yet -- a plain column
+## containment check (the old x-gate here) rejected that neighbor outright,
+## so WallOverdrawMask could only ever repaint whichever single column the
+## entity's exact centre currently floor-divided to, leaving the straddling
+## half of the sprite unoccluded for a chunk of every step (see
+## WallOverdrawMask._straddled_columns()'s own doc comment for the full
+## picture -- this test covers just the underlying primitive's new margin).
+func test_occludes_extent_for_a_position_straddling_into_the_walls_column() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# tile (2,2) is the tile north of the wall (x=[96,144]); a position just
+	# inside the tile east of that, x=150, is 6px past wall_tile's own right
+	# edge (144) -- well within a 24px half-extent, so its sprite still
+	# reaches back into wall_tile's column even though its centre doesn't.
+	var straddling_position := Vector2(150.0, 120.0)
+
+	assert_true(MazeRenderer.wall_occludes_extent(wall_tile, straddling_position, 24.0, TILE_SIZE, OVERDRAW),
+		"a sprite straddling the column boundary must still be checked against the neighboring wall tile")
+
+
+func test_does_not_occlude_extent_for_a_position_too_far_outside_the_column_to_straddle() -> void:
+	var wall_tile := Vector2i(2, 3)
+	# x=170 is 26px past wall_tile's right edge (144) -- just outside a 24px
+	# half-extent, so this position's sprite genuinely doesn't reach back in.
+	var far_position := Vector2(170.0, 120.0)
+
+	assert_false(MazeRenderer.wall_occludes_extent(wall_tile, far_position, 24.0, TILE_SIZE, OVERDRAW))
+
+
 func test_occludes_extent_ceiling_for_an_entity_resting_at_the_adjacent_tiles_own_centre() -> void:
 	var wall_tile := Vector2i(2, 3)
 	# tile (2,4) is the tile south of the wall; resting centre: y=(4*48)+24=216.
 	var resting_position := Vector2(120.0, 216.0)
 
 	assert_true(MazeRenderer.wall_occludes_extent_ceiling(wall_tile, resting_position, 24.0, TILE_SIZE, OVERDRAW))
+
+
+func test_occludes_extent_ceiling_for_a_position_straddling_into_the_walls_column() -> void:
+	var wall_tile := Vector2i(2, 3)
+	var straddling_position := Vector2(150.0, 216.0) # 6px past wall_tile's right edge (144)
+
+	assert_true(MazeRenderer.wall_occludes_extent_ceiling(wall_tile, straddling_position, 24.0, TILE_SIZE, OVERDRAW))
 
 
 func test_does_not_occlude_extent_ceiling_for_a_position_too_far_south() -> void:
@@ -194,36 +231,26 @@ func _make_renderer() -> MazeRenderer:
 	return renderer
 
 
-func test_set_fade_focus_stores_the_position() -> void:
-	var renderer := _make_renderer()
-
-	renderer.set_fade_focus(Vector2(100.0, 200.0))
-
-	assert_eq(renderer.fade_focus_position, Vector2(100.0, 200.0))
-
-
-func test_defaults_to_a_fade_focus_that_never_occludes_anything() -> void:
-	var renderer := _make_renderer()
-
-	# The default must never accidentally fade a wall before Level ever
-	# calls set_fade_focus() -- Vector2.INF can't fall inside any tile's
-	# finite x range, so wall_occludes_position() always returns false.
-	assert_false(MazeRenderer.wall_occludes_position(Vector2i(1, 1), renderer.fade_focus_position, 48, 16.0))
-
-
-func test_draw_does_not_error_with_walls_and_a_fade_focus_present() -> void:
-	var renderer := _make_renderer()
-	renderer.set_fade_focus(Vector2(24.0, 24.0))
+## MazeRenderer no longer fades a wall's own paint for anything (playtest
+## follow-up: that used to be driven by Level calling set_fade_focus() with
+## the player's position every frame, specifically to keep a wall from
+## fully hiding them -- removed in favor of WallOverdrawMask repainting the
+## player at a translucent alpha instead, same mechanism every other
+## entity uses, just with a softer color; see WallOverdrawMask's own doc
+## comment for why layering both would have double-faded the same patch).
+## _draw_wall_ground()/_draw_wall_ceiling() always draw at full opacity now
+## -- this just confirms that still doesn't error, on both planes.
+func test_draw_does_not_error_on_the_ground_plane() -> void:
+	_make_renderer()
 
 	await get_tree().process_frame
 
 	assert_true(true, "reached this point without erroring")
 
 
-func test_draw_does_not_error_on_ceiling_plane_with_walls_and_a_fade_focus() -> void:
+func test_draw_does_not_error_on_the_ceiling_plane() -> void:
 	var renderer := _make_renderer()
 	renderer.set_active_plane(Level.Layer.CEILING)
-	renderer.set_fade_focus(Vector2(24.0, 24.0))
 
 	await get_tree().process_frame
 

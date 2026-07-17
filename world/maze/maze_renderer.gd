@@ -36,16 +36,17 @@ var grid_line_color := Color(1, 1, 1, 0.08)
 var wall_overdraw_height := 16.0
 var wall_front_face_height := 16.0
 
-## Any wall whose rendered block would currently overlap this world-space
-## position fades to wall_fade_alpha -- set by Level every frame to the
-## player's own position (occlusion fade), so a wall directly "in front of"
-## the player on screen never hides them. Vector2.INF (the default) can
-## never fall inside any wall's finite occlusion band, so nothing fades
-## until Level calls set_fade_focus().
-var fade_focus_position := Vector2.INF
-var wall_fade_alpha := 0.25
-
 var _active_plane: Level.Layer = Level.Layer.GROUND
+
+## Assumed visual half-extent (both axes) of an occludable entity's sprite --
+## every entity this half-extent is used for (Player/Enemy ~41px sprite,
+## CentipedeSegment ~40px collision box) is roughly tile-sized, so this is
+## deliberately just half a tile rather than a per-type measurement. Lives
+## here (not on WallOverdrawMask, its only reader) purely so wall_occludes_
+## extent()/_ceiling() can sit next to the plain position-check functions
+## they replace. See wall_occludes_extent()'s own doc comment for why a
+## plain position check can't substitute for this.
+const ENTITY_VISUAL_HALF_EXTENT := 24.0
 
 
 func _ready() -> void:
@@ -69,12 +70,6 @@ func set_active_plane(plane: Level.Layer) -> void:
 	queue_redraw()
 
 
-## Where the occlusion fade should center -- see fade_focus_position's own
-## doc comment.
-func set_fade_focus(world_position: Vector2) -> void:
-	fade_focus_position = world_position
-
-
 ## Read-only access to which plane is currently active -- WallOverdrawMask
 ## needs this to know which neighbor direction (north for ground, south for
 ## ceiling) a given entity's own wall-adjacency check should use.
@@ -86,9 +81,10 @@ func active_plane() -> Level.Layer:
 ## matching whichever plane is currently active -- the exact patch
 ## _draw_wall_ground()/_draw_wall_ceiling() paints for that wall's top face
 ## poking into its neighbor. WallOverdrawMask paints this same patch again,
-## on top of Entities, whenever an entity (not the player) is standing
-## inside it -- see WallOverdrawMask's own doc comment for why a second pass
-## is needed instead of just relying on draw order once.
+## on top of Entities, whenever an occludable entity is standing inside it
+## -- see WallOverdrawMask's own doc comment for why a second pass is
+## needed instead of just relying on draw order once, and for how the
+## player specifically gets a softer repaint than everyone else.
 func overdraw_rect_for(tile: Vector2i) -> Rect2:
 	var tile_left := float(tile.x) * _tile_size
 	if _active_plane == Level.Layer.GROUND:
@@ -119,51 +115,53 @@ func _draw_wall(tile: Vector2i) -> void:
 
 
 ## Ground-plane wall: front face anchored to the tile's own bottom edge,
-## top face poking up into the tile north of it. Fades both faces together
-## if this wall currently occludes fade_focus_position. Always renders at
-## full height, even when a pit or flooded tile (same MazeData overlay --
-## see MazeData.is_pit()) sits in the tile north of it (playtest fix,
-## mirrors _draw_wall_ceiling()): the overdraw represents the wall's own
-## height occluding whatever's behind it from the viewer's perspective, and
-## a hole is no exception to that -- its near edge should partially
-## disappear behind the wall's silhouette, not the wall shrinking to avoid
-## touching it. An earlier version clipped the overdraw to 0 next to a pit;
-## that produced a visible notch in the wall's own silhouette right where a
-## consistent block was expected, which is a worse look than the wall
-## simply doing what it does everywhere else.
+## top face poking up into the tile north of it. Always renders at full
+## height and full opacity -- WallOverdrawMask is solely responsible for
+## softening a wall's appearance where it would hide an entity (including
+## the player; see its own doc comment), by repainting just the affected
+## patch on top of Entities, rather than this draw call fading itself.
+## (An earlier version faded the wall's own paint here directly, driven by
+## a fade_focus_position Level set to the player's position every frame --
+## replaced because fading the *whole* tile's block this way, then having
+## WallOverdrawMask repaint translucently over just the player's own
+## silhouette on top of that, double-layered the same translucent color
+## and made the band beside the player visibly more opaque than intended.)
+## Always renders at full height even when a pit or flooded tile (same
+## MazeData overlay -- see MazeData.is_pit()) sits in the tile north of it
+## (playtest fix, mirrors _draw_wall_ceiling()): the overdraw represents
+## the wall's own height occluding whatever's behind it from the viewer's
+## perspective, and a hole is no exception to that -- its near edge should
+## partially disappear behind the wall's silhouette, not the wall shrinking
+## to avoid touching it. An earlier version clipped the overdraw to 0 next
+## to a pit; that produced a visible notch in the wall's own silhouette
+## right where a consistent block was expected, which is a worse look than
+## the wall simply doing what it does everywhere else.
 func _draw_wall_ground(tile: Vector2i) -> void:
 	var overdraw := wall_overdraw_height
-	var alpha := wall_fade_alpha if wall_occludes_position(tile, fade_focus_position, _tile_size, overdraw) else 1.0
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
 	var tile_bottom := tile_top + _tile_size
 	var block_top := tile_top - overdraw
 	var front_face_top := tile_bottom - wall_front_face_height
-	draw_rect(Rect2(tile_left, block_top, _tile_size, front_face_top - block_top),
-		Color(wall_top_face_color, wall_top_face_color.a * alpha))
-	draw_rect(Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height),
-		Color(wall_front_face_color, wall_front_face_color.a * alpha))
+	draw_rect(Rect2(tile_left, block_top, _tile_size, front_face_top - block_top), wall_top_face_color)
+	draw_rect(Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height), wall_front_face_color)
 
 
 ## Ceiling-plane wall: mirrored -- front face anchored to the tile's own
 ## top edge, hanging down; top face pokes down into the tile south of it
-## (tunnel visual rework Phase 2). Fades both faces together if this wall
-## currently occludes fade_focus_position via the ceiling-mirrored check.
-## Same full-height-always behavior as _draw_wall_ground() -- see its doc
-## comment for why a pit/flooded neighbor never clips the overdraw on
-## either plane.
+## (tunnel visual rework Phase 2). Same full-height-always, full-opacity-
+## always behavior as _draw_wall_ground() -- see its doc comment for both
+## the pit/flooded-neighbor rationale and why fading belongs to
+## WallOverdrawMask now, not here.
 func _draw_wall_ceiling(tile: Vector2i) -> void:
 	var overdraw := wall_overdraw_height
-	var alpha := wall_fade_alpha if wall_occludes_position_ceiling(tile, fade_focus_position, _tile_size, overdraw) else 1.0
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
 	var tile_bottom := tile_top + _tile_size
 	var block_bottom := tile_bottom + overdraw
 	var front_face_bottom := tile_top + wall_front_face_height
-	draw_rect(Rect2(tile_left, front_face_bottom, _tile_size, block_bottom - front_face_bottom),
-		Color(wall_top_face_color, wall_top_face_color.a * alpha))
-	draw_rect(Rect2(tile_left, tile_top, _tile_size, wall_front_face_height),
-		Color(wall_front_face_color, wall_front_face_color.a * alpha))
+	draw_rect(Rect2(tile_left, front_face_bottom, _tile_size, block_bottom - front_face_bottom), wall_top_face_color)
+	draw_rect(Rect2(tile_left, tile_top, _tile_size, wall_front_face_height), wall_front_face_color)
 
 
 ## True if a wall at `wall_tile` (tile coordinates) would visually overlap
@@ -194,21 +192,32 @@ static func wall_occludes_position_ceiling(wall_tile: Vector2i, position: Vector
 
 
 ## Size-aware sibling of wall_occludes_position(): true if an entity centred
-## at `position` with vertical half-extent `half_extent` would visually
-## overlap the overdraw band, not just its exact centre point. Needed
-## because GridMover always rests an entity at its own tile's centre --
-## 24px from any tile edge at this project's 48px tile size -- while the
-## overdraw band is only ~16px deep, so a plain point check (wall_occludes_
-## position) can never be true for a resting entity even though its actual
-## sprite (roughly tile-sized, ~40-48px) visibly reaches within a few
-## pixels of the edge either way. Found via playtest: WallOverdrawMask
-## using the point check meant it essentially never fired in normal play --
-## entities always rested just outside the checked band while still
-## visibly overlapping the wall's rendered overdraw.
+## at `position` with half-extent `half_extent` (applied on BOTH axes) would
+## visually overlap the overdraw band, not just its exact centre point.
+## Needed on the y axis because GridMover always rests an entity at its own
+## tile's centre -- 24px from any tile edge at this project's 48px tile
+## size -- while the overdraw band is only ~16px deep, so a plain point
+## check (wall_occludes_position) can never be true for a resting entity
+## even though its actual sprite (roughly tile-sized, ~40-48px) visibly
+## reaches within a few pixels of the edge either way. Found via playtest:
+## WallOverdrawMask using the point check meant it essentially never fired
+## in normal play -- entities always rested just outside the checked band
+## while still visibly overlapping the wall's rendered overdraw. Needed on
+## the x axis too (second playtest finding) so a moving entity whose sprite
+## currently straddles a tile-column boundary -- true for most of every
+## step, since half_extent is close to half a tile wide -- is still
+## detected against a wall_tile candidate its exact centre x hasn't reached
+## yet; the caller (WallOverdrawMask._draw()) is what actually supplies
+## both neighboring wall_tile candidates to check this against, this
+## function just has to stop rejecting the genuinely-overlapping one on x
+## alone. Without this, an entity crossing a column boundary next to a wall
+## run showed only half its sprite occluded for stretches of every step --
+## the near half correctly hidden, the far half popping fully visible until
+## the tile-column flip, then instantly reversing.
 static func wall_occludes_extent(wall_tile: Vector2i, position: Vector2, half_extent: float, tile_size: int, overdraw: float) -> bool:
 	var tile_left := float(wall_tile.x) * tile_size
 	var tile_top := float(wall_tile.y) * tile_size
-	if position.x < tile_left or position.x > tile_left + tile_size:
+	if position.x + half_extent < tile_left or position.x - half_extent > tile_left + tile_size:
 		return false
 	return position.y + half_extent >= tile_top - overdraw and position.y - half_extent <= tile_top
 
@@ -217,7 +226,7 @@ static func wall_occludes_extent(wall_tile: Vector2i, position: Vector2, half_ex
 static func wall_occludes_extent_ceiling(wall_tile: Vector2i, position: Vector2, half_extent: float, tile_size: int, overdraw: float) -> bool:
 	var tile_left := float(wall_tile.x) * tile_size
 	var tile_bottom := float(wall_tile.y) * tile_size + tile_size
-	if position.x < tile_left or position.x > tile_left + tile_size:
+	if position.x + half_extent < tile_left or position.x - half_extent > tile_left + tile_size:
 		return false
 	return position.y - half_extent <= tile_bottom + overdraw and position.y + half_extent >= tile_bottom
 
