@@ -158,6 +158,7 @@ func test_paint_color_for_uses_the_renderers_live_alpha_at_that_tile() -> void:
 	var level := _make_level()
 	var wall_tile := Vector2i(2, 2)
 	var entity_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
+	level.maze.set_open(entity_tile.x, entity_tile.y) # pin it open -- poked_into_tile_is_open() needs this, not left to the random maze's luck
 	level._renderer.set_fade_center(entity_tile)
 	level._renderer.wall_fade_min_alpha = 0.25
 
@@ -176,6 +177,7 @@ func test_player_is_fully_occluded_by_a_wall_far_from_the_fade_center() -> void:
 	var wall_tile := Vector2i(2, 2)
 	level.maze.set_wall(wall_tile.x, wall_tile.y)
 	var entity_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
+	level.maze.set_open(entity_tile.x, entity_tile.y) # pin it open, not left to the random maze's luck
 	level.player.global_position = level.tile_centre(entity_tile)
 	level._renderer.set_fade_center(Vector2i(50, 50)) # far away -- no fade should reach here
 
@@ -194,6 +196,7 @@ func test_wall_tile_softens_near_the_fade_center_regardless_of_which_entity_is_t
 	var wall_tile := Vector2i(2, 2)
 	level.maze.set_wall(wall_tile.x, wall_tile.y)
 	var entity_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
+	level.maze.set_open(entity_tile.x, entity_tile.y) # pin it open, not left to the random maze's luck
 	level.enemy.global_position = level.tile_centre(entity_tile)
 	level._renderer.set_fade_center(entity_tile) # simulate the player standing right there
 
@@ -201,6 +204,51 @@ func test_wall_tile_softens_near_the_fade_center_regardless_of_which_entity_is_t
 
 	assert_lt(colors[wall_tile].a, level._renderer.wall_top_face_color.a,
 		"a wall right next to the fade centre should soften even for the Enemy, not only the player")
+
+
+## Playtest finding: an entity resting normally (dead-centre in its own
+## tile -- exactly where GridMover always leaves it) makes _straddled_
+## columns() check both its own column AND one neighbor, by design (see
+## that function's own doc comment). When that neighbor column's wall_tile
+## has ANOTHER wall stacked immediately behind it (poked_into_tile_is_open()
+## false for it), repainting it at all -- regardless of alpha -- silently
+## overwrote that other wall's own front-face cap, because this repaint
+## runs after Entities, after MazeRenderer already resolved that same rect
+## in the stacked wall's favor within its own _draw(). Confirmed via a real
+## rendering probe: the cap tile came back painted wall_top_face_color
+## (the light color) where wall_front_face_color (the dark cap) belonged.
+func test_occluded_wall_tile_colors_never_repaints_a_straddle_neighbor_that_would_overwrite_a_different_walls_cap() -> void:
+	var level := _make_level()
+	level._renderer.set_active_plane(Level.Layer.CEILING)
+	var entity_tile := Vector2i(2, 3)
+	level.maze.set_open(entity_tile.x, entity_tile.y)
+	level.maze.set_wall(2, 2) # directly north of the entity -- legitimate occlusion
+	level.maze.set_wall(3, 2) # straddle-adjacent, same row -- the spurious target
+	level.maze.set_wall(3, 3) # (3,2)'s own poked-into tile is ALSO a wall
+	level.player.global_position = level.tile_centre(entity_tile)
+
+	var colors: Dictionary = _mask_of(level)._occluded_wall_tile_colors()
+
+	assert_true(colors.has(Vector2i(2, 2)), "the wall directly occluding the entity must still repaint")
+	assert_false(colors.has(Vector2i(3, 2)),
+		"a straddle-adjacent wall whose own poked-into tile is ALSO a wall must never repaint")
+
+
+## Ground-plane mirror of the test above -- poked-into flips to north.
+func test_occluded_wall_tile_colors_never_repaints_a_straddle_neighbor_on_ground_plane_either() -> void:
+	var level := _make_level()
+	var entity_tile := Vector2i(2, 1)
+	level.maze.set_open(entity_tile.x, entity_tile.y)
+	level.maze.set_wall(2, 2) # directly south of the entity -- legitimate occlusion
+	level.maze.set_wall(3, 2) # straddle-adjacent, same row -- the spurious target
+	level.maze.set_wall(3, 1) # (3,2)'s own poked-into tile (north) is ALSO a wall
+	level.player.global_position = level.tile_centre(entity_tile)
+
+	var colors: Dictionary = _mask_of(level)._occluded_wall_tile_colors()
+
+	assert_true(colors.has(Vector2i(2, 2)), "the wall directly occluding the entity must still repaint")
+	assert_false(colors.has(Vector2i(3, 2)),
+		"a straddle-adjacent wall whose own poked-into tile is ALSO a wall must never repaint")
 
 
 ## Playtest fix: while mid-step, an entity's sprite spans two tile columns

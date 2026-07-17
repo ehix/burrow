@@ -84,6 +84,23 @@ func _draw() -> void:
 ## tile's own position (via _paint_color_for()), never on which entity
 ## triggered it, so every entity sharing a tile always agrees on its color
 ## and dedup here is just "skip a tile once it's already been computed."
+##
+## Playtest finding: _straddled_columns() deliberately checks an entity's
+## own column AND one neighbor even for an entity resting dead-centre in its
+## tile (see that function's own doc comment -- "a deliberate, harmless
+## redundancy"). That redundancy stops being harmless the moment the
+## neighbor column's wall_tile has ANOTHER wall stacked on the far side of
+## it: this repaint would still fire for it (the straddle/extent checks
+## above only look at the ENTITY's geometry, not at whether wall_tile's own
+## sliver represents real occludable space), and since this repaint runs
+## after Entities -- after MazeRenderer has already resolved that same rect
+## in the stacked wall's own front-face cap's favor within its own _draw()
+## call -- it would silently overwrite that cap with this wall_tile's own
+## sliver color instead. MazeRenderer.poked_into_tile_is_open() is the same
+## guard overdraw_alpha_for() uses to stop fading a seam like this; here it
+## has to be a hard skip instead of just an alpha of 1.0, because painting
+## ANYTHING here -- at any alpha -- is wrong when the poked-into tile isn't
+## real occludable floor.
 func _occluded_wall_tile_colors() -> Dictionary:
 	var maze := _level.maze
 	var plane := _renderer.active_plane()
@@ -99,6 +116,8 @@ func _occluded_wall_tile_colors() -> Dictionary:
 				continue
 			if maze.is_open(wall_tile.x, wall_tile.y):
 				continue # no wall there -- nothing to occlude with
+			if not _renderer.poked_into_tile_is_open(wall_tile):
+				continue # this sliver is an internal wall-to-wall seam, not real occludable space
 			var occludes := (
 				MazeRenderer.wall_occludes_extent(wall_tile, position, ENTITY_VISUAL_HALF_EXTENT, Level.TILE_SIZE, overdraw)
 				if plane == Level.Layer.GROUND
