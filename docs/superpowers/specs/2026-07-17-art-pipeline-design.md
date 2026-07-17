@@ -15,10 +15,15 @@ used successfully.
 
 ## 2. Non-goals
 
-- Reconsidering the visual style itself. `docs/art-bible.md` §§2–3 (palette,
-  anatomy realism, top-down resting pose, color-language rules) remain
-  authoritative. This pipeline exists to actually *hit* that style
-  consistently, not redefine it.
+- Reconsidering anatomy realism, palette, top-down resting pose, or
+  color-language rules — `docs/art-bible.md` §§2–3 remain authoritative on
+  those. The one style pillar that *did* change is the rendering direction
+  itself: §2 was revised 2026-07-17, alongside this tooling change, to a
+  retro/indie pixel-art look (driven by SpriteCook cost and the user's
+  preference), replacing the prior semi-realistic/soft-edged direction.
+  That's a closed decision as of this revision, not an open one for
+  Category 0 to re-litigate — Category 0 executes it and becomes the new
+  reference anchor.
 - Wiring up `PreyType`/prey-variant gameplay logic. `resources/prey_type.gd`
   exists but has zero `.tres` instances and `Larva` never references it —
   that's a code prerequisite for Category 3, tracked there, not solved by
@@ -26,9 +31,11 @@ used successfully.
 - Replacing the Camouflage/Sense reveal techniques. Both are shader-driven
   (`assets/shaders/outline.gdshader`) outlining whatever sprite already
   exists — a technique, not an asset gap. Out of scope.
-- Real-dollar cost accounting. No tool available to either platform exposes
-  pricing; cost control here means checkpointing against the user's account
-  dashboard, not computing a budget in advance.
+- Real-dollar cost accounting. SpriteCook doesn't expose real-dollar
+  pricing, only credit costs (`list_generation_models`,
+  `list_character_workflows`) and live balance (`get_credit_balance`, see
+  §4/§9) — this pipeline budgets in credits against the user's monthly
+  subscription allowance, not dollars.
 
 ## 3. Current state (re-audited 2026-07-17, supersedes art-bible §11)
 
@@ -68,60 +75,114 @@ duplicated here; see the category sections below for what each covers.
 
 ## 4. Tooling
 
-**Comfy Cloud only, for now.** SpriteCook (the tool that produced the
-original 7 placeholder sprites, tracked in `spritecook-assets.json`) is
-documented and has dedicated Godot-export skills, but the user is not
-opting to pay for it. Its MCP server also isn't connected in this
-environment. Comfy Cloud is confirmed reachable (production, authenticated)
-and is the generation tool this pipeline uses. If SpriteCook becomes
-available later, it can be folded in per-category without redesigning the
-pipeline — the manifest format below (§6) doesn't assume either tool.
+**SpriteCook only.** Comfy Cloud is dropped from this pipeline entirely —
+it cost more per asset than SpriteCook for the same work, once SpriteCook's
+published credit costs were checked directly (see below), and a
+two-platform split added manifest/provenance complexity (§6) for no real
+benefit once SpriteCook covers stills, tiles, and animation on its own.
+SpriteCook (the same tool that produced the original 7 placeholder
+sprites, tracked in `spritecook-assets.json`) was authenticated in a
+separate session; this revision re-verified it directly —
+`get_credit_balance` and `list_recent_assets` both returned live data,
+including that original asset history (Wolf spider, trapdoor spider,
+larva, web props, all 40–126px).
 
-Neither platform exposes real pricing or credit-balance via its tools —
-cost tracking is a manual dashboard check, not something this pipeline can
-automate (see §9).
+Every category now maps to a single SpriteCook tool:
+- **Stills** (style anchors, VFX stills, item/UI icons) — `generate_game_art`,
+  `pixel=true` (see §2 revision above and §5's style decision).
+- **Tiles** — `generate_tileset` (autotile piece-set generation, purpose-built
+  for this, unlike anything Comfy Cloud offered).
+- **Creature animation** — the guided `generate_character` /
+  `generate_character_animations` workflow for full creatures (idle/walk/
+  attack/hurt/death), or the freeform `animate_game_art` for one-off VFX
+  loops that aren't full characters. Both do native per-motion generation —
+  no grid-sheet template, no manual slicing (see §5).
+
+**Cost is now a real, live number, not a dashboard check.** SpriteCook
+publishes per-operation credit costs directly via `list_generation_models`
+and `list_character_workflows` — confirmed 2026-07-17:
+- Still image, pixel mode: 8–12 credits, depending on model (cheapest
+  non-deprecated: `gemini-3.1-flash-lite-image`, 8 credits at 1K).
+- Guided character animation: 12 credits for the base character, ~20
+  credits per animation state (idle/walk/attack/hurt/death), plus a 12-credit
+  "prep" step for any pose that isn't the default front-facing view.
+- `animate_game_art`'s per-motion cost isn't separately published; treat it
+  as comparable to the guided workflow's ~20 credits/state until Category 0
+  confirms the real number via `get_credit_balance` deltas.
+
+**Budget:** the user is subscribing at 800 credits/month. A rough estimate
+across the full roadmap (§8) — roughly 13 creatures at ~120 credits each
+for a full 5-state animation set, plus tiles and VFX/item stills — lands
+around 1,500–2,500 credits total, more than one month's allowance but
+comfortably covered across the 2–4 months this roadmap already spans
+sequentially (§9's per-category checkpoint exists partly to keep this
+honest as real numbers replace the estimate). Balance was 0 credits as of
+2026-07-17, pre-subscription — resolved once the subscription is active,
+tracked as a Category 0 prerequisite, not a blocker on this design.
 
 ## 5. Generation technique
 
-Comfy Cloud has no dedicated pixel-art/sprite-animation category. The
-closest fit, found by direct research (not assumed), is two templates built
-on Google's Nano Banana image model:
+Two earlier options are dropped: Comfy Cloud's Nano-Banana grid-sheet
+templates (`template_purz_nb2_single_image_sprite_sheet`,
+`templates-sprite_sheet` — never verified against Burrow's style, needed a
+manual `SplitImageToTileList` slice step, and Comfy is no longer in the
+pipeline at all per §4) and the semi-realistic/detailed rendering direction
+(§2 revision — pixel mode is now the confirmed style, not an open
+question). Video-model partner APIs (Kling, Seedance, Wan) were checked and
+ruled out for animation independent of either of those — their guidance
+and template set frame them for cinematic/cutscene output, not discrete
+clean sprite-pose frames; AnimateDiff-family nodes are built for continuous
+motion blur, the opposite of what a crisp game sprite needs.
 
-- **`template_purz_nb2_single_image_sprite_sheet`** (Nano Banana 2) — one
-  reference image in, animated sprite sheet out. Simpler input.
-- **`templates-sprite_sheet`** (Nano Banana Pro) — sprite image + a
-  `2x2_grid_image.png`-style grid reference in, idle/attack/walk/jump frames
-  out.
+**Per-creature flow (full characters — Categories 0, 2, 3):**
+1. `generate_character(prompt, perspective="platformer")` — a guided
+   pixel-art base character, front-facing.
+2. `generate_character_animations(character_id, perspective="platformer",
+   animation_ids=["idle","walk","attack","hurt","death"])` — native
+   per-state generation, no grid template or manual slicing.
+3. `export_godot_character_package(run_id)` for a ready-to-import
+   `SpriteFrames`/`AnimatedSprite2D` manifest (`spritecook-use-assets-in-godot`).
 
-Neither has been verified against Burrow's specific style. Video-model
-partner APIs (Kling, Seedance, Wan) were checked and ruled out — their
-guidance and template set frame them for cinematic/cutscene output, not
-discrete clean sprite-pose frames; AnimateDiff-family nodes are built for
-continuous motion blur, the opposite of what a crisp game sprite needs.
+The "platformer" perspective (front-facing only, no back/side poses) is
+deliberately chosen over "topdown" (which generates separate up/down/
+left/right poses) because Burrow's existing sprites are single-facing —
+each of the 7 placeholder sprites was generated "oriented facing RIGHT,"
+implying the game already has some way of handling other facings for a
+non-animated `Sprite2D`. **This needs to be confirmed as an explicit
+Category 0 investigation, not assumed:** `art-bible.md` §2 currently
+documents the *opposite* of a flip-based scheme — it states sprites are
+rotated in-engine to face travel direction (`player.gd:123-124`), with "no
+walk cycle needed" and creature art required to be "radially neutral" so
+rotation doesn't look wrong. A real walk-cycle animation (legs mid-stride)
+is not radially neutral — rotating an in-progress gait to arbitrary angles
+will look broken. Category 0 must determine whether adding animation
+also requires changing `Player`'s rotation-based facing to a flip/8-way
+scheme (a code change, likely still in Category 0's scope since nothing
+else can be validated without it) before any other creature category
+starts.
 
-**Per-creature flow:**
-1. Generate a new still-image style anchor via `partner_generate`
-   (nano-banana-pro or flux — a head-to-head test on the first asset decides
-   which matches the art-bible spec better; this decision doesn't need to
-   be made until Category 0).
-2. Run the anchor through one of the two sprite-sheet templates above to
-   get idle/walk/attack/hurt/death frames.
-3. Slice the grid output into individual frames using Comfy's grid-split
-   nodes (`SplitImageToTileList` / the `split_image_grid_to_tiles`
-   subgraph).
-4. Import into Godot as a `SpriteFrames` resource + `AnimatedSprite2D`,
-   replacing whatever static `Sprite2D` or `_draw()` placeholder currently
-   represents that entity.
+**Per-asset flow (VFX, items, icons — Categories 4–6, non-character):**
+1. `generate_game_art(prompt, pixel=true)` for the still.
+2. For anything needing motion (a burst, a pulse, a short loop — not a
+   full animation-state set), `animate_game_art(asset_id, prompt,
+   output_format="spritesheet")` for a single native per-motion call. No
+   grid template or slicing here either.
+3. Import into Godot as `Sprite2D` (static) or `AnimatedSprite2D` +
+   `SpriteFrames` (animated loop), per `spritecook-use-assets-in-godot`.
 
-Tiles are the one category kept **static** — no walk-cycle equivalent for a
-wall — unless a specific hazard tile (water) earns a small animated loop
-during Category 1.
+**Tiles (Category 1):** `generate_tileset` — purpose-built autotile
+piece-set generation (15-piece top-down sets match the existing
+`world/maze/tile_types.gd` classification already in the codebase, per §7).
+Tiles stay static — no walk-cycle equivalent for a wall — unless a specific
+hazard tile (water) earns a small animated loop, generated the same way as
+other VFX loops above.
 
 ## 6. Asset manifest
 
-Since SpriteCook's manifest tooling (`spritecook-assets.json`,
-`get_credit_balance`, `list_recent_assets`) isn't in play, this pipeline
-maintains its own lightweight manifest, same shape/spirit, at
+SpriteCook's own asset tooling (`get_credit_balance`, `list_recent_assets`)
+tracks assets by ID but not by Burrow-specific role/category or Godot
+integration status, so this pipeline still maintains its own lightweight
+manifest, same shape/spirit as `spritecook-assets.json`, at
 `assets/art-manifest.json`:
 
 ```json
@@ -131,17 +192,28 @@ maintains its own lightweight manifest, same shape/spirit, at
       "id": "wolf-idle-anchor",
       "category": 2,
       "role": "player_class_wolf",
-      "model": "vertexai/nano-banana-pro",
-      "prompt_id": "<comfy prompt_id, for provenance/regeneration>",
+      "character_id": "<base character asset_id from generate_character>",
+      "run_id": "<generate_character_animations run id, for provenance/regeneration>",
       "still_local": "assets/sprites/wolf/wolf_anchor.png",
-      "spritesheet_local": "assets/sprites/wolf/wolf_sheet.png",
       "frames_local": "assets/sprites/wolf/frames/",
-      "animations": ["idle", "move", "attack", "hurt", "death"],
+      "animations": {
+        "idle": "<animation asset_id>",
+        "walk": "<animation asset_id>",
+        "attack": "<animation asset_id>",
+        "hurt": "<animation asset_id>",
+        "death": "<animation asset_id>"
+      },
       "status": "approved"
     }
   ]
 }
 ```
+
+Non-character assets (VFX/items/tiles, §5) use the same manifest with
+`character_id`/`run_id` swapped for a plain `asset_id` (from
+`generate_game_art` or `generate_tileset`) and, where animated, a single
+`animation_asset_id` from `animate_game_art` instead of the `animations`
+map.
 
 `status` gates integration: `generated` → `approved` (user has visually
 signed off, see §8) → `integrated` (wired into a Godot scene).
@@ -173,7 +245,7 @@ this document sequences them but does not spec categories 1–6 in detail.
 
 | # | Category | Scope |
 |---|---|---|
-| **0** | **Pipeline proof-of-concept** | New style anchor + one full creature (Wolf) taken through still → sheet → sliced frames → Godot `AnimatedSprite2D`, verified with a real windowed screenshot (not just automated tests — this project has repeatedly found shader/visual bugs invisible to GUT, see the Sense saga in the playtest roadmap history). Gates every other category — nothing else starts until this loop is proven to actually produce usable, on-style output. |
+| **0** | **Pipeline proof-of-concept** | New pixel-art style anchor + one full creature (Wolf) taken through `generate_character` → `generate_character_animations` (idle/walk/attack/hurt/death) → Godot `AnimatedSprite2D`, verified with a real windowed screenshot (not just automated tests — this project has repeatedly found shader/visual bugs invisible to GUT, see the Sense saga in the playtest roadmap history). Also resolves §5's rotation-vs-flip facing question. Gates every other category — nothing else starts until this loop is proven to actually produce usable, on-style output. |
 | 1 | Tileset | Floor/wall/pit/water, ground+ceiling variants, real `TileSet`/`TileMapLayer` conversion of the maze renderer. |
 | 2 | Player/enemy spiders | Wolf, Warden (new dedicated player sprite — currently borrows Wolf's body), Ogre, Echo — each a distinct silhouette per art-bible §5, animated. Includes fixing `Enemy`'s per-class texture selection bug (§3). |
 | 3 | Prey & Centipede | Larva, the 4 prey variants (Fungal Larva/Beetle/Ant/Cicada Nymph — needs `PreyType` wired into `Larva` first as a code prerequisite), Centipede segment. |
@@ -187,12 +259,16 @@ this document sequences them but does not spec categories 1–6 in detail.
   before integration (manifest `status: approved`), same discipline as the
   Sense/Camouflage saga that found three rounds of real playtest-only bugs
   invisible to automated review.
-- **Cost checkpoint**: run Category 0 first, then check actual Comfy Cloud
-  credit consumption on the user's dashboard before committing to
-  Categories 1–6. If sprite-sheet generation costs meaningfully more than a
-  single still, re-scope (e.g. fewer animation states per entity, or
-  static-only for lower-visibility entities) before generating the full
-  backlog, not after.
+- **Cost checkpoint**: SpriteCook's `get_credit_balance` gives a real
+  number, not a dashboard guess — check it after Category 0 completes
+  (base character + 5 animation states) to see actual per-creature cost
+  against the ~120-credit estimate in §4, before committing to Categories
+  1–6. Subscription is 800 credits/month; §4's rough full-backlog estimate
+  (1,500–2,500 credits) already assumes this spans multiple months, but
+  Category 0's real numbers should confirm or correct that before treating
+  it as a plan. If per-creature cost runs meaningfully higher than
+  estimated, re-scope (fewer animation states per entity, static-only for
+  lower-visibility entities) before generating the full backlog, not after.
 - **Render-verified, not test-verified**: per this project's established
   lesson, integration correctness for anything visual is checked with a
   real windowed Godot run/screenshot, not just GUT tests — automated tests

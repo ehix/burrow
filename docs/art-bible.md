@@ -27,12 +27,22 @@ anatomy and a genuinely underground palette, not a cartoon mascot spider.
 
 ## 2. Established art style
 
-Seven reference sprites already exist (`assets/sprites/`) and set the house
-style. Match this, don't reinvent it:
+**Revised 2026-07-17** as part of the full art/animation pipeline reset
+(`docs/superpowers/specs/2026-07-17-art-pipeline-design.md`): the style
+direction below now targets SpriteCook's pixel-art mode, a deliberate pivot
+away from this section's original semi-realistic direction — driven by
+cost (pixel-mode generation is cheaper) as well as visual preference. The
+seven existing reference sprites (`assets/sprites/`) no longer set the house
+style; they are placeholders being fully replaced, not anchors to match.
+Category 0 of the pipeline produces the first real style anchor under this
+new direction.
 
-- **Semi-realistic pixel/vector illustration** — detailed, soft-edged,
-  anti-aliased outlines, not blocky 8-bit/retro pixel art. Fine linework
-  (see `web_trap.png`'s hand-drawn web strand detail) is in-style.
+- **Retro/indie pixel art** — crisp edges, grid-aligned, readable at small
+  scale. This replaces the prior "semi-realistic, soft-edged, not blocky
+  8-bit" direction; embracing a pixel-art look, not working around it. Fine
+  linework where it reads clearly at pixel-art scale (see `web_trap.png`'s
+  web-strand detail for the *kind* of silhouette detail worth keeping, not
+  its soft-edged rendering) is still worth preserving.
 - **Real arachnid/invertebrate anatomy**, not a cartoon/mascot reinterpretation
   — correct leg count and joints, correct body segmentation. The existing
   `enemy_trapdoor_spider.png` (a naturalistic trapdoor spider) and
