@@ -67,9 +67,33 @@ class ActiveFlood:
 		level.set_water_at(tile, true)
 		var tree = level.get_tree()
 		if tree != null:
+			var level_id: int = level.get_instance_id() # `level` is untyped, so this call's own return can't be inferred
 			tree.create_timer(remaining).timeout.connect(
-				func() -> void: WaterIngress._drain_ring(level, [tile]))
+				func() -> void:
+					var lvl := WaterIngress._resolve_level(level_id)
+					if lvl != null:
+						WaterIngress._drain_ring(lvl, [tile]))
 		return true
+
+
+## Resolves a level scheduled by instance ID back to the live Node, or null
+## if it's gone -- every timer-delayed callback below captures the ID
+## (a plain int) rather than the Level node itself, specifically so the
+## capture can never go stale. Capturing the Node directly used to log
+## "Lambda capture ... was freed" (GDScript engine diagnostic, modules/
+## gdscript/gdscript_lambda_callable.cpp) whenever a flood outlived the
+## level it was flooding -- e.g. the round ending mid-flood, well within
+## FLOOD_DURATION's 12s -- because the engine detects a freed Object held in
+## a *typed* capture slot and substitutes null right at Callable-invocation
+## time, before _flood_ring()/_drain_ring()'s own is_instance_valid() guard
+## ever gets a chance to run. An int capture can never be "freed" the same
+## way, so that diagnostic can't fire; is_instance_valid() here is purely
+## our own guard against a stale ID, not a workaround for the engine one.
+static func _resolve_level(level_id: int) -> Node:
+	var obj := instance_from_id(level_id)
+	if obj == null or not is_instance_valid(obj):
+		return null
+	return obj as Node
 
 
 func trigger(level: Node) -> void:
@@ -86,6 +110,7 @@ func trigger(level: Node) -> void:
 		return
 	var flood := ActiveFlood.new(origin)
 	level.register_active_flood(flood)
+	var level_id := level.get_instance_id()
 	var full_flood_time := float(FLOOD_RADIUS) * RING_STEP
 	for k in rings.size():
 		var ring_tiles: Array = rings[k]
@@ -95,15 +120,22 @@ func trigger(level: Node) -> void:
 			_flood_ring(level, ring_tiles)
 		else:
 			tree.create_timer(float(k) * RING_STEP).timeout.connect(
-				func() -> void: _flood_ring(level, ring_tiles))
+				func() -> void:
+					var lvl := _resolve_level(level_id)
+					if lvl != null:
+						_flood_ring(lvl, ring_tiles))
 		var drain_delay: float = full_flood_time + FLOOD_DURATION + float(FLOOD_RADIUS - k) * RING_STEP
 		tree.create_timer(drain_delay).timeout.connect(
-			func() -> void: _drain_ring(level, ring_tiles))
+			func() -> void:
+				var lvl := _resolve_level(level_id)
+				if lvl != null:
+					_drain_ring(lvl, ring_tiles))
 	var total_lifetime: float = full_flood_time + FLOOD_DURATION + float(FLOOD_RADIUS) * RING_STEP
 	tree.create_timer(total_lifetime).timeout.connect(
 		func() -> void:
-			if is_instance_valid(level):
-				level.unregister_active_flood(flood))
+			var lvl := _resolve_level(level_id)
+			if lvl != null:
+				lvl.unregister_active_flood(flood))
 	EventBus.hazard_triggered.emit("water_ingress")
 
 

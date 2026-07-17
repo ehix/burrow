@@ -76,3 +76,38 @@ func test_flood_ring_is_a_noop_on_a_freed_level() -> void:
 
 	WaterIngress._flood_ring(level, tiles) # must not error on a freed level
 	assert_true(true, "reached this point without erroring")
+
+
+## trigger()'s ring timers used to capture `level` itself inside their
+## func() -> void: closures. If the level was freed before a timer fired --
+## e.g. the round ending mid-flood, well within FLOOD_DURATION's 12s -- the
+## GDScript engine detects the freed Object held in that typed capture slot
+## and logs "Lambda capture at index 0 was freed. Passed 'null' instead."
+## (gdscript_lambda_callable.cpp) the instant the Callable is invoked,
+## before _flood_ring()/_drain_ring()'s own is_instance_valid() guard ever
+## runs -- confirmed via a standalone headless repro (a Node captured
+## directly in a timer callback logs this error once freed; the same
+## scenario with an instance ID captured instead does not). trigger() now
+## captures level.get_instance_id() and resolves it back through
+## _resolve_level() inside each closure instead, so there's nothing left
+## for the engine to find freed at invocation time -- this covers that
+## resolver in isolation.
+func test_resolve_level_returns_the_live_level_for_a_valid_id() -> void:
+	var level := _make_level()
+
+	var resolved := WaterIngress._resolve_level(level.get_instance_id())
+
+	assert_eq(resolved, level)
+
+
+func test_resolve_level_returns_null_for_a_freed_levels_id() -> void:
+	var level := preload("res://world/level.tscn").instantiate()
+	add_child_autofree(level)
+	level.build()
+	var id := level.get_instance_id()
+	level.queue_free()
+	await get_tree().process_frame
+
+	var resolved := WaterIngress._resolve_level(id)
+
+	assert_eq(resolved, null)
