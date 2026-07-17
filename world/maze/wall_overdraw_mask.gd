@@ -38,6 +38,16 @@ var _level: Level
 var _renderer: MazeRenderer
 
 
+func _ready() -> void:
+	# Never relit by the player's VisionLight -- must always paint the exact
+	# same literal color MazeRenderer's own wall draw would show at that
+	# tile, or the two would visibly disagree at the fade edge. See
+	# MazeRenderer._ready()'s own doc comment for the full playtest finding
+	# this fixes.
+	material = CanvasItemMaterial.new()
+	material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+
+
 func setup(level: Level, renderer: MazeRenderer) -> void:
 	_level = level
 	_renderer = renderer

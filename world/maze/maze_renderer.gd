@@ -62,6 +62,20 @@ const ENTITY_VISUAL_HALF_EXTENT := 24.0
 
 func _ready() -> void:
 	set_process(not Engine.is_editor_hint())
+	# Walls always render at their own literal authored color, never relit by
+	# the player's VisionLight (playtest finding: the light's real radial
+	# falloff + real shadow-casting off each wall's LightOccluder2D was
+	# recompositing every wall pixel -- including the overdraw fade band --
+	# after this class had already drawn it, so two tiles painted with the
+	# exact same alpha could still read as very different brightnesses, and
+	# flickered as the light moved continuously while the fade window only
+	# updates in whole-tile steps. This was always true of every solid wall
+	# on the map, just invisible at full opacity; the translucent fade band
+	# made it obvious because most of what shows through it is the
+	# (differently-lit) floor beneath. WallOverdrawMask gets the identical
+	# treatment for the same reason -- see its own _ready().)
+	material = CanvasItemMaterial.new()
+	material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 
 
 func _process(_delta: float) -> void:
