@@ -237,6 +237,32 @@ func _draw_wall(tile: Vector2i) -> void:
 		_draw_wall_ceiling(tile)
 
 
+## The wall's own body color for `wall_tile`, CEILING plane only (see
+## _draw_wall_ceiling()) -- wall_top_face_color (the lighter shade) when its
+## sliver actually pokes into open floor (poked_into_tile_is_open()), the
+## same shade every other exposed wall surface reads; wall_front_face_color
+## (the same dark shade as its own cap) otherwise. Playtest ask: a
+## ceiling-plane wall's own body used to read the same flat light color
+## regardless of whether it was actually next to open space or just more
+## wall continuing on with nothing for its overdraw to ever occlude --
+## undermining the depth illusion the same way a uniformly-lit interior
+## would. A wall with nothing open nearby now reads as receding into
+## shadow instead, while a wall that's genuinely exposed to a corridor
+## stays lit. Only the own-tile body switches -- the front face and the
+## overdraw sliver itself (the actual occludable part) are unaffected
+## either way.
+##
+## Ground-plane deliberately does NOT use this (see _draw_wall_ground()'s
+## own doc comment) -- playtest follow-up, same day: the identical
+## treatment read as a regression on the ground plane specifically, even
+## though it was exactly the improvement wanted on ceiling. Kept as a
+## standalone function anyway (not folded into _draw_wall_ceiling()
+## directly) so it stays independently unit-testable and the doc comment
+## has one place to live.
+func _own_body_color_for(wall_tile: Vector2i) -> Color:
+	return wall_top_face_color if poked_into_tile_is_open(wall_tile) else wall_front_face_color
+
+
 ## Ground-plane wall: front face anchored to the tile's own bottom edge, top
 ## face poking up into the tile north of it. Front face and the wall's own-
 ## tile top face always render at full height and full opacity -- only the
@@ -257,16 +283,24 @@ func _draw_wall(tile: Vector2i) -> void:
 ## ones right next to the player that just happened to have an Enemy or
 ## Centipede segment standing in them instead -- fully opaque, an
 ## inconsistent look the player/enemy distinction shouldn't be driving.)
-## Always renders at full height even when a pit or flooded tile (same
-## MazeData overlay -- see MazeData.is_pit()) sits in the tile north of it
-## (playtest fix, mirrors _draw_wall_ceiling()): the overdraw represents
-## the wall's own height occluding whatever's behind it from the viewer's
-## perspective, and a hole is no exception to that -- its near edge should
-## partially disappear behind the wall's silhouette, not the wall shrinking
-## to avoid touching it. An earlier version clipped the overdraw to 0 next
-## to a pit; that produced a visible notch in the wall's own silhouette
-## right where a consistent block was expected, which is a worse look than
-## the wall simply doing what it does everywhere else.
+## (A later version briefly gave this own-tile top face the same
+## _own_body_color_for() treatment _draw_wall_ceiling() uses -- darkening
+## it whenever nothing open bordered the tile -- copied over from the
+## ceiling-plane fix in the same playtest pass. Reverted same day: it read
+## as a real regression on the ground plane specifically, even though the
+## identical change was exactly the improvement wanted on ceiling -- the
+## two planes read differently enough here that they don't share one
+## rule.) Always renders at full height even when a pit or flooded tile
+## (same MazeData overlay -- see MazeData.is_pit()) sits in the tile north
+## of it (playtest fix, mirrors _draw_wall_ceiling()): the overdraw
+## represents the wall's own height occluding whatever's behind it from
+## the viewer's perspective, and a hole is no exception to that -- its near
+## edge should partially disappear behind the wall's silhouette, not the
+## wall shrinking to avoid touching it. An earlier version clipped the
+## overdraw to 0 next to a pit; that produced a visible notch in the
+## wall's own silhouette right where a consistent block was expected,
+## which is a worse look than the wall simply doing what it does
+## everywhere else.
 func _draw_wall_ground(tile: Vector2i) -> void:
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
@@ -281,9 +315,13 @@ func _draw_wall_ground(tile: Vector2i) -> void:
 
 ## Ceiling-plane wall: mirrored -- front face anchored to the tile's own
 ## top edge, hanging down; top face pokes down into the tile south of it
-## (tunnel visual rework Phase 2). Same "only the overdraw sliver fades"
-## behavior as _draw_wall_ground() -- see its doc comment for both the
-## pit/flooded-neighbor rationale and the fading design.
+## (tunnel visual rework Phase 2). Same overdraw-sliver-fading and pit/
+## flooded-neighbor behavior as _draw_wall_ground() -- see its doc comment
+## for both -- but NOT the same own-tile top face color: this plane's own-
+## tile top face uses _own_body_color_for() (playtest ask, see its own doc
+## comment for why), while _draw_wall_ground() deliberately stays flat
+## wall_top_face_color always -- the two planes read differently enough
+## here that a shared rule was a regression on one of them.
 func _draw_wall_ceiling(tile: Vector2i) -> void:
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
@@ -291,7 +329,7 @@ func _draw_wall_ceiling(tile: Vector2i) -> void:
 	var front_face_bottom := tile_top + wall_front_face_height
 	var overdraw_rect := overdraw_rect_for(tile)
 	var own_top_face := Rect2(tile_left, front_face_bottom, _tile_size, tile_bottom - front_face_bottom)
-	draw_rect(own_top_face, wall_top_face_color)
+	draw_rect(own_top_face, _own_body_color_for(tile))
 	draw_rect(overdraw_rect, Color(wall_top_face_color, wall_top_face_color.a * overdraw_alpha_for(tile)))
 	draw_rect(Rect2(tile_left, tile_top, _tile_size, wall_front_face_height), wall_front_face_color)
 

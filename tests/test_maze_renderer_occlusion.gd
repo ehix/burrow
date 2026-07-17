@@ -389,3 +389,45 @@ func test_overdraw_alpha_for_never_softens_on_ceiling_when_the_poked_into_tile_i
 
 	assert_eq(renderer.overdraw_alpha_for(Vector2i(0, 0)), 1.0,
 		"a wall-to-wall seam must never soften on the ceiling plane either")
+
+
+# --- _own_body_color_for() (playtest ask: a wall reads as receding into
+# shadow -- its own body drawn in wall_front_face_color, the same dark
+# shade as its own cap -- when nothing open is even next to it, rather than
+# every wall's body reading the same flat light color regardless of
+# whether it borders a real corridor or is just more wall continuing on)
+# -----------------------------------------------------------------------
+
+func test_own_body_color_for_is_the_light_shade_when_the_poked_into_tile_is_open() -> void:
+	# Ground plane pokes north (y-1): row 0 open, row 1 (the wall under
+	# test) sits directly south of it.
+	var maze := MazeData.new(PackedByteArray([1, 0]), 1, 2)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, 48)
+
+	assert_eq(renderer._own_body_color_for(Vector2i(0, 1)), renderer.wall_top_face_color,
+		"(0,0) is open floor -- this wall genuinely borders a corridor")
+
+
+func test_own_body_color_for_is_the_dark_shade_when_the_poked_into_tile_is_also_a_wall() -> void:
+	# Three rows so the wall-tile-under-test's poked-into neighbor is a
+	# genuine in-bounds wall, not just an out-of-bounds edge.
+	var maze := MazeData.new(PackedByteArray([0, 0, 0]), 1, 3)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, 48)
+
+	assert_eq(renderer._own_body_color_for(Vector2i(0, 1)), renderer.wall_front_face_color,
+		"(0,0) is also a wall -- nothing here for this wall's overdraw to ever occlude")
+
+
+func test_own_body_color_for_uses_the_south_neighbor_on_the_ceiling_plane() -> void:
+	var maze := MazeData.new(PackedByteArray([0, 1]), 1, 2)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, 48)
+	renderer.set_active_plane(Level.Layer.CEILING)
+
+	assert_eq(renderer._own_body_color_for(Vector2i(0, 0)), renderer.wall_top_face_color,
+		"south, not north, is the ceiling-plane poked-into direction")
