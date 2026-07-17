@@ -140,3 +140,84 @@ func test_set_body_alpha_reuses_the_same_material_set_outline_uses() -> void:
 	var mat_after_alpha := sprite.material
 
 	assert_eq(mat_after_outline, mat_after_alpha, "one shared material, not a second one stacked on")
+
+
+func test_set_dimmed_true_sets_the_shader_uniform() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_dimmed(sprite, true)
+
+	var mat := sprite.material as ShaderMaterial
+	assert_not_null(mat)
+	assert_true(mat.get_shader_parameter("dim_enabled"))
+
+
+func test_set_dimmed_on_null_sprite_is_a_noop() -> void:
+	OutlineFx.set_dimmed(null, true) # must not error
+	assert_true(true, "reached this point without erroring")
+
+
+## Mirrors test_set_body_alpha_back_to_neutral_releases_the_material's own
+## rationale: the shader must actually come off once dimmed becomes false
+## and nothing else needs the material, not just numerically neutralize
+## while staying attached.
+func test_set_dimmed_back_to_false_releases_the_material() -> void:
+	var sprite := _make_sprite()
+	OutlineFx.set_dimmed(sprite, true) # e.g. off the player's plane
+	assert_not_null(sprite.material)
+
+	OutlineFx.set_dimmed(sprite, false) # e.g. back on the same plane
+
+	assert_null(sprite.material,
+		"back to neutral -- the shader comes off entirely, not just numerically neutral")
+
+
+func test_set_dimmed_false_on_an_untouched_sprite_never_creates_a_material() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_dimmed(sprite, false)
+
+	assert_null(sprite.material, "the common case (never off-plane) never even touches the shader")
+
+
+func test_set_dimmed_reuses_the_same_material_set_outline_uses() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_outline(sprite, true, Color.RED)
+	var mat_after_outline := sprite.material
+	OutlineFx.set_dimmed(sprite, true)
+	var mat_after_dim := sprite.material
+
+	assert_eq(mat_after_outline, mat_after_dim, "one shared material, not a second one stacked on")
+
+
+## Verifies _release_if_neutral() now checks dim_enabled too, not just
+## outline_active/body_alpha -- otherwise a sprite that's dimmed but
+## otherwise neutral (no outline, body_alpha at 1.0) would have its
+## material incorrectly stripped, silently losing the dim visual.
+func test_set_dimmed_true_keeps_the_material_even_though_outline_and_body_alpha_are_neutral() -> void:
+	var sprite := _make_sprite()
+
+	OutlineFx.set_dimmed(sprite, true)
+
+	assert_not_null(sprite.material, "dim_enabled alone is enough reason to keep the material attached")
+
+
+## The exact interaction Task 4's review flagged as the highest-risk,
+## previously untested: Sense's outline and plane-focus dimming can be
+## active on the same sprite at once (e.g. a Sensed enemy that's also off
+## the player's plane). The material must survive until BOTH release --
+## releasing just one of the two must never strip it early.
+func test_outline_and_dimmed_together_only_release_once_both_are_cleared() -> void:
+	var sprite := _make_sprite()
+	OutlineFx.set_outline(sprite, true, Color.RED)
+	OutlineFx.set_dimmed(sprite, true)
+	assert_not_null(sprite.material, "both effects active -- material must be attached")
+
+	OutlineFx.set_outline(sprite, false)
+
+	assert_not_null(sprite.material, "dim_enabled is still true -- releasing only the outline must not strip it")
+
+	OutlineFx.set_dimmed(sprite, false)
+
+	assert_null(sprite.material, "both effects now cleared -- the material finally releases")

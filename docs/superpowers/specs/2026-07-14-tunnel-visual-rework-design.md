@@ -130,42 +130,103 @@ to.
 
 ### Phase 2 — Ceiling-plane inverse treatment
 
-**Mirrored wall rendering.** The ceiling plane needs its own wall
-tile-source with the overdraw flipped to hang *downward* (front-face below
-the footprint's own northern edge, extending into the tile south of it) —
-the same asset pair (top face + front face) as the ground variant, just
-composited the other way. Cleanest implementation: a second `TileMapLayer`
-(ceiling walls) stacked with the existing one, visibility toggled by
-`MazeRenderer.set_active_plane()` exactly like the floor color swap
-already works — not a runtime flip of the same layer, since Y-sort
-direction and overdraw direction both need to invert together and a
-single shared layer would fight itself if both variants were ever visible
-at once (which currently never happens — only one plane is "active" for
-rendering purposes at a time).
+**Revised scope (post-Phase-1 brainstorm, 2026-07-14):** `assets/tilesets/`
+is still empty and no underside/belly sprite art exists — same "no real
+art yet" state Phase 1 found. So Phase 2 stays code-only too: no
+`TileMapLayer` migration (still hand-rolled `_draw()` on `MazeRenderer`,
+same as Phase 1 actually shipped — Phase 1's own build deviated from this
+doc's original Phase 1 text for the same reason), and the underside
+sprite is deferred to a future pass once that art exists — not built in
+this phase.
 
-**Floor blur/desaturate.** The biggest genuinely new technical piece in
-this whole rework. While the player is on the ceiling, the floor plane
-(and anyone/anything standing on it) needs to read as a soft, out-of-focus
-background layer rather than just a recolored tile. Godot doesn't have a
-trivial built-in real-time blur for arbitrary `CanvasItem` content without
-an extra pass — the practical route is a `BackBufferCopy` + blur shader on
-a dedicated "floor plane" `CanvasLayer`/`SubViewport`, or (simpler, if
-sufficient) a strong desaturate + brightness-reduction shader without a
-true blur convolution, matching what the mockup actually demonstrated
-(`saturate(0.6) brightness(0.75)` plus a small blur). Recommend starting
-with the desaturate/darken pass alone (cheap, no extra buffer/viewport) and
-only reaching for a true blur pass if playtesting shows it's needed to
-read as "out of focus" rather than just "dimmer" — this keeps the
-guardrail from the original ceiling-plane design (design decision: "the
-floor re-color... off-plane things read as less in focus") intact without
-necessarily paying for a full blur pipeline up front.
+**Mirrored wall rendering.** No new node needed. `MazeRenderer` already
+tracks `_active_plane`; `_draw_wall()` gets a per-plane variant instead of
+a second tile layer — on `GROUND` the front face anchors to the tile's own
+bottom edge with the top face poking up into the tile north of it (as
+Phase 1 shipped); on `CEILING` this mirrors: front face anchors to the
+tile's own top edge, hanging down into the tile south of it. Phase 1's
+`wall_occludes_position()` fade check gets a matching mirrored variant for
+the ceiling case (checking the southern overdraw band instead of the
+northern one), wired the same way via `set_fade_focus()` — kept symmetric
+with the ground-plane fade on the user's call, even though that fade's
+real-world effect is still unconfirmed (see Phase 1's final review notes).
 
-**Underside sprite.** Player (and Enemy, since it shares the same class
-kit and can also use the ceiling) gets one additional sprite variant per
-class — a belly/underside pose — swapped in on `plane_changed` alongside
-the existing color-tint logic, the same event `_on_plane_changed()`
-already fires on. This is purely an art + one texture-swap addition, no
-new mechanic.
+**Floor dim via `CanvasGroup` + shader, floor tiles only for the actual
+color transform.** Floor-drawing moves out of `MazeRenderer._draw()`
+(which keeps walls only) into a new sibling node, `FloorRenderer`, living
+inside a new `GroundLayer` (`CanvasGroup`) node. `GroundLayer` carries a
+small new shader (this project's second hand-written shader, after
+`outline.gdshader`) doing the desaturate + brightness-reduction pass the
+mockup demonstrated (`saturate(0.6) brightness(0.75)`, no blur — cheap,
+no extra buffer/viewport, matching this doc's original recommendation to
+start simple). The shader is active only when the *focus* plane (the
+player's own plane, via `PlaneComponent.effective_plane()`) is `CEILING`;
+on `GROUND` it's fully off, since the ground is the plane actually in
+focus, not background. `Level._on_plane_changed()`/`_refresh_plane_focus()`
+toggle it (same signal already driving the existing per-entity
+`body_alpha` dimming — see below).
+
+This retires `ceiling_floor_color` (shipped in sub-project F): with a
+real background layer that dims independently, re-tinting the *same*
+floor tiles to indicate "which plane you're on" is now redundant — the
+dim effect is a strictly better version of the same cue. `FloorRenderer`
+always draws the one true ground `floor_color`; "which plane am I on"
+reads from wall orientation + whether the floor is dimmed, not a color
+swap.
+
+**Ground-layer scope covers everything ground-resident, not just
+tiles — except the Centipedes.** `GroundLayer` gets the hazard markers
+(pit/water `Polygon2D` nodes, currently `add_child()`'d directly onto
+`Level`) and always-ground entities currently parented under `Entities`:
+larvae and `WorldItemPickup`. Neither carries a `PlaneComponent` today
+(confirmed by grep — only `Player`, `Enemy`, and the skills that can be
+cast from either plane (`EggMineSkill`, `BlockadeSkill`, `CocoonMine`) do),
+so moving them under `GroundLayer` doesn't change any plane-aware
+behavior, only where they're parented for rendering purposes.
+
+**Both Centipede types (the obstacle `Centipede` and
+`CentipedeExpressRider`) are deliberately excluded** (correction, post-
+Phase-1-brainstorm follow-up, 2026-07-14): a Centipede's body is the same
+width as the tunnel itself, so it must read identically regardless of
+which plane the player is viewing from — dimming it along with the actual
+floor content would be wrong, since it's not "background" the way a loose
+larva or item is. Both Centipede types stay parented under `Entities`
+(undimmed), same as `Player`/`Enemy`. `Player`/`Enemy`/mines/blockades
+also stay under the existing `Entities` node, unaffected — that's a
+different question ("is this specific plane-aware entity on the
+off-plane") from "is this static ground-only content in the background
+right now" (which never applies to either Centipede type).
+
+**Enemy's off-plane dimming switches from a flat alpha fade to the same
+hazy/desaturate look** (second correction, same day): sub-project F's
+`body_alpha`-only fade (`OFF_PLANE_ALPHA = 0.35`) is replaced by the same
+desaturate+darken formula `GroundLayer` uses, for visual consistency
+across the whole "off-plane/background" language — Enemy stays fully
+opaque but reads hazy/darker instead of merely more transparent. Since
+`Player`/`Enemy` sprites already share one `ShaderMaterial`
+(`outline.gdshader`, via `OutlineFx`) for their outline/Camouflage
+effects, and a `CanvasItem` can only ever hold one `material`, the
+formula is merged directly into `outline.gdshader` as new uniforms
+(`saturation`, `brightness`, `dim_enabled`) rather than given a second
+material — `GroundLayer`'s own `ground_dim.gdshader` stays a separate,
+dedicated shader, since a `CanvasGroup` has no outline/Camouflage
+concerns to share a material with. `OFF_PLANE_ALPHA` is retired entirely;
+`body_alpha` remains, now exclusively Camouflage's uniform.
+
+**New scene tree order** (`world/level.tscn`): `GroundLayer` (floor +
+hazards + larvae/items) draws first, then `Renderer` (`MazeRenderer`,
+walls only) on top of it, then `Walls`/`Occluders` (collision/light
+geometry, unchanged), then `Entities`
+(player/enemy/mines/blockades/centipedes) on top of everything, then
+`SenseLayer`. This preserves the existing "entities always draw on top"
+guarantee while adding the new layer: crisp ceiling walls compositing
+over the hazy ground-layer background when viewed from the ceiling.
+
+**Underside sprite — deferred.** No belly/underside art exists for either
+class yet (confirmed via `spritecook-assets.json`). Not built this phase;
+revisit once that art is generated. `plane_changed`'s existing dispatch
+(`_on_plane_changed()`) is already the right seam to hang a texture swap
+on when that art exists — no structural change needed to add it later.
 
 ## Non-goals
 
@@ -176,8 +237,12 @@ new mechanic.
   — start with the cheaper desaturate/darken version; only escalate if it
   doesn't read as intended.
 - Doesn't block or depend on the rest of the tileset (floor/pit/water
-  tiles from `docs/art-bible.md` §8) beyond walls specifically, though it's
-  the natural moment to build the wall tileset since none exists yet.
+  tiles from `docs/art-bible.md` §8) beyond walls specifically.
+- No `TileMapLayer`/`TileSet` migration in Phase 2 either (revised scope,
+  see above) — `assets/tilesets/` is still empty, so this stays hand-drawn
+  `_draw()` rects, same as Phase 1 actually shipped.
+- No underside/belly sprite in Phase 2 (revised scope, see above) — no
+  art exists yet; deferred to a future pass.
 
 ## Testing approach
 
@@ -204,8 +269,9 @@ alone.
 ## Suggested plan structure
 
 Phase 1 is independently shippable and resolves the original complaint on
-its own; Phase 2 depends on Phase 1's wall-art foundation but is otherwise
-separable and carries the one open-ended technical risk (the floor blur/
-desaturate pass). Recommend two separate implementation plans rather than
-one combined one, so Phase 1 can land and be played with before committing
-to Phase 2's specifics.
+its own (shipped 2026-07-14, PR #15) — confirmed separable, as recommended.
+Phase 2 depends on Phase 1's wall-rendering foundation (`_draw_wall()`,
+`wall_occludes_position()`) but is otherwise separable and carries the one
+open-ended technical risk (the floor dim pass and the `GroundLayer`
+scene-tree restructure). Its own implementation plan, per this doc's
+original recommendation to keep the two phases separate.

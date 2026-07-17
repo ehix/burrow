@@ -38,6 +38,14 @@ func bind_level(level: Node) -> void:
 	_level = level
 
 
+## Read-only access to the body's visual segments (wall-occlusion masking,
+## tunnel visual rework Phase 2 follow-up: a Centipede's segments span
+## tunnel-width tiles just like Player/Enemy, so they need the same
+## wall-overdraw occlusion check).
+func get_segments() -> Array[CentipedeSegment]:
+	return _segments
+
+
 ## Lays out the body at `tiles` (head first) and (re)builds its segment
 ## visuals to match. Called right after instancing and bind_level(), by
 ## Level._seed_centipedes() (initial seeding) and CentipedeExpress (an apex
@@ -126,16 +134,52 @@ func _nearest_boundary_tile() -> Vector2i:
 	return best_tile
 
 
-## Boxed-in fallback (design §6): if no open+dry path exists, carve the
+## Boxed-in fallback (design §6, playtest follow-up): if no open+dry path
+## exists from the current head, try leading with the OTHER end of the body
+## instead (_reverse_body()) before ever carving a single wall. A body
+## sitting in a 1-tile-wide dead-end corridor with its own tail occupying
+## the only way out isn't actually stuck -- _find_path() always treats
+## every one of this body's own tiles as impassable (correctly: a crawl
+## must never double back through itself mid-route), but that also means
+## the tile directly behind the tail -- exactly where a reversed head needs
+## to go, and guaranteed open since the body walked in from there -- can
+## only ever be tried if _tiles[0] is actually pointed that way. Only if
+## EVEN the reversed direction has no path either (both ends genuinely
+## walled in, not just self-blocked) does this fall through to carving the
 ## single adjacent non-boundary wall tile that most shortens the remaining
-## distance to `target`, then retry. If even that finds no candidate (fully
-## enclosed by the map boundary -- extremely unlikely), _path stays empty;
-## _crawl_step()'s own empty-path branch retries this same search again
-## next tick rather than freezing or falsely "arriving".
+## distance to `target`, then retry. If that still finds no candidate
+## (fully enclosed by the map boundary -- extremely unlikely), _path stays
+## empty; _crawl_step()'s own empty-path branch retries this same search
+## again next tick rather than freezing or falsely "arriving".
+##
+## Playtest finding this restores: a body boxed in by its own tail fell
+## straight to the carving fallback below, which has no notion of which
+## pockets actually connect anywhere and could carve through a large,
+## visibly destructive fraction of the map hunting for one that does --
+## confirmed via a timed repro, 24 tiles carved and ~18 real seconds for a
+## case reversing now resolves in a single, zero-cost step.
 func _start_crawl() -> void:
 	_path = _find_path(_tiles[0], _target)
+	if _path.is_empty():
+		_reverse_body()
+		_path = _find_path(_tiles[0], _target)
 	if _path.is_empty() and _tunnel_toward(_target):
 		_path = _find_path(_tiles[0], _target)
+
+
+## Flips which end of the body is currently `_tiles[0]` -- the "head" every
+## other method (_find_path(), _crawl_step(), _tunnel_toward(),
+## shove_spiders_out_of(), hit_segment_at()'s _tiles.find()) treats as
+## ground truth, with no idea a reversal ever happened. `_tiles` and
+## `_segments` are reversed together so _segments[i] keeps mapping to
+## _tiles[i] exactly like before -- this is walking the same physical body
+## from its opposite end, not reshaping or reassigning it, so every other
+## mechanic (combat hit-detection by tile, the shove-spiders-out-of-the-way
+## crawl guard, the exit sequence) keeps working unmodified. See
+## _start_crawl()'s own doc comment for why this exists.
+func _reverse_body() -> void:
+	_tiles.reverse()
+	_segments.reverse()
 
 
 ## Finds the wall tile, adjacent to ANY tile currently reachable from the

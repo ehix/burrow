@@ -9,6 +9,13 @@ extends StaticBody2D
 ##
 ## catch_larva() / try_consume() are public and guard against missing child
 ## nodes so the resolution logic can be unit-tested without the full scene.
+##
+## Plane-aware (mirrors CocoonMine/BlockadeSkill's own `_plane_of()` idiom):
+## a trap physically sits on whichever plane its placer occupied at the
+## moment it was laid, and only interacts with bodies on that same plane —
+## a web laid on the ceiling can't catch a larva wandering the floor below
+## it (larvae have no PlaneComponent, so they're always effectively GROUND),
+## nor entangle/feed a spider crossing the same tile on the other plane.
 
 const SpentScene := preload("res://entities/web/web_trap_spent.tscn")
 
@@ -33,12 +40,17 @@ var caught_larva: Node = null
 var spent := false
 var web_hits := 0
 var _entangle_armed := false
+var _plane: Level.Layer = Level.Layer.GROUND
 
 @onready var _catch_area: Area2D = get_node_or_null("CatchArea")
 
 
-func setup(placer: Node) -> void:
+## `plane` is the plane `placer` occupied at the moment of placement —
+## defaults to GROUND so every existing caller that never passes one keeps
+## behaving exactly as before.
+func setup(placer: Node, plane: Level.Layer = Level.Layer.GROUND) -> void:
 	owner_spider = placer
+	_plane = plane
 
 
 func _ready() -> void:
@@ -51,7 +63,7 @@ func _ready() -> void:
 
 
 func _on_body_entered(body: Node) -> void:
-	if spent:
+	if spent or _plane_of(body) != _plane:
 		return
 	if body.is_in_group("larvae"):
 		catch_larva(body)
@@ -63,6 +75,16 @@ func _on_body_entered(body: Node) -> void:
 			try_consume(body)
 		else:
 			_entangle(body)
+
+
+## Mirrors BlockadeSkill._plane_of()/CocoonMine._plane_of(): PlaneComponent-
+## tracked plane, or GROUND for anything without one (every larva, and a
+## bare test double).
+func _plane_of(body: Node) -> Level.Layer:
+	var plane_component: PlaneComponent = body.get("_plane") if "_plane" in body else null
+	if plane_component != null:
+		return plane_component.current_plane
+	return Level.Layer.GROUND
 
 
 ## Slow any spider that crosses the web — no exception for the placer; webs
@@ -78,7 +100,7 @@ func _entangle(spider: Node) -> void:
 ## Hold a larva. Emits larva_trapped and immediately resolves consumption if a
 ## spider is already standing on the trap.
 func catch_larva(larva: Node) -> void:
-	if spent or caught_larva != null:
+	if spent or caught_larva != null or _plane_of(larva) != _plane:
 		return
 	caught_larva = larva
 	if larva.has_method("set_caught"):

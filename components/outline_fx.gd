@@ -73,6 +73,22 @@ static func set_body_alpha(sprite: CanvasItem, alpha: float) -> void:
 	_release_if_neutral(sprite)
 
 
+## Sets the shader's dim_enabled uniform directly (tunnel visual rework
+## Phase 2) -- no ref-counting, same rationale as set_body_alpha: only
+## one caller (Level._refresh_plane_focus) ever decides this per sprite,
+## so the last call wins.
+static func set_dimmed(sprite: CanvasItem, dimmed: bool) -> void:
+	if sprite == null:
+		return
+	# Mirrors set_body_alpha's fast path: nothing to do if there's no
+	# material yet and this call wouldn't need one either.
+	if not dimmed and (sprite.material as ShaderMaterial == null or (sprite.material as ShaderMaterial).shader != OutlineShader):
+		return
+	var mat := _material_of(sprite)
+	mat.set_shader_parameter("dim_enabled", dimmed)
+	_release_if_neutral(sprite)
+
+
 static func _material_of(sprite: CanvasItem) -> ShaderMaterial:
 	var mat := sprite.material as ShaderMaterial
 	if mat == null or mat.shader != OutlineShader:
@@ -83,15 +99,16 @@ static func _material_of(sprite: CanvasItem) -> ShaderMaterial:
 
 
 ## Once neither effect this shader provides is actually doing anything
-## (outline off for every caller AND body_alpha back to its neutral 1.0),
-## detaches the material entirely and restores `sprite.material` to null --
-## every sprite this project ever applies the outline shader to starts with
-## no material of its own. Leaving a "neutral" ShaderMaterial permanently
-## attached instead (found via playtest: a ceiling-plane transition dims
-## the off-plane spider via set_body_alpha(), and the shader visibly never
-## came back off even once alpha returned to 1.0) takes the sprite out of
-## the engine's default per-item rendering path for good, for no reason --
-## the numeric effect is already fully neutral, so there's nothing left for
+## (outline off for every caller, body_alpha back to its neutral 1.0,
+## AND dim_enabled false), detaches the material entirely and restores
+## `sprite.material` to null -- every sprite this project ever applies
+## the outline shader to starts with no material of its own. Leaving a
+## "neutral" ShaderMaterial permanently attached instead (found via
+## playtest: a ceiling-plane transition dims the off-plane spider via
+## set_body_alpha(), and the shader visibly never came back off even
+## once alpha returned to 1.0) takes the sprite out of the engine's
+## default per-item rendering path for good, for no reason -- the
+## numeric effect is already fully neutral, so there's nothing left for
 ## a lingering material to be doing.
 static func _release_if_neutral(sprite: CanvasItem) -> void:
 	var mat := sprite.material as ShaderMaterial
@@ -104,5 +121,7 @@ static func _release_if_neutral(sprite: CanvasItem) -> void:
 	# an unset body_alpha is still the neutral 1.0, just not overridden yet.
 	var alpha_param: Variant = mat.get_shader_parameter("body_alpha")
 	var alpha: float = alpha_param if alpha_param != null else 1.0
-	if not outline_active and is_equal_approx(alpha, 1.0):
+	var dim_param: Variant = mat.get_shader_parameter("dim_enabled")
+	var dimmed: bool = dim_param if dim_param != null else false
+	if not outline_active and is_equal_approx(alpha, 1.0) and not dimmed:
 		sprite.material = null

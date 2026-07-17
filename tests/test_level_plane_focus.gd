@@ -1,9 +1,9 @@
 extends GutTest
-## Level's plane-focus dimming (ceiling/plane mechanics rework): whichever of
-## Player/Enemy is off the other's plane dims via the shared outline
-## shader's body_alpha uniform (already shipped for Camouflage) — the floor
-## re-color tells you which plane you're on, this tells you which other
-## spider is or isn't reachable from here.
+## Level's plane-focus dimming: whichever of Player/Enemy is off the
+## other's plane dims via the shared outline shader's dim_enabled uniform
+## (tunnel visual rework Phase 2 — previously a flat body_alpha fade) — the
+## GroundLayer dim (see test_ground_layer.gd) tells you which plane you're
+## on, this tells you which other spider is or isn't reachable from here.
 
 func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
@@ -22,8 +22,7 @@ func test_refresh_plane_focus_dims_the_enemy_when_only_it_is_on_the_ceiling() ->
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 	var mat := enemy_sprite.material as ShaderMaterial
 	assert_not_null(mat)
-	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001,
-		"enemy is off the player's plane, so it dims")
+	assert_true(mat.get_shader_parameter("dim_enabled"), "enemy is off the player's plane, so it reads hazy/desaturated")
 
 
 func test_refresh_plane_focus_keeps_full_brightness_when_planes_match() -> void:
@@ -45,7 +44,7 @@ func test_plane_changed_event_triggers_a_focus_refresh() -> void:
 	var enemy_sprite := level.enemy.get_node("Sprite") as CanvasItem
 	var mat := enemy_sprite.material as ShaderMaterial
 	assert_not_null(mat)
-	assert_almost_eq(mat.get_shader_parameter("body_alpha"), Level.OFF_PLANE_ALPHA, 0.001)
+	assert_true(mat.get_shader_parameter("dim_enabled"))
 
 
 ## Camouflage conflict guardrail (design's explicit judgment call): body_alpha
@@ -92,3 +91,23 @@ func test_refresh_plane_focus_never_touches_a_camouflaged_enemys_body_alpha() ->
 	var mat := enemy_sprite.material as ShaderMaterial
 	assert_almost_eq(mat.get_shader_parameter("body_alpha"), camo_alpha, 0.001,
 		"plane-focus dimming must not overwrite Camouflage's own body_alpha")
+
+
+func test_refresh_plane_focus_dims_ground_layer_when_player_is_on_ceiling() -> void:
+	var level := _make_level()
+	var player_plane := level.player.get_node("PlaneComponent") as PlaneComponent
+	player_plane.current_plane = Level.Layer.CEILING
+
+	level._refresh_plane_focus()
+
+	var mat := level._ground_layer.dim_material()
+	assert_true(mat.get_shader_parameter("dim_enabled"), "ground is background while the player is on the ceiling")
+
+
+func test_refresh_plane_focus_keeps_ground_layer_undimmed_when_player_is_on_ground() -> void:
+	var level := _make_level()
+
+	level._refresh_plane_focus() # default GROUND
+
+	var mat := level._ground_layer.dim_material()
+	assert_false(mat.get_shader_parameter("dim_enabled"), "ground is the plane in focus, not background")

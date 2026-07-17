@@ -82,6 +82,33 @@ static func spider_tile_contested(mover: GridMover, self_node: Node2D, dir: Vect
 	return false
 
 
+## True if another same-plane spider currently shares self_node's own tile
+## (an overlap should never normally happen -- see spider_tile_contested --
+## but PlaneComponent.transition()'s shove, or a pit opening up underneath
+## someone, can both still leave two spiders standing on the same tile for
+## a moment). Player/Enemy's own _blocked() checks this before falling back
+## to test_move()'s physical collision check: Player and Enemy physically
+## collide with each other (their collision masks include each other's
+## layer), so a body that starts a move already embedded in the other
+## spider's own collider can report the escape route itself as blocked, even
+## though every other check (walls, pits, contested destination) says it's
+## clear. Overlap should always be escapable on foot -- "at least they can
+## walk over one another" -- even on the rare step where a forced shove
+## doesn't manage to cleanly separate them outright.
+static func tile_shared_with_another(mover: GridMover, self_node: Node2D) -> bool:
+	var my_tile := mover.committed_tile()
+	for node in self_node.get_tree().get_nodes_in_group("spiders"):
+		if node == self_node:
+			continue
+		var other := node as Node2D
+		if other == null or not PlaneComponent.same_plane(self_node, other):
+			continue
+		var other_mover := other.get_node_or_null("GridMover") as GridMover
+		if other_mover != null and other_mover.committed_tile() == my_tile:
+			return true
+	return false
+
+
 ## Begin a one-tile step in a cardinal direction. Buffers and returns false if
 ## already moving; returns false if stunned or blocked; true if a step started.
 func try_step(dir: Vector2i) -> bool:

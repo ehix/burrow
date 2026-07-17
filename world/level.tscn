@@ -1,13 +1,36 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://world/level.gd" id="1_level"]
 [ext_resource type="Script" path="res://world/maze/maze_renderer.gd" id="2_renderer"]
+[ext_resource type="Script" path="res://world/ground_layer.gd" id="3_ground_layer"]
+[ext_resource type="Script" path="res://world/maze/floor_renderer.gd" id="4_floor_renderer"]
+[ext_resource type="Shader" path="res://assets/shaders/ground_blur.gdshader" id="5_ground_blur"]
+[ext_resource type="Script" path="res://world/maze/wall_overdraw_mask.gd" id="6_overdraw_mask"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ground_blur"]
+shader = ExtResource("5_ground_blur")
 
 [node name="Level" type="Node2D"]
 script = ExtResource("1_level")
 
 [node name="CanvasModulate" type="CanvasModulate" parent="."]
 color = Color(0.05, 0.05, 0.07, 1)
+
+[node name="GroundLayer" type="Node2D" parent="."]
+script = ExtResource("3_ground_layer")
+
+[node name="FloorRenderer" type="Node2D" parent="GroundLayer"]
+script = ExtResource("4_floor_renderer")
+
+[node name="GroundBlur" type="Node2D" parent="."]
+visible = false
+
+[node name="Capture" type="BackBufferCopy" parent="GroundBlur"]
+copy_mode = 2
+
+[node name="Overlay" type="ColorRect" parent="GroundBlur"]
+material = SubResource("ShaderMaterial_ground_blur")
+color = Color(1, 1, 1, 1)
 
 [node name="Renderer" type="Node2D" parent="."]
 script = ExtResource("2_renderer")
@@ -19,6 +42,9 @@ collision_mask = 0
 [node name="Occluders" type="Node2D" parent="."]
 
 [node name="Entities" type="Node2D" parent="."]
+
+[node name="OverdrawMask" type="Node2D" parent="."]
+script = ExtResource("6_overdraw_mask")
 
 [node name="SenseLayer" type="CanvasLayer" parent="."]
 follow_viewport_enabled = true

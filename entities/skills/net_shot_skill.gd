@@ -57,13 +57,25 @@ func resolve_hit(shooter: Node, victim: Node) -> void:
 ## Called by the net shot's own script when it lands on a larva: captures it
 ## alive at the impact point using the same WebTrap machinery a normally
 ## -placed trap uses (including its own auto-consume-if-a-spider-is-standing
-## -there path), instead of killing it outright.
+## -there path), instead of killing it outright. Setup with the shooter's own
+## plane (mirrors TrapPlacer.place()) so WebTrap's plane gate still applies —
+## a ceiling-fired shot can't capture a ground larva just because the
+## projectile itself doesn't distinguish planes physically.
 func resolve_larva_hit(shooter: Node, larva: Node, at_position: Vector2) -> void:
 	var trap: WebTrap = WebTrapScene.instantiate()
 	_spawn_parent(shooter).add_child(trap)
 	trap.global_position = at_position
-	trap.setup(shooter)
+	trap.setup(shooter, _plane_of(shooter))
 	trap.catch_larva(larva)
+
+
+## Mirrors BlockadeSkill._plane_of()/CocoonMine._plane_of(): PlaneComponent-
+## tracked plane, or GROUND for anything without one.
+func _plane_of(source: Node) -> Level.Layer:
+	var plane_component: PlaneComponent = source.get("_plane") if "_plane" in source else null
+	if plane_component != null:
+		return plane_component.current_plane
+	return Level.Layer.GROUND
 
 
 func _copy_status_effects(shooter: Node, victim: Node) -> void:

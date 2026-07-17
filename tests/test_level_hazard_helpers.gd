@@ -209,3 +209,76 @@ func test_collapse_tile_at_clears_water_state_on_a_flooded_tile() -> void:
 	assert_false(level._water_nodes.has(interior_cell), "no dangling water marker on the new wall")
 	assert_false(level._water_tiles.has(interior_cell), "no dangling water tracking on the new wall")
 	assert_false(level.maze.is_open(interior_cell.x, interior_cell.y), "the tile really did become a wall")
+
+
+## Playtest fix: a pit only blocks GROUND movement (design §1: it doesn't
+## reach the ceiling at all), so a spider standing on the tile the instant a
+## pit opens there must be shoved off it rather than left stranded exactly
+## on the hole.
+func test_set_pit_at_shoves_a_ground_spider_off_the_new_pit_tile() -> void:
+	var level := _make_level()
+	var tile := level.tile_of(level.player.global_position)
+	level.dev_remove_wall_at(tile + Vector2i.RIGHT) # guarantee somewhere to land
+
+	level.set_pit_at(tile, true)
+
+	var mover := level.player.get_node("GridMover") as GridMover
+	assert_ne(mover.committed_tile(), tile, "the player got shoved off the tile the new pit opened on")
+
+
+func test_set_pit_at_never_shoves_a_ceiling_spider() -> void:
+	var level := _make_level()
+	var tile := level.tile_of(level.player.global_position)
+	var player_plane := level.player.get_node("PlaneComponent") as PlaneComponent
+	player_plane.current_plane = Level.Layer.CEILING
+
+	level.set_pit_at(tile, true)
+
+	var mover := level.player.get_node("GridMover") as GridMover
+	assert_eq(mover.committed_tile(), tile, "a pit doesn't reach the ceiling -- nothing to shove up there")
+
+
+## Playtest regression: knockback() refuses to interrupt an in-flight step
+## (by design), and a spider is rarely standing still -- a one-shot shove
+## attempt silently failed whenever the spider committed to (or already
+## standing on) the tile happened to be mid-step at the exact moment the
+## pit opened, letting it land there completely unshoved. Mirrors
+## PlaneComponent._shove()'s own wait-for-step_finished-then-retry fix.
+func test_set_pit_at_retries_the_shove_once_an_in_flight_spider_lands() -> void:
+	var level := _make_level()
+	var tile := level.tile_of(level.player.global_position)
+	var target := tile + Vector2i.RIGHT
+	level.dev_remove_wall_at(target)
+	level.dev_remove_wall_at(target + Vector2i.RIGHT) # somewhere for the retried shove to land
+
+	var mover := level.player.get_node("GridMover") as GridMover
+	assert_true(mover.try_step(Vector2i.RIGHT), "player starts stepping toward the tile about to become a pit")
+	mover.tick(0.03) # partway through -- still is_moving()
+
+	level.set_pit_at(target, true)
+
+	assert_true(mover.is_moving(), "the shove must not force-interrupt the in-flight step")
+	assert_eq(mover.committed_tile(), target, "still mid-step toward the tile, untouched so far")
+
+	mover.tick(1.0) # finishes the step -- fires step_finished, retrying the shove
+	assert_ne(mover.committed_tile(), target, "once landed, the deferred shove finally fires")
+
+
+func test_pit_marker_is_parented_under_ground_layer() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+
+	level.set_pit_at(open_cell, true)
+
+	var marker: Node2D = level._pit_nodes[open_cell]
+	assert_eq(marker.get_parent(), level._ground_layer)
+
+
+func test_water_marker_is_parented_under_ground_layer() -> void:
+	var level := _make_level()
+	var open_cell: Vector2i = level.maze.open_cells()[0]
+
+	level.set_water_at(open_cell, true)
+
+	var marker: Node2D = level._water_nodes[open_cell]
+	assert_eq(marker.get_parent(), level._ground_layer)

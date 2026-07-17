@@ -47,14 +47,6 @@ const DARK_MODULATE := Color(0.05, 0.05, 0.07)
 ## three.
 const SENSE_OUTLINE_COLOR := Color(0.75, 0.9, 1.0, 0.9)
 
-## Ceiling/plane mechanics rework: body_alpha for whichever of Player/Enemy
-## is off the other's plane — "less in focus," per the user's own framing
-## during brainstorming. Deliberately scoped to just these two (the only
-## entities that track a plane at all); larvae/hatchlings/decoys/traps
-## always render at full brightness regardless of plane (design's explicit
-## out-of-scope call).
-const OFF_PLANE_ALPHA := 0.35
-
 ## Dual-Plane Map Architecture (design §1): the ground floor and the inverted
 ## ceiling floor directly above it. A spider's PlaneComponent tracks which one
 ## it currently occupies; `is_blocked()` is the single seam both planes'
@@ -126,6 +118,16 @@ class SenseGhost:
 @onready var _walls: StaticBody2D = $Walls
 @onready var _occluders: Node2D = $Occluders
 @onready var _renderer: MazeRenderer = $Renderer
+@onready var _ground_layer: GroundLayer = $GroundLayer
+@onready var _floor_renderer: FloorRenderer = $GroundLayer/FloorRenderer
+@onready var _overdraw_mask: WallOverdrawMask = $OverdrawMask
+## Screen-space blur overlay for the ceiling-focus hazy background (see
+## assets/shaders/ground_blur.gdshader's own doc comment for why this is a
+## BackBufferCopy + blur shader rather than something GroundLayer itself
+## composites) -- hidden whenever the ground is the plane in focus, shown
+## alongside GroundLayer's own desaturate/darken dim whenever it isn't.
+@onready var _ground_blur: Node2D = $GroundBlur
+@onready var _ground_blur_overlay: ColorRect = $GroundBlur/Overlay
 @onready var _entities: Node2D = $Entities
 ## Sense's overlays live here, not under Level directly: CanvasModulate
 ## darkens the whole default canvas and no per-CanvasItem shader can opt
@@ -181,8 +183,8 @@ func _ready() -> void:
 	# RemoveWallsSkill, BlockadeSkill) without needing it threaded through
 	# every call site the way Enemy.bind_level() does.
 	add_to_group("level")
-	# Ceiling/plane mechanics rework: floor re-color tracks the player's own
-	# plane; entity dimming (Task 7) reacts to anyone's plane change.
+	# GroundLayer's dim tracks the player's own plane; entity dimming
+	# (_refresh_plane_focus) reacts to anyone's plane change.
 	EventBus.plane_changed.connect(_on_plane_changed)
 
 
@@ -191,6 +193,9 @@ func build() -> void:
 	maze = MazeGenerator.generate(MAZE_COLS, MAZE_ROWS, GameState.maze_seed(), LOOP_CHANCE)
 	ceiling = CeilingData.new(maze)
 	_renderer.setup(maze, TILE_SIZE)
+	_floor_renderer.setup(maze, TILE_SIZE)
+	_overdraw_mask.setup(self, _renderer)
+	_ground_blur_overlay.size = map_pixel_size()
 	_build_collision_and_occluders()
 	_astar = GridNav.build(maze, TILE_SIZE)
 	_larva_cap = mini(LARVA_CAP_MAX, maxi(LARVA_COUNT, maze.open_cells().size() / LARVA_TILES_PER_CAP))
@@ -204,13 +209,15 @@ func build() -> void:
 	_hazard_director.bind_level(self)
 
 
-## Keep the maze stocked (larva spawns), and while Sense is active, keep its
-## outline in sync with the player's live position every frame.
+## Keep the maze stocked (larva spawns), keep MazeRenderer's wall-overdraw
+## fade centred on the player every frame (see MazeRenderer.set_fade_
+## center()'s own doc comment for why), and while Sense is active, keep its
+## outline in sync with the player's live position too.
 func _process(delta: float) -> void:
 	if maze == null:
 		return
 	if player != null and is_instance_valid(player):
-		_renderer.set_fade_focus(player.global_position)
+		_renderer.set_fade_center(tile_of(player.global_position))
 	_spawn_accum += delta
 	if _spawn_accum >= LARVA_SPAWN_INTERVAL:
 		_spawn_accum = 0.0
@@ -455,6 +462,7 @@ func dev_remove_wall_at(tile: Vector2i) -> bool:
 	if _astar != null:
 		_astar.set_point_solid(tile, false)
 	_renderer.queue_redraw()
+	_floor_renderer.queue_redraw()
 	for flood in _active_floods:
 		if flood.absorb_new_opening(self, tile):
 			break
@@ -513,11 +521,88 @@ func set_pit_at(tile: Vector2i, value: bool) -> void:
 	if value:
 		if not _pit_nodes.has(tile):
 			_pit_nodes[tile] = _spawn_pit_marker(tile)
+		_shove_ground_spiders_off(tile)
+		_kill_larvae_at(tile)
 	else:
 		var marker = _pit_nodes.get(tile)
 		if marker != null and is_instance_valid(marker):
 			marker.queue_free()
 		_pit_nodes.erase(tile)
+
+
+## A pit only blocks GROUND movement (design §1: pits don't reach the
+## ceiling at all), so a spider standing on `tile` on the ground -- or
+## already mid-step *toward* it, about to land there -- the instant a pit
+## opens gets shoved off it, rather than being left stranded exactly on the
+## hole. committed_tile() already reports a mid-step mover's in-flight
+## destination throughout its step (not its current interpolated position),
+## so "about to walk onto it" is caught the same way as already standing
+## there. Reuses GridMover.knockback() -- the same forced-shove primitive
+## PlaneComponent's own transition-onto-an-occupied-tile shove and a
+## crawling Centipede body already use.
+func _shove_ground_spiders_off(tile: Vector2i) -> void:
+	for node in get_tree().get_nodes_in_group("spiders"):
+		var spider := node as Node2D
+		if spider == null or PlaneComponent.effective_plane(spider) != Layer.GROUND:
+			continue
+		var mover := spider.get_node_or_null("GridMover") as GridMover
+		if mover == null or mover.committed_tile() != tile:
+			continue
+		_shove_off_pit(mover, tile)
+
+
+## knockback() refuses to interrupt an in-flight step (by design -- see its
+## own doc comment: "Ignored mid-step"), and a spider is rarely standing
+## still, so a one-shot attempt silently failed whenever the spider stepping
+## onto (or already committed to) this tile happened to be mid-step at the
+## exact moment the pit opened -- the same race PlaneComponent._shove() hit
+## and fixed for the plane-transition shove (see its own doc comment).
+## Mirrors that same wait-for-step_finished-then-retry pattern, reusing its
+## bounds (SHOVE_MAX_ATTEMPTS/SHOVE_RETRY_INTERVAL) rather than duplicating
+## new ones. Re-validates the tile is still actually a pit and the mover is
+## still on it before each attempt, so a pit dug and immediately filled
+## again doesn't leave a stale retry armed to shove someone for no reason
+## once their step lands.
+func _shove_off_pit(mover: GridMover, tile: Vector2i,
+		attempts_left: int = PlaneComponent.SHOVE_MAX_ATTEMPTS) -> void:
+	if not is_instance_valid(mover) or attempts_left <= 0:
+		return
+	if maze == null or not maze.is_pit(tile.x, tile.y) or mover.committed_tile() != tile:
+		return
+	if mover.is_moving():
+		mover.step_finished.connect(
+			func() -> void: _shove_off_pit(mover, tile, attempts_left), CONNECT_ONE_SHOT)
+		return
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if mover.knockback(dir):
+			return
+	if mover.is_inside_tree():
+		mover.get_tree().create_timer(PlaneComponent.SHOVE_RETRY_INTERVAL).timeout.connect(
+			func() -> void: _shove_off_pit(mover, tile, attempts_left - 1))
+
+
+## A larva has no GridMover-blocking concept of "get shoved out of the way"
+## (unlike a spider, it's not plane-aware and has no dedicated push
+## primitive) -- unlike the spider shove above, a pit opening directly under
+## one (or one already mid-step *toward* it, about to land there) just
+## kills it outright, mirroring _destroy_occupants_at()'s identical plain
+## queue_free() for a tile turning into a wall. Checks the GridMover's own
+## committed_tile() rather than raw global_position -- mid-step, that's the
+## larva's actual in-flight destination, not wherever the lerp animation
+## currently happens to be interpolated to; checking raw position let a
+## larva already committed to stepping onto the tile finish walking onto a
+## pit that opened moments into its step, unkilled. Killed immediately
+## regardless of is_moving() -- unlike the spider shove, there's no need to
+## wait for the step to land first; queue_free() doesn't care.
+func _kill_larvae_at(tile: Vector2i) -> void:
+	for node in get_tree().get_nodes_in_group("larvae"):
+		var larva := node as Node2D
+		if larva == null:
+			continue
+		var mover := larva.get_node_or_null("GridMover") as GridMover
+		var larva_tile := mover.committed_tile() if mover != null else tile_of(larva.global_position)
+		if larva_tile == tile:
+			larva.queue_free()
 
 
 func _spawn_pit_marker(tile: Vector2i) -> Node2D:
@@ -528,7 +613,8 @@ func _spawn_pit_marker(tile: Vector2i) -> Node2D:
 		Vector2(half, half), Vector2(-half, half)])
 	poly.color = Color(0.15, 0.08, 0.05, 0.85)
 	poly.position = _tile_centre(tile.x, tile.y)
-	add_child(poly)
+	_ground_layer.add_child(poly)
+	poly.material = _ground_layer.dim_material()
 	return poly
 
 
@@ -581,7 +667,8 @@ func _spawn_water_marker(tile: Vector2i) -> Node2D:
 		Vector2(half, half), Vector2(-half, half)])
 	poly.color = WATER_MARKER_COLOR
 	poly.position = _tile_centre(tile.x, tile.y)
-	add_child(poly)
+	_ground_layer.add_child(poly)
+	poly.material = _ground_layer.dim_material()
 	return poly
 
 
@@ -667,6 +754,7 @@ func collapse_tile_at(tile: Vector2i) -> bool:
 	if _astar != null:
 		_astar.set_point_solid(tile, true)
 	_renderer.queue_redraw()
+	_floor_renderer.queue_redraw()
 	return true
 
 
@@ -727,9 +815,11 @@ func _on_plane_changed(who: Node, plane: int) -> void:
 
 
 ## Dims whichever of Player/Enemy is off the other's plane via the shared
-## outline shader's body_alpha uniform (already shipped for Camouflage) —
-## the floor re-color (above) tells you which plane *you're* on; this tells
-## you which other spider is or isn't reachable from here.
+## outline shader's dim_enabled uniform (tunnel visual rework Phase 2 --
+## previously a flat body_alpha fade, switched to match GroundLayer's own
+## hazy/desaturated "background" look for visual consistency) -- the
+## floor dim (above, GroundLayer) tells you which plane *you're* on; this
+## tells you which other spider is or isn't reachable from here.
 ##
 ## Camouflage guardrail: body_alpha isn't reference-counted (last caller
 ## wins, by design — see OutlineFx.set_body_alpha's own doc comment), so a
@@ -744,6 +834,9 @@ func _refresh_plane_focus() -> void:
 	if player == null or enemy == null:
 		return
 	var focus_plane := PlaneComponent.effective_plane(player)
+	var ceiling_focus := focus_plane == Layer.CEILING
+	_ground_layer.set_dimmed(ceiling_focus)
+	_ground_blur.visible = ceiling_focus
 	for node in [player, enemy]:
 		if not is_instance_valid(node):
 			continue
@@ -752,8 +845,7 @@ func _refresh_plane_focus() -> void:
 		var vis := node.get_node_or_null("Sprite") as CanvasItem
 		if vis == null:
 			continue
-		var alpha := 1.0 if PlaneComponent.effective_plane(node) == focus_plane else OFF_PLANE_ALPHA
-		OutlineFx.set_body_alpha(vis, alpha)
+		OutlineFx.set_dimmed(vis, PlaneComponent.effective_plane(node) != focus_plane)
 
 
 ## True if `entity` has a currently-active CamouflageSkill child, found by
@@ -821,7 +913,8 @@ func _spawn_random_item_at(cell: Vector2i) -> void:
 func _spawn_pickup_at(world_pos: Vector2, item: ConsumableItem) -> void:
 	var pickup := WorldItemPickupScene.instantiate()
 	pickup.item = item
-	_entities.add_child(pickup)
+	_ground_layer.add_child(pickup)
+	pickup.material = _ground_layer.dim_material()
 	pickup.global_position = world_pos
 
 
@@ -903,16 +996,19 @@ func _spawn_larvae(reserved: Array) -> void:
 	for cell in cells:
 		if placed >= LARVA_COUNT:
 			break
-		if cell in reserved:
+		if cell in reserved or maze.is_pit(cell.x, cell.y):
 			continue
 		_spawn_larva_at(cell)
 		placed += 1
 
 
-## Spawn one larva at a random open cell that no spider is standing on and
-## no Centipede body occupies -- otherwise a larva could spawn sitting
-## inside an already-BLOCKING Centipede, stuck there indefinitely since a
-## stationary body never crawls over its own tiles to squash it away.
+## Spawn one larva at a random open cell that no spider is standing on, no
+## Centipede body occupies, and isn't a pit/flood -- otherwise a larva could
+## spawn sitting inside an already-BLOCKING Centipede (stuck there
+## indefinitely since a stationary body never crawls over its own tiles to
+## squash it away) or directly on a hole it could never have walked onto
+## itself (its own _blocked() already refuses to step onto a pit exactly
+## like a wall, so spawning is the only way it could end up there).
 func _spawn_larva_at_random() -> void:
 	var cells := maze.open_cells()
 	if cells.is_empty():
@@ -928,6 +1024,8 @@ func _spawn_larva_at_random() -> void:
 			continue
 		if Centipede.segment_at_tile(get_tree(), cell) != null:
 			continue
+		if maze.is_pit(cell.x, cell.y):
+			continue
 		_spawn_larva_at(cell)
 		return
 
@@ -935,7 +1033,8 @@ func _spawn_larva_at_random() -> void:
 func _spawn_larva_at(cell: Vector2i) -> void:
 	var larva := LarvaScene.instantiate()
 	larva.position = _tile_centre(cell.x, cell.y)
-	_entities.add_child(larva)
+	_ground_layer.add_child(larva)
+	larva.get_node("Sprite").material = _ground_layer.dim_material()
 	larva.bind_level(self)
 	if larva.has_method("set_facing"):
 		larva.set_facing(TileTypes.default_facing(maze.classify(cell.x, cell.y)))

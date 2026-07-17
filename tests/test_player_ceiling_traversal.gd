@@ -79,3 +79,26 @@ func test_a_blockade_blocks_the_player_from_stepping_onto_its_tile() -> void:
 
 	player._plane.transition() # -> CEILING
 	assert_true(player._blocked(Vector2i(1, 0)), "the same blockade blocks the ceiling too")
+
+
+## Playtest fix: two spiders should never end up permanently unable to move
+## just because they're standing on the same tile (a forced shove can still
+## fail to cleanly separate them, e.g. into each other, or a pit opening
+## underneath one of them) -- Player/Enemy physically collide with each
+## other (their collision masks include each other's layer), so a body that
+## starts a move already embedded in the other spider's own collider can
+## report an otherwise-clear escape route as blocked via the test_move()
+## fallback. _blocked() must skip that fallback entirely while overlapping,
+## so an open direction is always escapable on foot regardless.
+func test_overlapping_another_spider_never_blocks_stepping_onto_open_ground() -> void:
+	var level := _make_level()
+	var player := level.player as Player
+	var tile := level.tile_of(player.global_position)
+	var escape := tile + Vector2i(1, 0)
+	level.dev_remove_wall_at(escape) # guarantee genuinely open + collider-free
+
+	level.enemy.global_position = player.global_position # force the overlap
+
+	assert_true(GridMover.tile_shared_with_another(player.get_node("GridMover"), player),
+		"sanity check -- they really are considered overlapping")
+	assert_false(player._blocked(Vector2i(1, 0)), "an open direction must always be escapable while overlapping")

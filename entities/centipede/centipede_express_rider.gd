@@ -49,6 +49,11 @@ func bind_level(level: Node) -> void:
 	_level = level
 
 
+## Mirrors Centipede.get_segments() -- same wall-occlusion masking consumer.
+func get_segments() -> Array[CentipedeSegment]:
+	return _segments
+
+
 ## Starts the whole body tucked off-map, `body_length` tiles behind `entry`
 ## along `direction` (tile_centre() is pure arithmetic, so an out-of-bounds
 ## tile position is perfectly safe -- Centipede._exit_step() relies on the
