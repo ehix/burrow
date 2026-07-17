@@ -117,3 +117,47 @@ func test_start_crawl_finds_a_path_after_tunneling_through_when_boxed_in() -> vo
 
 	assert_false(centipede._path.is_empty(),
 		"boxed-in start_crawl tunnels through (over one or more retries) and finds a path")
+
+
+## Playtest follow-up: _start_crawl() now tries reversing the body (leading
+## with the tail instead) before ever tunneling -- see
+## test_centipede_reverse.gd. Confirms the fallback chain still reaches
+## tunneling when reversing genuinely can't help either: a 2-segment body
+## with EVERY open neighbor on BOTH ends flooded (not just the tail's own
+## side, the way a self-filled dead-end blocks only one direction) has no
+## valid path forward or reversed, so this must still end up carving
+## exactly like it did before the reversal fallback existed.
+func test_start_crawl_still_falls_through_to_tunneling_when_both_ends_of_a_multi_segment_body_are_sealed() -> void:
+	var level := _make_level()
+	var cells := level.maze.open_cells()
+	var start: Vector2i = _find_boxable_cell(level)
+	var second := Vector2i.ZERO
+	var found_second := false
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		var candidate: Vector2i = start + dir
+		if level.maze.is_open(candidate.x, candidate.y):
+			second = candidate
+			found_second = true
+			break
+	assert_true(found_second, "sanity: the maze must have at least one open neighbor here")
+	# Seal every open neighbor of both ends, excluding each other (flooding
+	# either body tile itself would spuriously trigger notify_flooded()
+	# before this test ever calls _start_crawl() itself).
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		var n: Vector2i = start + dir
+		if n != second and level.maze.is_open(n.x, n.y):
+			level.set_water_at(n, true)
+	for dir in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		var n: Vector2i = second + dir
+		if n != start and level.maze.is_open(n.x, n.y):
+			level.set_water_at(n, true)
+	var centipede := _make_centipede(level, [start, second])
+	centipede._target = cells[cells.size() - 1]
+
+	var tries := 0
+	while centipede._path.is_empty() and tries < 10:
+		centipede._start_crawl()
+		tries += 1
+
+	assert_false(centipede._path.is_empty(),
+		"both ends genuinely sealed -- reversing can't help, but tunneling (over one or more retries) still finds a path")
