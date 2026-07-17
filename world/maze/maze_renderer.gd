@@ -156,8 +156,34 @@ static func overdraw_alpha_for_offset(column_offset: int, span: int, min_alpha: 
 ## repaint pass calls this same function so a wall fading near the viewer
 ## and its repaint-over-an-entity pass never disagree about how transparent
 ## that tile currently is.
+##
+## Never fades when the tile the sliver actually pokes into (north of
+## `wall_tile` on GROUND, south on CEILING) is itself another wall, not open
+## floor (playtest finding: two wall tiles stacked back-to-back share a
+## seam exactly where the southern one's sliver overdraws the northern
+## one's front face -- see _draw_wall_ground()'s doc comment for why that
+## overlap exists and is normally invisible, both being drawn at full
+## opacity in the same wall_top_face_color. Fading only the southern tile's
+## sliver there, just because it happened to fall within the fade window,
+## broke that -- it blended a translucent copy of the lighter top-face
+## color over the darker front-face color underneath instead of leaving it
+## fully covered, producing a visible seam/gap *inside* what should read as
+## one continuous wall run, popping in and out as the player walked past).
+## Nothing can ever stand in a tile that's still a wall, so there is no
+## legitimate occlusion happening there to soften in the first place -- but
+## the check is live against the current maze every frame, not a one-time
+## decision, so the instant an adjacent wall actually opens up (Remove Wall,
+## Seismic Compaction, Centipede Express carving a tile), this sliver
+## starts fading/occluding normally, exactly like any other tile bordering
+## real open floor.
 func overdraw_alpha_for(wall_tile: Vector2i) -> float:
 	if not _has_fade_center:
+		return 1.0
+	var poked_into := (
+		Vector2i(wall_tile.x, wall_tile.y - 1) if _active_plane == Level.Layer.GROUND
+		else Vector2i(wall_tile.x, wall_tile.y + 1)
+	)
+	if _maze == null or not _maze.is_open(poked_into.x, poked_into.y):
 		return 1.0
 	var fade_row := _fade_center_tile.y + 1 if _active_plane == Level.Layer.GROUND else _fade_center_tile.y - 1
 	if wall_tile.y != fade_row:

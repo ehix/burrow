@@ -231,6 +231,21 @@ func _make_renderer() -> MazeRenderer:
 	return renderer
 
 
+## A renderer over a maze where every cell is open floor -- for tests that
+## need overdraw_alpha_for()'s "is the poked-into tile actually open" guard
+## (see its own doc comment) to always pass, so they can isolate just the
+## row/column-window logic the guard sits in front of. _make_renderer()'s
+## MazeGenerator layout can't guarantee that at arbitrary probe coordinates.
+func _make_fully_open_renderer(width: int, height: int) -> MazeRenderer:
+	var cells := PackedByteArray()
+	cells.resize(width * height)
+	cells.fill(1)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(MazeData.new(cells, width, height), 48)
+	return renderer
+
+
 ## Confirms MazeRenderer still draws without erroring on both planes, with
 ## no fade centre set yet (the state before Level's first _process() call --
 ## see set_fade_center()'s own doc comment) -- overdraw_alpha_for() must
@@ -293,7 +308,7 @@ func test_overdraw_alpha_for_is_full_opacity_before_a_fade_center_is_ever_set() 
 ## softens; every other row (even the very next one further south, or the
 ## centre's own row) stays full opacity regardless of column.
 func test_overdraw_alpha_for_only_softens_the_occluding_row_within_the_column_span() -> void:
-	var renderer := _make_renderer()
+	var renderer := _make_fully_open_renderer(10, 10)
 	renderer.wall_fade_span_tiles = 1
 	renderer.wall_fade_min_alpha = 0.25
 	renderer.set_fade_center(Vector2i(5, 5)) # ground plane by default -- occluding row is y=6
@@ -311,7 +326,7 @@ func test_overdraw_alpha_for_only_softens_the_occluding_row_within_the_column_sp
 ## centre (wall_tile_for()'s ceiling-plane rule) -- confirms overdraw_alpha_
 ## for() actually reads active_plane() rather than assuming ground always.
 func test_overdraw_alpha_for_uses_the_north_row_on_the_ceiling_plane() -> void:
-	var renderer := _make_renderer()
+	var renderer := _make_fully_open_renderer(10, 10)
 	renderer.set_active_plane(Level.Layer.CEILING)
 	renderer.wall_fade_span_tiles = 1
 	renderer.wall_fade_min_alpha = 0.25
@@ -319,3 +334,58 @@ func test_overdraw_alpha_for_uses_the_north_row_on_the_ceiling_plane() -> void:
 
 	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 4)), 0.25, "north of the centre -- the ceiling-plane occluding row")
 	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 6)), 1.0, "south is the ground-plane occluding row, not ceiling")
+
+
+# --- overdraw_alpha_for()'s "poked-into tile must be open" guard (playtest
+# finding: fading a wall tile whose sliver pokes into ANOTHER wall, not open
+# floor, exposed a seam between two stacked wall tiles that should read as
+# one continuous run -- see the function's own doc comment) ----------------
+
+## Ground plane: a single-column wall run (x=0) bordering an open north-
+## south corridor (x=1) -- (0,0) and (0,1) are both walls, (1,0) and (1,1)
+## are both open. wall_tile (0,1) sits squarely inside the fade window
+## (one row south of the fade centre, one column west) but its own poked-
+## into neighbor (0,0) is also a wall -- nothing could ever stand there.
+func test_overdraw_alpha_for_never_softens_a_sliver_whose_poked_into_tile_is_also_a_wall() -> void:
+	var maze := MazeData.new(PackedByteArray([0, 1, 0, 1]), 2, 2)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, 48)
+	renderer.wall_fade_span_tiles = 1
+	renderer.set_fade_center(Vector2i(1, 0)) # player standing in the open corridor
+
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(0, 1)), 1.0,
+		"a wall-to-wall seam must never soften, even inside the fade window")
+
+
+## Complement: the instant that neighbor opens up (Remove Wall, Seismic
+## Compaction, Centipede Express), the identical wall_tile starts fading
+## normally -- the guard is live against the current maze every frame, not
+## a one-time decision baked in when the wall was placed.
+func test_overdraw_alpha_for_starts_softening_once_the_poked_into_tile_opens_up() -> void:
+	var maze := MazeData.new(PackedByteArray([0, 1, 0, 1]), 2, 2)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, 48)
+	renderer.wall_fade_span_tiles = 1
+	renderer.wall_fade_min_alpha = 0.25
+	renderer.set_fade_center(Vector2i(1, 0))
+
+	maze.set_open(0, 0) # "Remove Wall" on the tile the sliver pokes into
+
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(0, 1)), 0.25,
+		"now that something could actually stand there, the sliver fades like any other tile in the window")
+
+
+## Ceiling-plane mirror: the poked-into tile flips to south of wall_tile.
+func test_overdraw_alpha_for_never_softens_on_ceiling_when_the_poked_into_tile_is_also_a_wall() -> void:
+	var maze := MazeData.new(PackedByteArray([0, 1, 0, 1]), 2, 2)
+	var renderer := MazeRenderer.new()
+	add_child_autofree(renderer)
+	renderer.setup(maze, 48)
+	renderer.set_active_plane(Level.Layer.CEILING)
+	renderer.wall_fade_span_tiles = 1
+	renderer.set_fade_center(Vector2i(1, 1)) # player standing in the open corridor
+
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(0, 0)), 1.0,
+		"a wall-to-wall seam must never soften on the ceiling plane either")
