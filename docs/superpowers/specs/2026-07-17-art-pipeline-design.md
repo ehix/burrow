@@ -68,6 +68,19 @@ rework landed (2026-07-17, PR #16). A fresh codebase sweep confirms:
 - **Zero animation infrastructure exists anywhere in the codebase.** Every
   entity is either a static `Sprite2D` or a hand-coded `_draw()` placeholder.
   No `AnimatedSprite2D`/`SpriteFrames` usage exists today.
+- **A ceiling-plane underside/belly sprite was already scoped and explicitly
+  deferred**, not a new idea: `docs/superpowers/specs/2026-07-14-tunnel-
+  visual-rework-design.md` (Phase 2, lines 42-54 and 225-229) calls for the
+  player/enemy sprite to swap to a distinct underside pose while on the
+  ceiling plane ("a fixed top-down camera looking at an upside-down spider
+  would actually see its belly, not its back"), scoped there as one static
+  pose per class (5 total: Net-Caster, Wolf, Weaver, Decoy, the rival) —
+  deferred purely because no belly art existed yet. `PlaneComponent.
+  plane_changed` is already the intended seam for a texture swap (that
+  spec's own words). This pipeline now generates that art for real, as a
+  full animated set (not just a static pose) alongside each creature's
+  ground-facing set, per §5 — this closes a real, previously-shipped-and-
+  deferred gap, not scope creep invented by this design.
 
 Full per-entity breakdown (creatures, tiles, items, VFX, UI — current state,
 file:line) was captured during this design's research pass and is not
@@ -112,16 +125,23 @@ and `list_character_workflows` — confirmed 2026-07-17:
 
 **Budget:** the user is subscribing at 800 credits/month. §5's directional-
 art decision (full idle/walk coverage per facing, for consistency with the
-faux-3D wall renderer, §5) raises the per-creature estimate to ~250
-credits. Across the full roadmap (§8) — roughly 13 creatures at ~250
-credits each, plus tiles and VFX/item stills — lands around **3,500–4,500
-credits total**, spanning roughly 5–6 months at 800/month rather than the
-prior revision's 2–4. §9's per-category checkpoint exists partly to keep
-this honest as real numbers replace the estimate; if Category 0's actual
-cost runs higher, the directional-coverage decision itself (not just
-per-entity scope) becomes the thing to revisit. Balance was 0 credits as
-of 2026-07-17, pre-subscription — resolved once the subscription is
-active, tracked as a Category 0 prerequisite, not a blocker on this design.
+faux-3D wall renderer) raises the per-creature estimate to ~250 credits;
+the full underside/ceiling set (§5, closing the deferred Phase 2 gap, §3)
+doubles that to ~500 credits, but only for the 4 creatures with a
+`PlaneComponent` today — Wolf/Warden/Ogre/Echo (Category 0's Wolf, plus 3
+more in Category 2; `Enemy` reuses whichever class's art it rolls, not a
+separate 5th set, since Category 2 also fixes `Enemy`'s per-class texture
+bug, §3). The other ~9 creatures in the roadmap (Larva, the 4 prey
+variants, Centipede) have no `PlaneComponent` and stay ground-only at
+~250 credits each. Rough total: 4 × ~500 + 9 × ~250 ≈ 4,250, plus tiles
+and VFX/item stills — lands around **5,000–6,000 credits total**,
+spanning roughly 6–8 months at 800/month. §9's per-category checkpoint
+exists partly to keep this honest as real numbers replace the estimate;
+if Category 0's actual cost runs higher, the directional-coverage and/or
+underside-set decisions themselves (not just per-entity scope) become the
+thing to revisit. Balance was 0 credits as of 2026-07-17, pre-subscription
+— resolved once the subscription is active, tracked as a Category 0
+prerequisite, not a blocker on this design.
 
 ## 5. Generation technique
 
@@ -177,6 +197,40 @@ This raises the per-creature credit estimate from the prior revision's
 at 20 each, mirroring the free left-facing pairs) — see §4's revised
 budget.
 
+**Underside/ceiling set (full characters only — every creature with a
+`PlaneComponent`, i.e. `Player`/`Enemy` today):** closes the deferred Phase
+2 requirement (§3) with a *full* parallel animation set, not just the
+single static pose originally scoped in 2026-07-14 — the user's explicit
+call, made knowing this roughly doubles the per-creature cost. Same 9
+states, generated the same way, but from a second, independent base
+character:
+1. `generate_character(prompt, perspective="topdown")` — a second base
+   character describing the creature's ventral/underside view directly
+   (viewed from below, as if looking up at it clinging to a ceiling), not
+   a transform of the ground-facing base. `generate_character` takes no
+   reference/style-image parameter, so consistency with the ground base
+   relies on prompt-level consistency (reusing the same anatomical/color
+   language) — **an unverified assumption Category 0 exists to test.** If
+   the result doesn't visually match the ground-facing character closely
+   enough, regenerate via `generate_game_art`'s `edit_asset_id`/
+   `style_asset_id` (which do take reference images, unlike
+   `generate_character`) using the ground base as a style anchor, before
+   spending the full animation-set cost on a mismatched underside base.
+2. `generate_character_animations` with the same 9-state `animation_ids`
+   list, on this second `character_id`.
+3. `export_godot_character_package` for a second `SpriteFrames` resource.
+
+**Code wiring:** `Player` (Category 0) and later `Enemy` (Category 2) hold
+two `SpriteFrames` resources — ground-facing and underside — and swap
+`sprite.sprite_frames` on `PlaneComponent.plane_changed` (already emitted,
+already the seam the deferred spec called out). Both resources share the
+same 9 animation names (§5 above), so `_locomotion_animation_for()` and
+every `sprite.play(...)` call site work unchanged regardless of which
+resource is currently assigned — only the swap itself is new code.
+
+This doubles the per-creature credit estimate again, from ~250 to roughly
+**~500 credits** — see §4's revised budget.
+
 **Per-asset flow (VFX, items, icons — Categories 4–6, non-character):**
 1. `generate_game_art(prompt, pixel=true)` for the still.
 2. For anything needing motion (a burst, a pulse, a short loop — not a
@@ -223,6 +277,19 @@ manifest, same shape/spirit as `spritecook-assets.json`, at
         "hurt": "<animation asset_id>",
         "death": "<animation asset_id>"
       },
+      "underside_character_id": "<second base character asset_id, ventral view -- omitted for creatures with no PlaneComponent>",
+      "underside_run_id": "<generate_character_animations run id for the underside set>",
+      "underside_animations": {
+        "idle": "<animation asset_id>",
+        "idle_back": "<animation asset_id>",
+        "idle_right": "<animation asset_id>",
+        "walk_down": "<animation asset_id>",
+        "walk_up": "<animation asset_id>",
+        "walk_right": "<animation asset_id>",
+        "attack": "<animation asset_id>",
+        "hurt": "<animation asset_id>",
+        "death": "<animation asset_id>"
+      },
       "status": "approved"
     }
   ]
@@ -247,6 +314,12 @@ Applies uniformly across every category:
   `CombatFx.flash()`/slash calls, death, skill-cast triggers). No new
   animation *logic* is invented — the pipeline hangs new visuals on
   trigger points that already exist in code.
+- For the 4 creatures with a `PlaneComponent` (Wolf/Warden/Ogre/Echo, §4):
+  a second `SpriteFrames` resource (the underside/ceiling set, §5) is
+  swapped in wholesale on `PlaneComponent.plane_changed`, per the seam that
+  spec already called out — not a second node, not per-animation
+  branching, just which `SpriteFrames` resource `sprite.sprite_frames`
+  currently points at.
 - Every `_draw()` placeholder (Centipede segment, Blockade, Decoy, Ogre's
   net, Wolf's cocoon/spiderlings, item pickup dots, status badges, hazard
   VFX) gets replaced with a real `Sprite2D`/`AnimatedSprite2D` node and
@@ -265,7 +338,7 @@ this document sequences them but does not spec categories 1–6 in detail.
 
 | # | Category | Scope |
 |---|---|---|
-| **0** | **Pipeline proof-of-concept** | New pixel-art style anchor + one full creature (Wolf) taken through `generate_character` → `generate_character_animations` (directional idle/walk, single-pose attack/hurt/death, §5) → Godot `AnimatedSprite2D`, including the `Player` code change from rotation-based to directional-animation-based facing, verified with a real windowed screenshot (not just automated tests — this project has repeatedly found shader/visual bugs invisible to GUT, see the Sense saga in the playtest roadmap history). Gates every other category — nothing else starts until this loop is proven to actually produce usable, on-style output. |
+| **0** | **Pipeline proof-of-concept** | New pixel-art style anchor + one full creature (Wolf) taken through `generate_character` → `generate_character_animations` (directional idle/walk, single-pose attack/hurt/death, §5) → Godot `AnimatedSprite2D`, **plus a full parallel underside/ceiling animation set** (§5, closing the Phase 2 gap, §3), including the `Player` code change from rotation-based to directional-animation-based facing and the plane-triggered `SpriteFrames` swap (§7), verified with a real windowed screenshot on both planes (not just automated tests — this project has repeatedly found shader/visual bugs invisible to GUT, see the Sense saga in the playtest roadmap history). Gates every other category — nothing else starts until this loop is proven to actually produce usable, on-style output. |
 | 1 | Tileset | Floor/wall/pit/water, ground+ceiling variants, real `TileSet`/`TileMapLayer` conversion of the maze renderer. |
 | 2 | Player/enemy spiders | Wolf, Warden (new dedicated player sprite — currently borrows Wolf's body), Ogre, Echo — each a distinct silhouette per art-bible §5, animated. Includes fixing `Enemy`'s per-class texture selection bug (§3). |
 | 3 | Prey & Centipede | Larva, the 4 prey variants (Fungal Larva/Beetle/Ant/Cicada Nymph — needs `PreyType` wired into `Larva` first as a code prerequisite), Centipede segment. |
@@ -280,18 +353,18 @@ this document sequences them but does not spec categories 1–6 in detail.
   Sense/Camouflage saga that found three rounds of real playtest-only bugs
   invisible to automated review.
 - **Cost checkpoint**: SpriteCook's `get_credit_balance` gives a real
-  number, not a dashboard guess — check it after Category 0 completes
-  (base character + 6 directional idle/walk states + 3 single-pose combat
-  states) to see actual per-creature cost against the ~250-credit estimate
-  in §4, before committing to Categories 1–6. Subscription is 800
-  credits/month; §4's rough full-backlog estimate (3,500–4,500 credits)
-  already assumes this spans multiple months, but Category 0's real
-  numbers should confirm or correct that before treating it as a plan. If
-  per-creature cost runs meaningfully higher than estimated, re-scope —
-  first by reconsidering §5's directional-coverage decision itself (e.g.
-  dropping the back-facing pose, or accepting rotation for a subset of
-  lower-visibility creatures), then by trimming animation states per
-  entity, before generating the full backlog, not after.
+  number, not a dashboard guess — check it after Category 0 completes (two
+  full 9-state animation sets, ground-facing and underside) to see actual
+  per-creature cost against the ~500-credit estimate in §4, before
+  committing to Categories 1–6. Subscription is 800 credits/month; §4's
+  rough full-backlog estimate (5,000–6,000 credits) already assumes this
+  spans multiple months, but Category 0's real numbers should confirm or
+  correct that before treating it as a plan. If per-creature cost runs
+  meaningfully higher than estimated, re-scope — first by reconsidering
+  §5's underside-set and directional-coverage decisions themselves (e.g.
+  dropping the underside set's back-facing pose, or accepting rotation for
+  a subset of lower-visibility creatures), then by trimming animation
+  states per entity, before generating the full backlog, not after.
 - **Render-verified, not test-verified**: per this project's established
   lesson, integration correctness for anything visual is checked with a
   real windowed Godot run/screenshot, not just GUT tests — automated tests
@@ -304,6 +377,10 @@ this document sequences them but does not spec categories 1–6 in detail.
   none remaining as a `_draw()` placeholder or flat `Color()` literal.
 - Every creature has at minimum idle/move/attack/hurt/death animations
   where the gameplay trigger for that state already exists in code.
+- Every creature with a `PlaneComponent` (Wolf/Warden/Ogre/Echo) has a full
+  underside/ceiling animation set, wired to swap in on `plane_changed` —
+  closing `docs/superpowers/specs/2026-07-14-tunnel-visual-rework-design.md`'s
+  deferred Phase 2 gap for real, not just re-deferring it again.
 - All new art is visually traceable to one consistent style anchor per
   art-bible §§2–3.
 - `docs/art-bible.md` is updated to reflect the new reference art (replacing
