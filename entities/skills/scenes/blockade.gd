@@ -35,6 +35,17 @@ static func at_tile(tree: SceneTree, tile: Vector2i, tile_size: int) -> Blockade
 
 func _ready() -> void:
 	add_to_group("blockades")
+	# Always renders at its own literal authored color, never relit by the
+	# player's VisionLight (playtest finding, same root cause as MazeRenderer's
+	# own unshaded fix: the light's real radial falloff -- most pronounced at
+	# close range, exactly where a placed blockade usually gets seen -- made
+	# this flat 40x40 rect read with a bright lit centre fading to a visibly
+	# darker "outline" toward its own edges, worse the closer the player
+	# stood, since there's no real surface geometry here for a lighting
+	# gradient to make sense across in the first place; the same rect just
+	# looks like a rendering bug instead of an intentional shading style).
+	material = CanvasItemMaterial.new()
+	material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 
 
 func _draw() -> void:

@@ -9,6 +9,15 @@ extends StaticBody2D
 
 func _ready() -> void:
 	add_to_group("centipede_segments")
+	# Always renders at its own literal authored color, never relit by the
+	# player's VisionLight (playtest finding, same root cause and fix as
+	# Blockade.gd's own -- see its doc comment: a flat placeholder rect this
+	# small reads with a visibly darker "outline" toward its own edges under
+	# the light's real radial falloff, worst at exactly the close range a
+	# segment usually gets seen at, since there's no real surface geometry
+	# for that gradient to make sense across).
+	material = CanvasItemMaterial.new()
+	material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 
 
 func _draw() -> void:
