@@ -161,11 +161,21 @@ static func _straddled_columns(position_x: float, half_extent: float, tile_size:
 
 
 ## Every entity that should be subject to wall-overdraw occlusion: the full
-## "spiders" group (Player/Enemy/Decoy), plus every visual segment of every
-## live Centipede/CentipedeExpressRider (their segments carry the actual
-## position, not the body's own root node). The player is included like
-## everyone else -- see this class's own doc comment for why occlusion no
-## longer special-cases the player at all.
+## "spiders" group (Player/Enemy/Decoy), every visual segment of every live
+## Centipede/CentipedeExpressRider (their segments carry the actual
+## position, not the body's own root node), and every live Blockade. The
+## player is included like everyone else -- see this class's own doc
+## comment for why occlusion no longer special-cases the player at all.
+##
+## Blockade playtest finding: it's parented under Entities exactly like
+## Player/Enemy/Centipede segments (BlockadeSkill._spawn_parent() -- same
+## sibling-draw-order gap this whole class exists to close), so a blockade
+## standing in a wall's overdraw band was never reliably repainted the same
+## way -- only "by accident" on a tick some OTHER entity's own straddle also
+## happened to claim that exact wall_tile, since the paint dict dedupes per
+## tile, not per entity. Registering it here directly is what actually
+## guarantees it, matching every other occludable entity instead of leaving
+## it to chance.
 func _occludable_entities() -> Array[Node2D]:
 	var result: Array[Node2D] = []
 	for node in get_tree().get_nodes_in_group("spiders"):
@@ -182,4 +192,8 @@ func _occludable_entities() -> Array[Node2D]:
 		if rider != null:
 			for segment in rider.get_segments():
 				result.append(segment)
+	for node in get_tree().get_nodes_in_group("blockades"):
+		var blockade := node as Node2D
+		if blockade != null:
+			result.append(blockade)
 	return result

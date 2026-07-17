@@ -3,13 +3,16 @@ extends GutTest
 ## finding): a wall's overdraw silhouette is supposed to occlude whatever's
 ## standing in the tile it pokes into, but Level.tscn's sibling draw order
 ## means Entities always paints over Renderer's walls regardless -- this
-## repaints just the overlapping patches on top of Entities so a spider or
-## Centipede segment actually disappears behind the wall's silhouette. The
-## player gets the exact same repaint as everyone else, at the exact same
-## alpha -- no per-entity special case at all. What alpha that is depends
-## only on the wall tile's own distance from MazeRenderer's fade centre
-## (normally the player's own tile) -- see the class's own doc comment and
-## _paint_color_for().
+## repaints just the overlapping patches on top of Entities so a spider,
+## Centipede segment, or Blockade actually disappears behind the wall's
+## silhouette. The player gets the exact same repaint as everyone else, at
+## the exact same alpha -- no per-entity special case at all. What alpha
+## that is depends only on the wall tile's own distance from MazeRenderer's
+## fade centre (normally the player's own tile) -- see the class's own doc
+## comment and _paint_color_for().
+
+const BlockadeScene := preload("res://entities/skills/scenes/blockade.tscn")
+
 
 func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
@@ -61,6 +64,47 @@ func test_occludable_entities_includes_every_live_centipede_segment() -> void:
 
 	for segment in centipede.get_segments():
 		assert_true(entities.has(segment))
+
+
+## Playtest finding: Blockade is parented under Entities exactly like every
+## other occludable entity (BlockadeSkill._spawn_parent()), so without this
+## it was only ever repainted "by accident" on a tick some OTHER entity's
+## own straddle happened to also claim the exact same wall_tile -- not
+## reliably, the way Player/Enemy/Centipede segments always are.
+func test_occludable_entities_includes_a_live_blockade() -> void:
+	var level := _make_level()
+	var blockade: Blockade = BlockadeScene.instantiate()
+	level.add_child(blockade)
+
+	var entities := _mask_of(level)._occludable_entities()
+
+	assert_true(entities.has(blockade))
+
+
+## End-to-end confirmation, not just group membership: a Blockade resting
+## naturally in a wall's overdraw band (level.tile_centre(), exactly where
+## it's placed -- see BlockadeSkill._on_activate()) is actually detected as
+## occluded, mirroring test_a_naturally_resting_enemy_is_actually_detected_
+## as_occluded() above but through the full _occluded_wall_tile_colors()
+## pipeline rather than just the underlying wall_occludes_extent() check.
+func test_a_naturally_placed_blockade_gets_occluded_by_the_wall_above_it() -> void:
+	var level := _make_level()
+	var wall_tile := Vector2i(2, 2)
+	level.maze.set_wall(wall_tile.x, wall_tile.y)
+	var blockade_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
+	level.maze.set_open(blockade_tile.x, blockade_tile.y)
+	# Well out of range of this wall_tile's own check -- isolates the
+	# assertion to the blockade itself, not a coincidental player/enemy
+	# straddle from level.build()'s own random spawn placement.
+	level.player.global_position = level.tile_centre(Vector2i(50, 50))
+	level.enemy.global_position = level.tile_centre(Vector2i(51, 51))
+	var blockade: Blockade = BlockadeScene.instantiate()
+	level.add_child(blockade)
+	blockade.global_position = level.tile_centre(blockade_tile)
+
+	var colors: Dictionary = _mask_of(level)._occluded_wall_tile_colors()
+
+	assert_true(colors.has(wall_tile), "the wall directly above the blockade repaints over it")
 
 
 func test_occludable_entities_includes_every_live_express_rider_segment() -> void:
