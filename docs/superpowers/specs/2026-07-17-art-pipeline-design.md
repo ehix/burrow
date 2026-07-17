@@ -110,15 +110,18 @@ and `list_character_workflows` — confirmed 2026-07-17:
   as comparable to the guided workflow's ~20 credits/state until Category 0
   confirms the real number via `get_credit_balance` deltas.
 
-**Budget:** the user is subscribing at 800 credits/month. A rough estimate
-across the full roadmap (§8) — roughly 13 creatures at ~120 credits each
-for a full 5-state animation set, plus tiles and VFX/item stills — lands
-around 1,500–2,500 credits total, more than one month's allowance but
-comfortably covered across the 2–4 months this roadmap already spans
-sequentially (§9's per-category checkpoint exists partly to keep this
-honest as real numbers replace the estimate). Balance was 0 credits as of
-2026-07-17, pre-subscription — resolved once the subscription is active,
-tracked as a Category 0 prerequisite, not a blocker on this design.
+**Budget:** the user is subscribing at 800 credits/month. §5's directional-
+art decision (full idle/walk coverage per facing, for consistency with the
+faux-3D wall renderer, §5) raises the per-creature estimate to ~250
+credits. Across the full roadmap (§8) — roughly 13 creatures at ~250
+credits each, plus tiles and VFX/item stills — lands around **3,500–4,500
+credits total**, spanning roughly 5–6 months at 800/month rather than the
+prior revision's 2–4. §9's per-category checkpoint exists partly to keep
+this honest as real numbers replace the estimate; if Category 0's actual
+cost runs higher, the directional-coverage decision itself (not just
+per-entity scope) becomes the thing to revisit. Balance was 0 credits as
+of 2026-07-17, pre-subscription — resolved once the subscription is
+active, tracked as a Category 0 prerequisite, not a blocker on this design.
 
 ## 5. Generation technique
 
@@ -135,31 +138,44 @@ clean sprite-pose frames; AnimateDiff-family nodes are built for continuous
 motion blur, the opposite of what a crisp game sprite needs.
 
 **Per-creature flow (full characters — Categories 0, 2, 3):**
-1. `generate_character(prompt, perspective="platformer")` — a guided
-   pixel-art base character, front-facing.
-2. `generate_character_animations(character_id, perspective="platformer",
-   animation_ids=["idle","walk","attack","hurt","death"])` — native
-   per-state generation, no grid template or manual slicing.
+1. `generate_character(prompt, perspective="topdown")` — a guided pixel-art
+   base character.
+2. `generate_character_animations(character_id, perspective="topdown",
+   animation_ids=["idle","idle_back","idle_right","walk_down","walk_up",
+   "walk_right","attack","hurt","death"])` — native per-state generation.
 3. `export_godot_character_package(run_id)` for a ready-to-import
    `SpriteFrames`/`AnimatedSprite2D` manifest (`spritecook-use-assets-in-godot`).
 
-The "platformer" perspective (front-facing only, no back/side poses) is
-deliberately chosen over "topdown" (which generates separate up/down/
-left/right poses) because Burrow's existing sprites are single-facing —
-each of the 7 placeholder sprites was generated "oriented facing RIGHT,"
-implying the game already has some way of handling other facings for a
-non-animated `Sprite2D`. **This needs to be confirmed as an explicit
-Category 0 investigation, not assumed:** `art-bible.md` §2 currently
-documents the *opposite* of a flip-based scheme — it states sprites are
-rotated in-engine to face travel direction (`player.gd:123-124`), with "no
-walk cycle needed" and creature art required to be "radially neutral" so
-rotation doesn't look wrong. A real walk-cycle animation (legs mid-stride)
-is not radially neutral — rotating an in-progress gait to arbitrary angles
-will look broken. Category 0 must determine whether adding animation
-also requires changing `Player`'s rotation-based facing to a flip/8-way
-scheme (a code change, likely still in Category 0's scope since nothing
-else can be validated without it) before any other creature category
-starts.
+**This resolves what was an open question in the prior revision** (whether
+Player/Enemy's rotation-based facing — `sprite.rotation = facing.angle()`,
+`player.gd:124`/`enemy.gd:589` — could stay as-is for a new walk-cycle
+animation). Investigating `world/maze/maze_renderer.gd` (the Phase 2
+faux-3D wall rework) settled it: the whole tunnel's "physically standing at
+floor level" illusion comes from every wall having a *fixed*, never-rotated
+lighter-top-face/darker-front-face convention anchored to world-space edges
+— nothing else in this renderer ever rotates. A creature sprite that
+rotates 90°/180°/270° to face travel direction would be the one visual
+element fighting that convention, worse once the sprite has its own
+faux-3D shading to match the walls (its "light source" would visibly
+disagree with every wall the instant it faces anything but its authored
+direction). So: **no rotation.** `idle`/`walk` (the two states visible
+continuously while exploring, where the mismatch would be most exposed)
+get real directional art — `idle_right`/`walk_right` mirrored to
+left in Godot (`scale.x`), `idle`/`walk_down` (front) and `idle_back`/
+`walk_up` (back) generated separately. `attack`/`hurt`/`death` (brief,
+one-shot, less exposed) stay a single front-facing pose, mirrored
+left/right the same way but not corrected for up-facing — a small,
+deliberate cost/consistency tradeoff, not an oversight. Player/Enemy's
+`_physics_process`/`_face()` change from setting `.rotation` to selecting
+the matching named animation (plus `scale.x` for the mirrored direction) —
+a real code change, done as part of Category 0 since nothing else can be
+visually verified without it.
+
+This raises the per-creature credit estimate from the prior revision's
+~124 to roughly **~250 credits** (12 base + idle/idle_back/idle_right at
+20–32 each + walk_down/walk_up/walk_right at 20–32 each + attack/hurt/death
+at 20 each, mirroring the free left-facing pairs) — see §4's revised
+budget.
 
 **Per-asset flow (VFX, items, icons — Categories 4–6, non-character):**
 1. `generate_game_art(prompt, pixel=true)` for the still.
@@ -198,7 +214,11 @@ manifest, same shape/spirit as `spritecook-assets.json`, at
       "frames_local": "assets/sprites/wolf/frames/",
       "animations": {
         "idle": "<animation asset_id>",
-        "walk": "<animation asset_id>",
+        "idle_back": "<animation asset_id>",
+        "idle_right": "<animation asset_id>",
+        "walk_down": "<animation asset_id>",
+        "walk_up": "<animation asset_id>",
+        "walk_right": "<animation asset_id>",
         "attack": "<animation asset_id>",
         "hurt": "<animation asset_id>",
         "death": "<animation asset_id>"
@@ -245,7 +265,7 @@ this document sequences them but does not spec categories 1–6 in detail.
 
 | # | Category | Scope |
 |---|---|---|
-| **0** | **Pipeline proof-of-concept** | New pixel-art style anchor + one full creature (Wolf) taken through `generate_character` → `generate_character_animations` (idle/walk/attack/hurt/death) → Godot `AnimatedSprite2D`, verified with a real windowed screenshot (not just automated tests — this project has repeatedly found shader/visual bugs invisible to GUT, see the Sense saga in the playtest roadmap history). Also resolves §5's rotation-vs-flip facing question. Gates every other category — nothing else starts until this loop is proven to actually produce usable, on-style output. |
+| **0** | **Pipeline proof-of-concept** | New pixel-art style anchor + one full creature (Wolf) taken through `generate_character` → `generate_character_animations` (directional idle/walk, single-pose attack/hurt/death, §5) → Godot `AnimatedSprite2D`, including the `Player` code change from rotation-based to directional-animation-based facing, verified with a real windowed screenshot (not just automated tests — this project has repeatedly found shader/visual bugs invisible to GUT, see the Sense saga in the playtest roadmap history). Gates every other category — nothing else starts until this loop is proven to actually produce usable, on-style output. |
 | 1 | Tileset | Floor/wall/pit/water, ground+ceiling variants, real `TileSet`/`TileMapLayer` conversion of the maze renderer. |
 | 2 | Player/enemy spiders | Wolf, Warden (new dedicated player sprite — currently borrows Wolf's body), Ogre, Echo — each a distinct silhouette per art-bible §5, animated. Includes fixing `Enemy`'s per-class texture selection bug (§3). |
 | 3 | Prey & Centipede | Larva, the 4 prey variants (Fungal Larva/Beetle/Ant/Cicada Nymph — needs `PreyType` wired into `Larva` first as a code prerequisite), Centipede segment. |
@@ -261,14 +281,17 @@ this document sequences them but does not spec categories 1–6 in detail.
   invisible to automated review.
 - **Cost checkpoint**: SpriteCook's `get_credit_balance` gives a real
   number, not a dashboard guess — check it after Category 0 completes
-  (base character + 5 animation states) to see actual per-creature cost
-  against the ~120-credit estimate in §4, before committing to Categories
-  1–6. Subscription is 800 credits/month; §4's rough full-backlog estimate
-  (1,500–2,500 credits) already assumes this spans multiple months, but
-  Category 0's real numbers should confirm or correct that before treating
-  it as a plan. If per-creature cost runs meaningfully higher than
-  estimated, re-scope (fewer animation states per entity, static-only for
-  lower-visibility entities) before generating the full backlog, not after.
+  (base character + 6 directional idle/walk states + 3 single-pose combat
+  states) to see actual per-creature cost against the ~250-credit estimate
+  in §4, before committing to Categories 1–6. Subscription is 800
+  credits/month; §4's rough full-backlog estimate (3,500–4,500 credits)
+  already assumes this spans multiple months, but Category 0's real
+  numbers should confirm or correct that before treating it as a plan. If
+  per-creature cost runs meaningfully higher than estimated, re-scope —
+  first by reconsidering §5's directional-coverage decision itself (e.g.
+  dropping the back-facing pose, or accepting rotation for a subset of
+  lower-visibility creatures), then by trimming animation states per
+  entity, before generating the full backlog, not after.
 - **Render-verified, not test-verified**: per this project's established
   lesson, integration correctness for anything visual is checked with a
   real windowed Godot run/screenshot, not just GUT tests — automated tests
