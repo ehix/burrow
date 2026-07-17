@@ -5,9 +5,11 @@ extends GutTest
 ## means Entities always paints over Renderer's walls regardless -- this
 ## repaints just the overlapping patches on top of Entities so a spider or
 ## Centipede segment actually disappears behind the wall's silhouette. The
-## player gets the same repaint as everyone else (playtest follow-up: it
-## used to be skipped entirely here), just at a translucent alpha instead
-## of full opacity -- see the class's own doc comment and _paint_color_for().
+## player gets the exact same repaint as everyone else, at the exact same
+## alpha -- no per-entity special case at all. What alpha that is depends
+## only on the wall tile's own distance from MazeRenderer's fade centre
+## (normally the player's own tile) -- see the class's own doc comment and
+## _paint_color_for().
 
 func _make_level() -> Level:
 	var level: Level = preload("res://world/level.tscn").instantiate()
@@ -138,48 +140,65 @@ func test_a_naturally_resting_player_is_actually_detected_as_occluded() -> void:
 	assert_true(occludes, "a normally-resting player's sprite reaches into the band even though its centre point doesn't")
 
 
-## _paint_color_for() is what actually keeps the player from ever being
-## fully hidden now that it goes through the same repaint as everyone else
-## (playtest ask: the mask should paint over the player just like the enemy,
-## but stay translucent so more of the spider still shows through).
-func test_paint_color_for_the_player_is_translucent() -> void:
+## _paint_color_for() no longer takes an entity at all -- a wall tile's
+## repaint color depends only on that tile's own position, via MazeRenderer.
+## overdraw_alpha_for() (see this file's class doc comment for why the old
+## per-entity-type check was replaced). With no fade centre set yet (the
+## state before Level's first _process() call), every tile reads at full
+## opacity.
+func test_paint_color_for_defaults_to_full_opacity_without_a_fade_center() -> void:
 	var level := _make_level()
 
-	var color: Color = _mask_of(level)._paint_color_for(level.player)
-
-	assert_eq(color.a, level._renderer.wall_top_face_color.a * WallOverdrawMask.PLAYER_PAINT_ALPHA)
-
-
-func test_paint_color_for_the_enemy_is_full_opacity() -> void:
-	var level := _make_level()
-
-	var color: Color = _mask_of(level)._paint_color_for(level.enemy)
+	var color: Color = _mask_of(level)._paint_color_for(Vector2i(2, 2))
 
 	assert_eq(color, level._renderer.wall_top_face_color)
 
 
-## Playtest bug: a centipede segment's own wall overdraw would go nearly
-## transparent whenever the player walked near enough to also claim the same
-## occluding wall_tile -- _occludable_entities() always lists spiders (the
-## player included) before centipede segments, so the old first-wins dedup
-## in _draw() let the player's translucent paint silently override a
-## full-opacity entity's occlusion for that tile, even though the player's
-## own sprite was nowhere near the affected pixels. Using the Enemy here
-## (also full-opacity, see test_paint_color_for_the_enemy_is_full_opacity)
-## stands in for a centipede segment without the extra scene setup.
-func test_occluded_wall_tile_colors_prefers_full_opacity_over_the_players_translucent_paint() -> void:
+func test_paint_color_for_uses_the_renderers_live_alpha_at_that_tile() -> void:
+	var level := _make_level()
+	level._renderer.set_fade_center(Vector2i(2, 2))
+	level._renderer.wall_fade_min_alpha = 0.25
+
+	var color: Color = _mask_of(level)._paint_color_for(Vector2i(2, 2))
+
+	assert_eq(color.a, level._renderer.wall_top_face_color.a * 0.25,
+		"the fade centre tile itself should read at wall_fade_min_alpha")
+
+
+## Playtest ask: the player should be occluded exactly like every other
+## entity when far from the fade centre -- no permanent softening just for
+## being the player. Sets the fade centre far away from the wall in
+## question so no distance-based fade should apply here at all.
+func test_player_is_fully_occluded_by_a_wall_far_from_the_fade_center() -> void:
 	var level := _make_level()
 	var wall_tile := Vector2i(2, 2)
 	level.maze.set_wall(wall_tile.x, wall_tile.y)
 	var entity_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
-	var resting_position := level.tile_centre(entity_tile)
-	level.player.global_position = resting_position
-	level.enemy.global_position = resting_position
+	level.player.global_position = level.tile_centre(entity_tile)
+	level._renderer.set_fade_center(Vector2i(50, 50)) # far away -- no fade should reach here
 
 	var colors: Dictionary = _mask_of(level)._occluded_wall_tile_colors()
 
 	assert_eq(colors[wall_tile], level._renderer.wall_top_face_color,
-		"a full-opacity entity sharing the tile must not have its occlusion diluted by the player's translucent paint")
+		"the player must be fully occluded by a wall far from the fade centre, exactly like every other entity")
+
+
+## Complement to the test above: a wall right next to the fade centre softens
+## for ANY entity standing in it, not just the player -- proving the fade is
+## tied to the wall's own position, not to entity type (see this file's
+## class doc comment).
+func test_wall_tile_softens_near_the_fade_center_regardless_of_which_entity_is_there() -> void:
+	var level := _make_level()
+	var wall_tile := Vector2i(2, 2)
+	level.maze.set_wall(wall_tile.x, wall_tile.y)
+	var entity_tile := Vector2i(2, 1) # north of the wall -- ground-plane overdraw pokes here
+	level.enemy.global_position = level.tile_centre(entity_tile)
+	level._renderer.set_fade_center(entity_tile) # simulate the player standing right there
+
+	var colors: Dictionary = _mask_of(level)._occluded_wall_tile_colors()
+
+	assert_lt(colors[wall_tile].a, level._renderer.wall_top_face_color.a,
+		"a wall right next to the fade centre should soften even for the Enemy, not only the player")
 
 
 ## Playtest fix: while mid-step, an entity's sprite spans two tile columns

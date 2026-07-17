@@ -209,11 +209,15 @@ func build() -> void:
 	_hazard_director.bind_level(self)
 
 
-## Keep the maze stocked (larva spawns), and while Sense is active, keep its
-## outline in sync with the player's live position every frame.
+## Keep the maze stocked (larva spawns), keep MazeRenderer's wall-overdraw
+## fade centred on the player every frame (see MazeRenderer.set_fade_
+## center()'s own doc comment for why), and while Sense is active, keep its
+## outline in sync with the player's live position too.
 func _process(delta: float) -> void:
 	if maze == null:
 		return
+	if player != null and is_instance_valid(player):
+		_renderer.set_fade_center(tile_of(player.global_position))
 	_spawn_accum += delta
 	if _spawn_accum >= LARVA_SPAWN_INTERVAL:
 		_spawn_accum = 0.0

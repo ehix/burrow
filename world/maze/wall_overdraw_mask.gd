@@ -13,26 +13,26 @@ extends Node2D
 ## much bigger change), this repaints just the specific overdraw patches
 ## that currently overlap an occludable entity, as a final pass added AFTER
 ## Entities in Level.tscn -- so the patch simply paints over the entity's
-## sprite a second time, using the exact same rect/color MazeRenderer itself
-## would draw there. Every occludable entity gets this same repaint,
-## including the player now (playtest follow-up: the player used to be
-## skipped entirely here, relying instead on MazeRenderer fading the wall's
-## own paint underneath -- but that meant the player was never actually
-## covered by the wall's silhouette the way an Enemy or Centipede segment
-## is, just standing in front of a paler wall, a visibly different and
-## inconsistent treatment). See _paint_color_for() for how the player still
-## avoids ever being FULLY hidden -- a lower, translucent paint alpha
-## instead of skipping the repaint altogether.
+## sprite a second time, using the exact same rect/alpha MazeRenderer itself
+## is currently drawing there (MazeRenderer.overdraw_alpha_for()). Every
+## occludable entity gets this same repaint, the player included, with no
+## per-entity special case: how visible a given wall tile's overdraw is
+## depends only on that tile's own distance from MazeRenderer's fade centre
+## (normally the player's own tile, see MazeRenderer.set_fade_center()), not
+## on which entity happens to be standing in it. That's what actually
+## resolves the playtest ask ("occlude the player too, but don't make it
+## hard to see") without a player/enemy double standard: walls right around
+## the viewer fade toward transparent, walls anywhere else on the map stay
+## fully solid, and any entity -- player or otherwise -- standing in a
+## faded wall's overdraw gets repainted at that exact same live alpha.
+## (Earlier versions tried this as an entity-type check here instead --
+## skip the player entirely, then a flat translucent alpha for the player
+## only -- both of which left every *other* wall on the map fully opaque
+## regardless of how close the player actually was to it, an inconsistency
+## that had nothing to do with the entity standing there.)
 
 ## See MazeRenderer.ENTITY_VISUAL_HALF_EXTENT's own doc comment.
 const ENTITY_VISUAL_HALF_EXTENT := MazeRenderer.ENTITY_VISUAL_HALF_EXTENT
-
-## The player's own repaint alpha -- translucent rather than the full
-## wall_top_face_color opacity every other entity gets (see
-## _paint_color_for()), so the player reads as genuinely behind the wall's
-## silhouette (consistent draw-order/layering with every other entity) while
-## never fully disappearing the way an Enemy or Centipede segment can.
-const PLAYER_PAINT_ALPHA := 0.25
 
 var _level: Level
 var _renderer: MazeRenderer
@@ -70,21 +70,10 @@ func _draw() -> void:
 ## Every wall tile currently occluding at least one entity, mapped to the
 ## color its repaint should use -- pure computation split out of _draw() so
 ## it's directly unit-testable. Several entities/columns can share one
-## occluding wall tile, and the rect painted for a given tile is the same
-## regardless of which entity triggered it -- EXCEPT the player's own lower
-## alpha (see _paint_color_for()). When more than one entity claims the same
-## wall_tile, the more opaque color always wins here, not just whichever
-## entity happened to be checked first: a wall tile genuinely occluding a
-## full-opacity entity (Enemy/Centipede/Decoy segment) must still look fully
-## occluded even if the player also straddles into that same tile's band
-## nearby (playtest bug: a centipede segment's own wall overdraw would go
-## nearly transparent -- inheriting the player's translucent alpha instead
-## of its own full opacity -- whenever the player walked close enough to
-## share that tile's occlusion check, even though the player's sprite was
-## nowhere near the segment's own pixels). _occludable_entities() lists
-## spiders (the player included) before centipede segments, so first-wins
-## dedup silently picked the player's softer paint far more often than the
-## doc comment here used to assume was "rare."
+## occluding wall tile; the color for a given tile depends only on the
+## tile's own position (via _paint_color_for()), never on which entity
+## triggered it, so every entity sharing a tile always agrees on its color
+## and dedup here is just "skip a tile once it's already been computed."
 func _occluded_wall_tile_colors() -> Dictionary:
 	var maze := _level.maze
 	var plane := _renderer.active_plane()
@@ -96,6 +85,8 @@ func _occluded_wall_tile_colors() -> Dictionary:
 		var base_wall_tile := wall_tile_for(entity_tile, plane)
 		for col in _straddled_columns(position.x, ENTITY_VISUAL_HALF_EXTENT, Level.TILE_SIZE):
 			var wall_tile := Vector2i(col, base_wall_tile.y)
+			if colors.has(wall_tile):
+				continue
 			if maze.is_open(wall_tile.x, wall_tile.y):
 				continue # no wall there -- nothing to occlude with
 			var occludes := (
@@ -105,21 +96,18 @@ func _occluded_wall_tile_colors() -> Dictionary:
 			)
 			if not occludes:
 				continue
-			var color := _paint_color_for(entity)
-			if not colors.has(wall_tile) or color.a > colors[wall_tile].a:
-				colors[wall_tile] = color
+			colors[wall_tile] = _paint_color_for(wall_tile)
 	return colors
 
 
-## The repaint's own color for `entity` -- full wall_top_face_color opacity
-## for every entity except the player, who gets PLAYER_PAINT_ALPHA instead
-## so their sprite still shows through the wall's silhouette rather than
-## vanishing behind it outright (see this class's own doc comment).
-func _paint_color_for(entity: Node2D) -> Color:
+## The repaint's own color for `wall_tile` -- wall_top_face_color at
+## MazeRenderer's own live alpha for that tile (MazeRenderer.overdraw_
+## alpha_for()), so the repaint over an entity's sprite never disagrees with
+## what the wall itself is currently rendering there (see this class's own
+## doc comment).
+func _paint_color_for(wall_tile: Vector2i) -> Color:
 	var color := _renderer.wall_top_face_color
-	if entity is Player:
-		return Color(color, color.a * PLAYER_PAINT_ALPHA)
-	return color
+	return Color(color, color.a * _renderer.overdraw_alpha_for(wall_tile))
 
 
 ## Every wall-tile x-column an entity's sprite could visually overlap at
@@ -147,8 +135,8 @@ static func _straddled_columns(position_x: float, half_extent: float, tile_size:
 ## "spiders" group (Player/Enemy/Decoy), plus every visual segment of every
 ## live Centipede/CentipedeExpressRider (their segments carry the actual
 ## position, not the body's own root node). The player is included like
-## everyone else -- see _paint_color_for() for how it still avoids ever
-## being fully hidden.
+## everyone else -- see this class's own doc comment for why occlusion no
+## longer special-cases the player at all.
 func _occludable_entities() -> Array[Node2D]:
 	var result: Array[Node2D] = []
 	for node in get_tree().get_nodes_in_group("spiders"):

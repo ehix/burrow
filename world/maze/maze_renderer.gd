@@ -36,7 +36,17 @@ var grid_line_color := Color(1, 1, 1, 0.08)
 var wall_overdraw_height := 16.0
 var wall_front_face_height := 16.0
 
+## How many tiles out from the fade centre (see set_fade_center()) a wall's
+## overdraw sliver keeps fading, and how transparent it gets at the centre
+## itself -- see overdraw_alpha_for()'s own doc comment for why only the
+## sliver fades, never the rest of the wall block. Placeholder numbers, easy
+## to retune once real tile art exists (see this file's own doc comment).
+var wall_fade_radius_tiles := 2.0
+var wall_fade_min_alpha := 0.25
+
 var _active_plane: Level.Layer = Level.Layer.GROUND
+var _fade_center_tile: Vector2i
+var _has_fade_center := false
 
 ## Assumed visual half-extent (both axes) of an occludable entity's sprite --
 ## every entity this half-extent is used for (Player/Enemy ~41px sprite,
@@ -77,14 +87,59 @@ func active_plane() -> Level.Layer:
 	return _active_plane
 
 
+## Where "the viewer" currently is, in tile coordinates -- Level calls this
+## every frame with the player's own tile (mirrors the old fade_focus_
+## position idiom, see _draw_wall_ground()'s doc comment for why that
+## version was replaced). Drives overdraw_alpha_for(): every wall's overdraw
+## sliver fades toward transparent the closer it is to this tile, so a wall
+## about to swallow the player's own sprite doesn't actually hide it (the
+## playtest ask this restores), while walls elsewhere on the map stay fully
+## solid -- the illusion of depth is still consistent everywhere, just
+## biased toward staying visible right around the viewer.
+func set_fade_center(tile: Vector2i) -> void:
+	_fade_center_tile = tile
+	_has_fade_center = true
+
+
+## Alpha multiplier for a wall's overdraw sliver at `wall_tile`, given how
+## many tiles it is from `distance` away from the fade centre (Chebyshev/
+## grid-ring distance, so "N tiles out" reads as a square ring the way a
+## top-down grid naturally does) -- 1.0 (fully solid, matching every other
+## wall on the map) once `distance` reaches `radius`, ramping down linearly
+## to `min_alpha` at the centre tile itself. A pure function so it's
+## directly unit-testable; see overdraw_alpha_for() for the wrapper that
+## supplies the live `distance` from this renderer's own fade centre.
+static func overdraw_alpha_for_distance(distance: float, radius: float, min_alpha: float) -> float:
+	if radius <= 0.0:
+		return 1.0
+	var t := clampf(distance / radius, 0.0, 1.0)
+	return lerpf(min_alpha, 1.0, t)
+
+
+## Live alpha for `wall_tile`'s overdraw sliver right now -- 1.0 (no fade
+## centre set yet, e.g. before Level's first _process()) or the Chebyshev
+## tile-distance from the last set_fade_center() call fed through
+## overdraw_alpha_for_distance(). _draw_wall_ground()/_draw_wall_ceiling()
+## use this for the sliver only (never the front face or a wall's own-tile
+## top face -- see their own doc comments for why just the sliver), and
+## WallOverdrawMask's repaint pass calls this same function so a wall
+## fading near the viewer and its repaint-over-an-entity pass never
+## disagree about how transparent that tile currently is.
+func overdraw_alpha_for(wall_tile: Vector2i) -> float:
+	if not _has_fade_center:
+		return 1.0
+	var distance := float(maxi(absi(wall_tile.x - _fade_center_tile.x), absi(wall_tile.y - _fade_center_tile.y)))
+	return overdraw_alpha_for_distance(distance, wall_fade_radius_tiles, wall_fade_min_alpha)
+
+
 ## The overdraw sliver's own rect in world space for `tile` (a wall tile),
 ## matching whichever plane is currently active -- the exact patch
-## _draw_wall_ground()/_draw_wall_ceiling() paints for that wall's top face
-## poking into its neighbor. WallOverdrawMask paints this same patch again,
-## on top of Entities, whenever an occludable entity is standing inside it
-## -- see WallOverdrawMask's own doc comment for why a second pass is
-## needed instead of just relying on draw order once, and for how the
-## player specifically gets a softer repaint than everyone else.
+## _draw_wall_ground()/_draw_wall_ceiling() paints (at overdraw_alpha_for()'s
+## live alpha) for that wall's top face poking into its neighbor.
+## WallOverdrawMask paints this same patch again, on top of Entities,
+## whenever an occludable entity is standing inside it, at that same live
+## alpha -- see WallOverdrawMask's own doc comment for why a second pass is
+## needed instead of just relying on draw order once.
 func overdraw_rect_for(tile: Vector2i) -> Rect2:
 	var tile_left := float(tile.x) * _tile_size
 	if _active_plane == Level.Layer.GROUND:
@@ -114,18 +169,26 @@ func _draw_wall(tile: Vector2i) -> void:
 		_draw_wall_ceiling(tile)
 
 
-## Ground-plane wall: front face anchored to the tile's own bottom edge,
-## top face poking up into the tile north of it. Always renders at full
-## height and full opacity -- WallOverdrawMask is solely responsible for
-## softening a wall's appearance where it would hide an entity (including
-## the player; see its own doc comment), by repainting just the affected
-## patch on top of Entities, rather than this draw call fading itself.
-## (An earlier version faded the wall's own paint here directly, driven by
-## a fade_focus_position Level set to the player's position every frame --
-## replaced because fading the *whole* tile's block this way, then having
-## WallOverdrawMask repaint translucently over just the player's own
-## silhouette on top of that, double-layered the same translucent color
-## and made the band beside the player visibly more opaque than intended.)
+## Ground-plane wall: front face anchored to the tile's own bottom edge, top
+## face poking up into the tile north of it. Front face and the wall's own-
+## tile top face always render at full height and full opacity -- only the
+## overdraw sliver itself (the bit poking into the neighboring tile, drawn
+## separately here at overdraw_alpha_for()'s live alpha) ever fades, so a
+## wall still reads as a solid physical block everywhere on the map; it's
+## specifically the "reaches into the next tile and could swallow whatever's
+## standing there" portion that softens near the viewer (see set_fade_
+## center()'s doc comment). WallOverdrawMask repaints this same sliver, at
+## this same alpha, on top of Entities -- see its own doc comment for why a
+## second pass is needed instead of just relying on draw order once.
+## (An earlier version faded the *entire* top-face rect here uniformly,
+## driven by a fade_focus_position Level set to the player's position every
+## frame -- replaced in favor of WallOverdrawMask handling fading entirely
+## via a per-entity alpha, which was itself replaced by this tile-position-
+## based version: entity-type special-casing meant only the player's own
+## silhouette ever looked softened, leaving every other wall -- including
+## ones right next to the player that just happened to have an Enemy or
+## Centipede segment standing in them instead -- fully opaque, an
+## inconsistent look the player/enemy distinction shouldn't be driving.)
 ## Always renders at full height even when a pit or flooded tile (same
 ## MazeData overlay -- see MazeData.is_pit()) sits in the tile north of it
 ## (playtest fix, mirrors _draw_wall_ceiling()): the overdraw represents
@@ -137,30 +200,31 @@ func _draw_wall(tile: Vector2i) -> void:
 ## right where a consistent block was expected, which is a worse look than
 ## the wall simply doing what it does everywhere else.
 func _draw_wall_ground(tile: Vector2i) -> void:
-	var overdraw := wall_overdraw_height
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
 	var tile_bottom := tile_top + _tile_size
-	var block_top := tile_top - overdraw
 	var front_face_top := tile_bottom - wall_front_face_height
-	draw_rect(Rect2(tile_left, block_top, _tile_size, front_face_top - block_top), wall_top_face_color)
+	var overdraw_rect := overdraw_rect_for(tile)
+	var own_top_face := Rect2(tile_left, tile_top, _tile_size, front_face_top - tile_top)
+	draw_rect(overdraw_rect, Color(wall_top_face_color, wall_top_face_color.a * overdraw_alpha_for(tile)))
+	draw_rect(own_top_face, wall_top_face_color)
 	draw_rect(Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height), wall_front_face_color)
 
 
 ## Ceiling-plane wall: mirrored -- front face anchored to the tile's own
 ## top edge, hanging down; top face pokes down into the tile south of it
-## (tunnel visual rework Phase 2). Same full-height-always, full-opacity-
-## always behavior as _draw_wall_ground() -- see its doc comment for both
-## the pit/flooded-neighbor rationale and why fading belongs to
-## WallOverdrawMask now, not here.
+## (tunnel visual rework Phase 2). Same "only the overdraw sliver fades"
+## behavior as _draw_wall_ground() -- see its doc comment for both the
+## pit/flooded-neighbor rationale and the fading design.
 func _draw_wall_ceiling(tile: Vector2i) -> void:
-	var overdraw := wall_overdraw_height
 	var tile_left := tile.x * _tile_size
 	var tile_top := tile.y * _tile_size
 	var tile_bottom := tile_top + _tile_size
-	var block_bottom := tile_bottom + overdraw
 	var front_face_bottom := tile_top + wall_front_face_height
-	draw_rect(Rect2(tile_left, front_face_bottom, _tile_size, block_bottom - front_face_bottom), wall_top_face_color)
+	var overdraw_rect := overdraw_rect_for(tile)
+	var own_top_face := Rect2(tile_left, front_face_bottom, _tile_size, tile_bottom - front_face_bottom)
+	draw_rect(own_top_face, wall_top_face_color)
+	draw_rect(overdraw_rect, Color(wall_top_face_color, wall_top_face_color.a * overdraw_alpha_for(tile)))
 	draw_rect(Rect2(tile_left, tile_top, _tile_size, wall_front_face_height), wall_front_face_color)
 
 

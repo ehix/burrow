@@ -231,15 +231,11 @@ func _make_renderer() -> MazeRenderer:
 	return renderer
 
 
-## MazeRenderer no longer fades a wall's own paint for anything (playtest
-## follow-up: that used to be driven by Level calling set_fade_focus() with
-## the player's position every frame, specifically to keep a wall from
-## fully hiding them -- removed in favor of WallOverdrawMask repainting the
-## player at a translucent alpha instead, same mechanism every other
-## entity uses, just with a softer color; see WallOverdrawMask's own doc
-## comment for why layering both would have double-faded the same patch).
-## _draw_wall_ground()/_draw_wall_ceiling() always draw at full opacity now
-## -- this just confirms that still doesn't error, on both planes.
+## Confirms MazeRenderer still draws without erroring on both planes, with
+## no fade centre set yet (the state before Level's first _process() call --
+## see set_fade_center()'s own doc comment) -- overdraw_alpha_for() must
+## default to full opacity in that state rather than erroring or drawing
+## nothing.
 func test_draw_does_not_error_on_the_ground_plane() -> void:
 	_make_renderer()
 
@@ -255,3 +251,59 @@ func test_draw_does_not_error_on_the_ceiling_plane() -> void:
 	await get_tree().process_frame
 
 	assert_true(true, "reached this point without erroring")
+
+
+func test_draw_does_not_error_with_a_fade_center_set() -> void:
+	var renderer := _make_renderer()
+	renderer.set_fade_center(Vector2i(1, 1))
+
+	await get_tree().process_frame
+
+	assert_true(true, "reached this point without erroring")
+
+
+# --- overdraw_alpha_for_distance()/overdraw_alpha_for() (playtest ask:
+# occlude the player exactly like every other entity, but fade nearby wall
+# overdraw so the player's own sprite doesn't vanish -- see WallOverdrawMask's
+# own doc comment for why this replaced the old per-entity-type special case)
+# -----------------------------------------------------------------------
+
+func test_overdraw_alpha_for_distance_is_full_opacity_at_or_beyond_the_radius() -> void:
+	assert_eq(MazeRenderer.overdraw_alpha_for_distance(2.0, 2.0, 0.25), 1.0)
+	assert_eq(MazeRenderer.overdraw_alpha_for_distance(5.0, 2.0, 0.25), 1.0)
+
+
+func test_overdraw_alpha_for_distance_is_min_alpha_at_the_centre() -> void:
+	assert_eq(MazeRenderer.overdraw_alpha_for_distance(0.0, 2.0, 0.25), 0.25)
+
+
+func test_overdraw_alpha_for_distance_ramps_linearly_between() -> void:
+	# Halfway to the radius (distance=1, radius=2) should read halfway
+	# between min_alpha (0.25) and full opacity (1.0): 0.625.
+	assert_almost_eq(MazeRenderer.overdraw_alpha_for_distance(1.0, 2.0, 0.25), 0.625, 0.0001)
+
+
+func test_overdraw_alpha_for_distance_is_full_opacity_when_radius_is_zero_or_negative() -> void:
+	# A zero/negative radius means "fading is off" -- must not divide by zero.
+	assert_eq(MazeRenderer.overdraw_alpha_for_distance(0.0, 0.0, 0.25), 1.0)
+	assert_eq(MazeRenderer.overdraw_alpha_for_distance(0.0, -1.0, 0.25), 1.0)
+
+
+func test_overdraw_alpha_for_is_full_opacity_before_a_fade_center_is_ever_set() -> void:
+	var renderer := _make_renderer()
+
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(0, 0)), 1.0)
+
+
+func test_overdraw_alpha_for_uses_chebyshev_distance_from_the_fade_center() -> void:
+	var renderer := _make_renderer()
+	renderer.wall_fade_radius_tiles = 2.0
+	renderer.wall_fade_min_alpha = 0.25
+	renderer.set_fade_center(Vector2i(5, 5))
+
+	# (6,7) is 2 tiles away on the y axis -- Chebyshev distance is the max of
+	# the two axes (max(1,2)=2), matching a square "N tiles out" ring, not a
+	# circular one -- exactly at the radius, so still full opacity.
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(6, 7)), 1.0)
+	# The centre tile itself reads at min_alpha.
+	assert_eq(renderer.overdraw_alpha_for(Vector2i(5, 5)), 0.25)
