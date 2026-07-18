@@ -88,13 +88,22 @@
       "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette (#4F453B/#2B2621). Third attempt: first two ('pebble'/'stone' wording) produced strong vertical rock-column banding that survived a prompt tweak toward 'irregular, non-repeating'; only dropping pebble/stone language entirely ('smooth compacted dirt wall, no embedded rocks or stones') fixed it. Verified seamless via a headless Godot 4x4 tile composite, no visible repeat or banding. Intentionally plain/subtle -- pair with assets/decals/ for visual variety, not meant to carry detail alone."
     },
     {
-      "asset_id": "0657eba0-1919-4766-a412-11940433d5f5",
-      "label": "floor-material-v2",
+      "asset_id": "85e32229-34b8-4111-97f9-e08c16481524",
+      "label": "floor-material-v3-simple",
       "role": "texture",
-      "sha12": "4a9d39ac7168",
+      "sha12": "2d4f07e618e1",
       "model": "gemini-3.1-flash-image",
       "local": "assets/textures/floor_material.png",
-      "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette. First attempt had a real defect (checkerboard/transparency-checker artifact baked into several patches despite bg_mode=include) plus an obvious diamond-grid repeat; this regeneration ('fully opaque solid dirt surface' + 'irregular, avoid symmetric/grid patterns') fixed the checkerboard artifact. Some faint per-tile motif repetition remains at close inspection (verified via headless Godot 3x3 tile composite) but reads fine at normal viewing distance."
+      "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette. Replaces floor-material-v2 (asset 0657eba0, no longer referenced by any file): v2's 'claw-drag scoring' detail read as distracting scratches in-game once wired into FloorRenderer -- user asked for something simpler. This version drops all linear/scratch detail entirely ('no scratches, no claw marks, no linear details, plain simple flat surface'), same trick that fixed wall_material's banding. Verified seamless via headless Godot 3x3 tile composite, no artifacts, calm subtle mottling only."
+    },
+    {
+      "asset_id": "0c476bad-d559-4cf2-a74c-28ab379fc4b1",
+      "label": "water-material",
+      "role": "texture",
+      "sha12": "c3650cfc2ab9",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/textures/water_material.png",
+      "notes": "generate_game_art mode=texture, bg_mode=include, water palette (#2673BF). Simple seamless wave/ripple pattern for the Water Ingress flood hazard. Verified seamless via headless Godot 3x3 tile composite, no artifacts. Not wired into any hazard-rendering code yet -- asset only."
     },
     {
       "asset_id": "219bb4bb-c4d4-49f5-ae37-e87e31244155",
