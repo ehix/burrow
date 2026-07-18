@@ -77,6 +77,42 @@
       "sha12": "f828a2e8afb4",
       "local": "assets/tilesets/tunnel_floor_wall_15piece.png",
       "notes": "generate_tileset, pixel/topdown/15-piece/32px/two_surfaces. Prompt: 'packed dirt tunnel floor and rough dirt-brown stone wall, floor #2B2621 wall #4F453B'. Dark blue-black floor with orange-lit cracks (volcanic/lava-cave read, not the requested dirt-brown) -- user picked it for the atmosphere anyway over 3 closer-to-palette alternatives. 4x4 atlas, 32px cells, SpriteCook dual-grid mask order."
+    },
+    {
+      "asset_id": "f77fa50c-5ed8-4b42-ad48-13393a8b5f8e",
+      "label": "wall-material-v3",
+      "role": "texture",
+      "sha12": "e83a1704bc21",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/textures/wall_material.png",
+      "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette (#4F453B/#2B2621). Third attempt: first two ('pebble'/'stone' wording) produced strong vertical rock-column banding that survived a prompt tweak toward 'irregular, non-repeating'; only dropping pebble/stone language entirely ('smooth compacted dirt wall, no embedded rocks or stones') fixed it. Verified seamless via a headless Godot 4x4 tile composite, no visible repeat or banding. Intentionally plain/subtle -- pair with assets/decals/ for visual variety, not meant to carry detail alone."
+    },
+    {
+      "asset_id": "0657eba0-1919-4766-a412-11940433d5f5",
+      "label": "floor-material-v2",
+      "role": "texture",
+      "sha12": "4a9d39ac7168",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/textures/floor_material.png",
+      "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette. First attempt had a real defect (checkerboard/transparency-checker artifact baked into several patches despite bg_mode=include) plus an obvious diamond-grid repeat; this regeneration ('fully opaque solid dirt surface' + 'irregular, avoid symmetric/grid patterns') fixed the checkerboard artifact. Some faint per-tile motif repetition remains at close inspection (verified via headless Godot 3x3 tile composite) but reads fine at normal viewing distance."
+    },
+    {
+      "asset_id": "219bb4bb-c4d4-49f5-ae37-e87e31244155",
+      "label": "decal-root-tangle",
+      "role": "decal",
+      "sha12": "d5fff2c910d2",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/decals/root_tangle.png",
+      "notes": "generate_game_art mode=assets, bg_mode=transparent. Isolated root-tangle detail for stamping onto wall_material variety (WallOverdrawMask use case). Clean cutout, no issues found."
+    },
+    {
+      "asset_id": "fd80535b-a426-416f-8729-c64fe23bc89a",
+      "label": "decal-crack-mineral-stain",
+      "role": "decal",
+      "sha12": "9c05e5e349a6",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/decals/crack_mineral_stain.png",
+      "notes": "generate_game_art mode=assets, bg_mode=transparent. Isolated crack/mineral-stain detail for stamping onto wall_material variety (WallOverdrawMask use case). Clean cutout, no issues found."
     }
   ]
 }
