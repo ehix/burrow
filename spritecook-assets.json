@@ -69,6 +69,14 @@
       "local": "assets/sprites/web_trap_spent.png",
       "edited_from": "133f3d2a-3d55-4248-b2f1-f1d82d801272",
       "notes": "Torn spent web left after consumption."
+    },
+    {
+      "asset_id": "7ff189a6-37ed-4b92-ad0d-fd755fb4d7f7",
+      "label": "tunnel-floor-wall-15piece",
+      "role": "tileset",
+      "sha12": "f828a2e8afb4",
+      "local": "assets/tilesets/tunnel_floor_wall_15piece.png",
+      "notes": "generate_tileset, pixel/topdown/15-piece/32px/two_surfaces. Prompt: 'packed dirt tunnel floor and rough dirt-brown stone wall, floor #2B2621 wall #4F453B'. Dark blue-black floor with orange-lit cracks (volcanic/lava-cave read, not the requested dirt-brown) -- user picked it for the atmosphere anyway over 3 closer-to-palette alternatives. 4x4 atlas, 32px cells, SpriteCook dual-grid mask order."
     }
   ]
 }
