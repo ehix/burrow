@@ -74,7 +74,7 @@ func _draw() -> void:
 		return
 	var colors := _occluded_wall_tile_colors()
 	for wall_tile in colors:
-		draw_rect(_renderer.overdraw_rect_for(wall_tile), colors[wall_tile])
+		draw_texture_rect(_renderer.wall_texture(), _renderer.overdraw_rect_for(wall_tile), true, colors[wall_tile])
 
 
 ## Every wall tile currently occluding at least one entity, mapped to the
@@ -135,7 +135,7 @@ func _occluded_wall_tile_colors() -> Dictionary:
 ## what the wall itself is currently rendering there (see this class's own
 ## doc comment).
 func _paint_color_for(wall_tile: Vector2i) -> Color:
-	var color := _renderer.wall_top_face_color
+	var color := _renderer.tinted_wall_top_face_color()
 	return Color(color, color.a * _renderer.overdraw_alpha_for(wall_tile))
 
 

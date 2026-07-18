@@ -195,7 +195,7 @@ func test_paint_color_for_defaults_to_full_opacity_without_a_fade_center() -> vo
 
 	var color: Color = _mask_of(level)._paint_color_for(Vector2i(2, 2))
 
-	assert_eq(color, level._renderer.wall_top_face_color)
+	assert_eq(color, level._renderer.tinted_wall_top_face_color())
 
 
 func test_paint_color_for_uses_the_renderers_live_alpha_at_that_tile() -> void:
@@ -227,7 +227,7 @@ func test_player_is_fully_occluded_by_a_wall_far_from_the_fade_center() -> void:
 
 	var colors: Dictionary = _mask_of(level)._occluded_wall_tile_colors()
 
-	assert_eq(colors[wall_tile], level._renderer.wall_top_face_color,
+	assert_eq(colors[wall_tile], level._renderer.tinted_wall_top_face_color(),
 		"the player must be fully occluded by a wall far from the fade centre, exactly like every other entity")
 
 
