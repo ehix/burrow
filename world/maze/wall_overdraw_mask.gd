@@ -74,7 +74,7 @@ func _draw() -> void:
 		return
 	var colors := _occluded_wall_tile_colors()
 	for wall_tile in colors:
-		draw_texture_rect(_renderer.wall_texture(), _renderer.overdraw_rect_for(wall_tile), true, colors[wall_tile])
+		TileTextureVariant.draw_varied(self, _renderer.wall_texture(), _renderer.overdraw_rect_for(wall_tile), wall_tile, colors[wall_tile])
 
 
 ## Every wall tile currently occluding at least one entity, mapped to the
