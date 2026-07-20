@@ -42,4 +42,4 @@ func _draw() -> void:
 	for y in _maze.height:
 		for x in _maze.width:
 			if _maze.is_open(x, y):
-				draw_texture_rect(_floor_texture, Rect2(x * _tile_size, y * _tile_size, _tile_size, _tile_size), true, tint)
+				TileTextureVariant.draw_varied(self, _floor_texture, Rect2(x * _tile_size, y * _tile_size, _tile_size, _tile_size), Vector2i(x, y), tint)
