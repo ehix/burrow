@@ -14,7 +14,7 @@
 - New `.gd` files leave a `.gd.uid` sidecar that must be committed alongside the file.
 - **GDScript's `%` keeps the sign of the dividend for negative operands**, and `hash()` can return a negative `int`. Always `absi(hash(tile))` before any modulo, or a tile can get a negative crop offset — a real, easy-to-miss bug, not a style preference.
 - This project's established test convention for renderer `_draw()` methods is **no pixel assertions** (see `test_floor_renderer.gd`'s own doc comment: "No pixel assertions -- this project's own established pattern -- just that setup() doesn't error"). Pure logic (like `TileTextureVariant.variant_for()`, or existing examples `MazeRenderer.wall_occludes_extent()`/`overdraw_alpha_for_offset()`) gets direct unit tests; renderer call sites that just wire a pure function in get "doesn't error" coverage via the existing test suite, not new pixel-inspecting tests. Follow this convention — don't invent pixel/rendering assertions for Tasks 2-5 below.
-- `draw_texture_rect_region(texture, rect, src_rect, modulate)` always stretches `src_rect` to fill `rect` exactly once — it has no `tile`/repeat behavior of its own (verified empirically during design). Flipping is achieved by giving `rect` a negative width/height (the standard Godot idiom), never by modifying `src_rect`.
+- `draw_texture_rect_region(texture, rect, src_rect, modulate)` always stretches `src_rect` to fill `rect` exactly once — it has no `tile`/repeat behavior of its own (verified empirically during design). ~~Flipping is achieved by giving `rect` a negative width/height (the standard Godot idiom), never by modifying `src_rect`.~~ **SUPERSEDED by commit `d00c4ec`:** Task 6's manual visual validation found this project's actual runtime (GL Compatibility / Mesa d3d12 on WSL2) silently ignores the sign of a negative-size `rect`, drawing `abs(size)` pixels forward instead of mirroring — shifting flipped tiles onto a neighboring cell and leaving gaps that read as solid black. The shipped `TileTextureVariant.draw_varied()` flips via `CanvasItem.draw_set_transform()` (scale `-1` on the flipped axis) instead, never constructing a negative-size `Rect2` at all — see that function's own doc comment for the full mechanism and evidence.
 - GUT suite command: `~/.local/bin/godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -gprefix=test_ -gsuffix=.gd -gexit`. Known pre-existing flakiness: this suite has order/timing-dependent failures unrelated to any of this work (different runs fail different timing-sensitive tests, reproduced on an unmodified `main` too during the prior water-tile-overlay plan's review) — don't chase a failure here unless it's in a file this plan actually touches.
 
 ---
@@ -162,6 +162,8 @@ static func draw_varied(canvas_item: CanvasItem, texture: Texture2D, dest_rect: 
 	)
 	canvas_item.draw_texture_rect_region(texture, flipped, variant.src_rect, modulate)
 ```
+
+**SUPERSEDED by commit `d00c4ec` — do not copy the code block above.** This negative-size-dest-rect flip renders broken on this project's actual runtime (see the Global Constraints note above for the full story: Task 6's manual visual check found it silently ignored the rect's sign, shifting flipped tiles onto a neighboring cell and leaving gaps that read as solid black across roughly half the map). The shipped `draw_varied()` uses `CanvasItem.draw_set_transform()` instead — read `world/maze/tile_texture_variant.gd` directly for the actual, correct implementation and its doc comment.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -411,6 +413,8 @@ with:
 	assert_eq(base.texture_repeat, CanvasItem.TEXTURE_REPEAT_DISABLED,
 		"base is a static single crop -- it never needs to wrap")
 ```
+
+**SUPERSEDED:** this plan text is factually wrong about Godot's actual default. Task 5's implementer found (and the task reviewer independently confirmed via a live probe) that a freshly-constructed `CanvasItem`'s own `texture_repeat` defaults to `TEXTURE_REPEAT_PARENT_NODE` (0), not `TEXTURE_REPEAT_DISABLED` (1) — the getter returns the node's own unset state, not a resolved/inherited value. The shipped test correctly asserts `CanvasItem.TEXTURE_REPEAT_PARENT_NODE` instead; see `tests/test_level_hazard_helpers.gd`'s actual assertion, not the snippet above.
 
 - [ ] **Step 2: Run the test to verify it fails**
 

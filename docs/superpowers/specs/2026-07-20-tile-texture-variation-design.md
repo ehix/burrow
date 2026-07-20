@@ -73,12 +73,19 @@ Internally:
    divisor/modulo steps on the hash per axis so x and y offsets aren't
    correlated.
 3. Picks `flip_h`/`flip_v` from further bits of the same hash.
-4. Issues `canvas_item.draw_texture_rect_region(texture, flipped_dest_rect, src_rect, modulate)`,
-   where `src_rect = Rect2(offset_x, offset_y, dest_rect.size.x, dest_rect.size.y)`
-   and `flipped_dest_rect` is `dest_rect` with its position/size adjusted
-   per the standard negative-size flip trick when `flip_h`/`flip_v` is
-   set (mirrors the destination quad; the sampled content itself doesn't
-   need mirroring separately).
+4. Issues `canvas_item.draw_texture_rect_region(texture, dest_rect_or_transformed, src_rect, modulate)`.
+   **Superseded by commit `d00c4ec`:** the original design here flipped via
+   a negative-size `dest_rect` (the standard Godot idiom) — this rendered
+   broken on this project's actual runtime (GL Compatibility / Mesa d3d12
+   on WSL2), silently ignoring the rect's sign and shifting a flipped tile
+   onto a neighboring cell instead of mirroring it in place, leaving gaps
+   that read as solid black across roughly half the map. Found by the
+   implementation plan's manual visual validation step, not by this
+   design's own reasoning. The shipped fix flips via
+   `CanvasItem.draw_set_transform()` (scale `-1` on the flipped axis)
+   around an always-positive-size `dest_rect` instead — see
+   `world/maze/tile_texture_variant.gd`'s own doc comment for the actual
+   mechanism and verification evidence.
 
 This replaces `draw_texture_rect(..., tile=true, ...)` at every call site
 below — `tile=true` is no longer used anywhere after this change.
@@ -150,8 +157,12 @@ clamped — it's a static single crop, it never needs to wrap).
   not incidental coverage.
 - `Level`/`WaterTileLayer`: update the existing water-marker test to
   assert `overlay.texture_repeat == CanvasItem.TEXTURE_REPEAT_ENABLED`
-  and `base.texture_repeat == CanvasItem.TEXTURE_REPEAT_DISABLED` (the
-  default) instead of the removed `repeat` field.
+  and `base.texture_repeat == CanvasItem.TEXTURE_REPEAT_PARENT_NODE` (the
+  actual default for an unset `CanvasItem.texture_repeat` — not
+  `TEXTURE_REPEAT_DISABLED` as originally written here; a freshly
+  constructed node's own property reads back as "inherit," not
+  "disabled," verified via a live Godot probe during implementation)
+  instead of the removed `repeat` field.
 - Manual: boot windowed, visually confirm a run of several adjacent floor
   and wall tiles are no longer identical, and that the water overlay's
   animation still looks correct (no visible seam/pop/clamped-edge
