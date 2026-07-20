@@ -93,7 +93,10 @@ func test_set_water_at_spawns_a_distinct_water_marker_not_the_pit_marker() -> vo
 	var overlay: WaterTileLayer = marker.get_child(1)
 	assert_eq(overlay.texture, preload("res://assets/textures/water_overlay_material.png"))
 	assert_eq(overlay.material, level._ground_layer.water_overlay_material())
-	assert_true(overlay.repeat, "overlay must repeat so its scrolled UV wraps instead of clamping at the texture edge")
+	assert_eq(overlay.texture_repeat, CanvasItem.TEXTURE_REPEAT_ENABLED,
+		"overlay must wrap so its scrolled UV doesn't clamp at the texture edge")
+	assert_eq(base.texture_repeat, CanvasItem.TEXTURE_REPEAT_PARENT_NODE,
+		"base is a static single crop -- it never needs to wrap, so it's left at Godot's own default")
 
 
 func test_set_water_at_false_clears_the_block_and_frees_the_marker() -> void:

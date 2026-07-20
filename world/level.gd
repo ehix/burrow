@@ -669,13 +669,15 @@ func _spawn_water_marker(tile: Vector2i) -> Node2D:
 	var base := WaterTileLayer.new()
 	base.texture = _wet_floor_texture
 	base.tile_size = TILE_SIZE
+	base.tile = tile
 	container.add_child(base)
 	base.material = _ground_layer.dim_material()
 
 	var overlay := WaterTileLayer.new()
 	overlay.texture = _water_overlay_texture
 	overlay.tile_size = TILE_SIZE
-	overlay.repeat = true
+	overlay.tile = tile
+	overlay.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	overlay.modulate_color = Color(1, 1, 1, WATER_OVERLAY_ALPHA)
 	container.add_child(overlay)
 	overlay.material = _ground_layer.water_overlay_material()
