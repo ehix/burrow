@@ -28,14 +28,19 @@ extends Node2D
 ## unlike a loose larva or item.
 
 const GroundDimShader := preload("res://assets/shaders/ground_dim.gdshader")
+const WaterOverlayShader := preload("res://assets/shaders/water_overlay.gdshader")
 
 var _material: ShaderMaterial
+var _water_overlay_material: ShaderMaterial
 
 
 func _ready() -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = GroundDimShader
 	$FloorRenderer.material = _material
+
+	_water_overlay_material = ShaderMaterial.new()
+	_water_overlay_material.shader = WaterOverlayShader
 
 
 ## The one ShaderMaterial instance every ground-resident CanvasItem (floor,
@@ -47,9 +52,17 @@ func dim_material() -> ShaderMaterial:
 	return _material
 
 
+## The shared ShaderMaterial for the animated water-tile overlay -- see
+## water_overlay.gdshader's own doc comment for why this is a second
+## instance instead of reusing dim_material().
+func water_overlay_material() -> ShaderMaterial:
+	return _water_overlay_material
+
+
 ## Toggles the hazy-background treatment -- Level calls this from
 ## _refresh_plane_focus() whenever the focus plane (the player's own)
 ## changes: dimmed while CEILING is in focus (the ground is background),
 ## full clarity while GROUND is in focus (the ground is what's underfoot).
 func set_dimmed(dimmed: bool) -> void:
 	_material.set_shader_parameter("dim_enabled", dimmed)
+	_water_overlay_material.set_shader_parameter("dim_enabled", dimmed)
