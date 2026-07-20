@@ -1,5 +1,7 @@
 shader_type canvas_item;
 
+#include "res://assets/shaders/dim.gdshaderinc"
+
 // Desaturate + darken pass for GroundLayer's "hazy background" read while
 // viewed from the ceiling (tunnel visual rework Phase 2) -- no blur
 // convolution, matching the design doc's own recommendation to start with
@@ -26,11 +28,5 @@ void fragment() {
 	// untextured ground draw rendered solid white and vanished into the
 	// equally-wrong-white floor.
 	vec4 base_color = COLOR;
-	if (dim_enabled) {
-		float luminance = dot(base_color.rgb, vec3(0.299, 0.587, 0.114));
-		vec3 desaturated = mix(vec3(luminance), base_color.rgb, saturation);
-		COLOR = vec4(desaturated * brightness, base_color.a);
-	} else {
-		COLOR = base_color;
-	}
+	COLOR = apply_dim(base_color, dim_enabled, saturation, brightness);
 }
