@@ -56,6 +56,16 @@ Flooded tiles already get a per-tile node spawned/freed by
 `Level.set_water_at()` → `_spawn_water_marker()` / `queue_free()` — that
 lifecycle is unchanged. What changes is what that node draws.
 
+**Superseded by the implementation plan:** the two layers below shipped as
+a new `WaterTileLayer extends Node2D` class using `draw_texture_rect`
+(matching `FloorRenderer`/`MazeRenderer`'s existing idiom), not as
+`Polygon2D.texture` — see
+`docs/superpowers/plans/2026-07-20-water-tile-overlay.md` Task 3 and
+`world/water_tile_layer.gd` for the as-built design. `Polygon2D`'s UV
+mapping for an empty `uv` array was ambiguous enough that the plan
+deliberately chose the already-proven `draw_texture_rect` path instead.
+The prose below is kept for historical context, not as current fact.
+
 **Base layer** — the existing marker `Polygon2D` gets
 `.texture = wet_floor_material.png` instead of a flat `WATER_MARKER_COLOR`
 fill. Since the polygon is exactly one tile's bounds, Godot maps the

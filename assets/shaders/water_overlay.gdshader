@@ -3,12 +3,12 @@ shader_type canvas_item;
 #include "res://assets/shaders/dim.gdshaderinc"
 
 // Same desaturate/darken pass as ground_dim.gdshader, sharing its logic via
-// dim.gdshaderinc rather than a separate ShaderMaterial: this material still
-// needs its own shader *file* because it also carries a TIME-driven UV
-// scroll uniform, which the single shared dim_material() instance every
-// other ground-resident node uses can't carry without scrolling every other
-// ground texture too (see GroundLayer's own doc comment on why one shared
-// instance is otherwise the rule here).
+// dim.gdshaderinc rather than duplicating it. This still needs its own
+// shader *file* (and its own ShaderMaterial instance) because it also
+// carries a TIME-driven UV scroll uniform, which the single shared
+// dim_material() instance every other ground-resident node uses can't
+// carry without scrolling every other ground texture too (see GroundLayer's
+// own doc comment on why one shared instance is otherwise the rule here).
 uniform float saturation : hint_range(0.0, 1.0) = 0.6;
 uniform float brightness : hint_range(0.0, 1.0) = 0.75;
 uniform bool dim_enabled = false;
