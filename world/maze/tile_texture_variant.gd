@@ -49,14 +49,30 @@ static func variant_for(tile: Vector2i, dest_size: Vector2, texture_size: Vector
 ## call site that used to rely on that flag; draw_texture_rect_region has
 ## no repeat/tile behavior of its own; regardless, it always stretches
 ## src_rect to fill dest_rect exactly once (verified during design).
-## Flipping is done via a negative-size dest rect (the standard Godot
-## idiom), not by touching src_rect.
+## Flipping is done via a canvas transform (draw_set_transform with a
+## negative scale axis around the tile's own center), NOT via a
+## negative-size dest Rect2 -- that's the usual Godot flip idiom, but on
+## this project's actual runtime (GL Compatibility / Mesa d3d12 on WSL2)
+## draw_texture_rect_region silently ignores the sign of a negative-size
+## dest rect's width/height and just draws abs(size) forward from
+## `position` -- so a flipped tile lands shifted by its own size instead
+## of mirrored in place, leaving its true grid cell completely undrawn.
+## In a gapless tile grid that reads as a hole showing whatever's behind
+## (black, in this game's dark maze) -- confirmed via isolated repro
+## (a dense FloorRenderer-style grid rendered with the old negative-rect
+## code left whole rows/columns undrawn wherever flip_h/flip_v tiles
+## landed). Not worth chasing further as a driver quirk since roughly
+## half of all tiles get flip_h=true; the transform sidesteps it cleanly
+## for both axes. draw_texture_rect_region is always called with a
+## positive-size rect centered on the origin; the transform is reset to
+## identity immediately after so it doesn't leak into later draw calls.
 static func draw_varied(canvas_item: CanvasItem, texture: Texture2D, dest_rect: Rect2, tile: Vector2i, modulate: Color = Color.WHITE) -> void:
 	var variant := variant_for(tile, dest_rect.size, texture.get_size())
-	var flipped := Rect2(
-		dest_rect.position.x + (dest_rect.size.x if variant.flip_h else 0.0),
-		dest_rect.position.y + (dest_rect.size.y if variant.flip_v else 0.0),
-		-dest_rect.size.x if variant.flip_h else dest_rect.size.x,
-		-dest_rect.size.y if variant.flip_v else dest_rect.size.y
-	)
-	canvas_item.draw_texture_rect_region(texture, flipped, variant.src_rect, modulate)
+	if not variant.flip_h and not variant.flip_v:
+		canvas_item.draw_texture_rect_region(texture, dest_rect, variant.src_rect, modulate)
+		return
+	var flip_scale := Vector2(-1.0 if variant.flip_h else 1.0, -1.0 if variant.flip_v else 1.0)
+	var center := dest_rect.position + dest_rect.size * 0.5
+	canvas_item.draw_set_transform(center, 0.0, flip_scale)
+	canvas_item.draw_texture_rect_region(texture, Rect2(-dest_rect.size * 0.5, dest_rect.size), variant.src_rect, modulate)
+	canvas_item.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
