@@ -337,9 +337,9 @@ func _draw_wall_ground(tile: Vector2i) -> void:
 	var overdraw_rect := overdraw_rect_for(tile)
 	var own_top_face := Rect2(tile_left, tile_top, _tile_size, front_face_top - tile_top)
 	var top_tint := _tinted(wall_top_face_color)
-	draw_texture_rect(_wall_texture, overdraw_rect, true, Color(top_tint, top_tint.a * overdraw_alpha_for(tile)))
-	draw_texture_rect(_wall_texture, own_top_face, true, top_tint)
-	draw_texture_rect(_wall_texture, Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height), true, _tinted(wall_front_face_color))
+	TileTextureVariant.draw_varied(self, _wall_texture, overdraw_rect, tile, Color(top_tint, top_tint.a * overdraw_alpha_for(tile)))
+	TileTextureVariant.draw_varied(self, _wall_texture, own_top_face, tile, top_tint)
+	TileTextureVariant.draw_varied(self, _wall_texture, Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height), tile, _tinted(wall_front_face_color))
 
 
 ## Ceiling-plane wall: mirrored -- front face anchored to the tile's own
@@ -359,9 +359,9 @@ func _draw_wall_ceiling(tile: Vector2i) -> void:
 	var overdraw_rect := overdraw_rect_for(tile)
 	var own_top_face := Rect2(tile_left, front_face_bottom, _tile_size, tile_bottom - front_face_bottom)
 	var top_tint := _tinted(wall_top_face_color)
-	draw_texture_rect(_wall_texture, own_top_face, true, _tinted(_own_body_color_for(tile)))
-	draw_texture_rect(_wall_texture, overdraw_rect, true, Color(top_tint, top_tint.a * overdraw_alpha_for(tile)))
-	draw_texture_rect(_wall_texture, Rect2(tile_left, tile_top, _tile_size, wall_front_face_height), true, _tinted(wall_front_face_color))
+	TileTextureVariant.draw_varied(self, _wall_texture, own_top_face, tile, _tinted(_own_body_color_for(tile)))
+	TileTextureVariant.draw_varied(self, _wall_texture, overdraw_rect, tile, Color(top_tint, top_tint.a * overdraw_alpha_for(tile)))
+	TileTextureVariant.draw_varied(self, _wall_texture, Rect2(tile_left, tile_top, _tile_size, wall_front_face_height), tile, _tinted(wall_front_face_color))
 
 
 ## True if a wall at `wall_tile` (tile coordinates) would visually overlap
