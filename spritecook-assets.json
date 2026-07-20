@@ -97,13 +97,20 @@
       "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette. Replaces floor-material-v2 (asset 0657eba0, no longer referenced by any file): v2's 'claw-drag scoring' detail read as distracting scratches in-game once wired into FloorRenderer -- user asked for something simpler. This version drops all linear/scratch detail entirely ('no scratches, no claw marks, no linear details, plain simple flat surface'), same trick that fixed wall_material's banding. Verified seamless via headless Godot 3x3 tile composite, no artifacts, calm subtle mottling only."
     },
     {
-      "asset_id": "0c476bad-d559-4cf2-a74c-28ab379fc4b1",
-      "label": "water-material",
+      "asset_id": "167258df-a3ef-4e7a-b9bc-b391a113825c",
+      "label": "wet-floor-material",
       "role": "texture",
-      "sha12": "c3650cfc2ab9",
-      "model": "gemini-3.1-flash-image",
-      "local": "assets/textures/water_material.png",
-      "notes": "generate_game_art mode=texture, bg_mode=include, water palette (#2673BF). Simple seamless wave/ripple pattern for the Water Ingress flood hazard. Verified seamless via headless Godot 3x3 tile composite, no artifacts. Not wired into any hazard-rendering code yet -- asset only."
+      "sha12": "eec53089142f",
+      "local": "assets/textures/wet_floor_material.png",
+      "notes": "generate_game_art-style seamless texture, murky reddish-brown clay floodwater with subtle even ripples and a dull liquid sheen. Base layer for flooded tiles (WaterIngress hazard) -- sits under water_overlay_material.png. Replaces the earlier water-material asset (0c476bad, plain blue #2673BF, never wired into code). Verified seamless via headless Godot 3x3 tile composite."
+    },
+    {
+      "asset_id": "2bd08a56-f480-4296-b8f8-5c83af7210b7",
+      "label": "water-overlay-material",
+      "role": "texture",
+      "sha12": "32f6b6520ba5",
+      "local": "assets/textures/water_overlay_material.png",
+      "notes": "generate_game_art-style seamless texture, murky greenish-brown floodwater with sharp small-scale specular highlights forming a shimmering caustic pattern. Animated overlay drawn on top of wet_floor_material.png via water_overlay.gdshader (TIME-scrolled UV). Verified seamless via headless Godot 3x3 tile composite."
     },
     {
       "asset_id": "219bb4bb-c4d4-49f5-ae37-e87e31244155",

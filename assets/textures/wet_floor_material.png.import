@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dn1ob8flrhoqp"
-path="res://.godot/imported/water_material.png-c9013fa66606d3291996a871ba6a0564.ctex"
+uid="uid://d1uo66uynpue8"
+path="res://.godot/imported/wet_floor_material.png-64f42ae0b10a3c74d2bca1204b09d19c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/textures/water_material.png"
-dest_files=["res://.godot/imported/water_material.png-c9013fa66606d3291996a871ba6a0564.ctex"]
+source_file="res://assets/textures/wet_floor_material.png"
+dest_files=["res://.godot/imported/wet_floor_material.png-64f42ae0b10a3c74d2bca1204b09d19c.ctex"]
 
 [params]
 
