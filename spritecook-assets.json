@@ -69,6 +69,138 @@
       "local": "assets/sprites/web_trap_spent.png",
       "edited_from": "133f3d2a-3d55-4248-b2f1-f1d82d801272",
       "notes": "Torn spent web left after consumption."
+    },
+    {
+      "asset_id": "7ff189a6-37ed-4b92-ad0d-fd755fb4d7f7",
+      "label": "tunnel-floor-wall-15piece",
+      "role": "tileset",
+      "sha12": "f828a2e8afb4",
+      "local": "assets/tilesets/tunnel_floor_wall_15piece.png",
+      "notes": "generate_tileset, pixel/topdown/15-piece/32px/two_surfaces. Prompt: 'packed dirt tunnel floor and rough dirt-brown stone wall, floor #2B2621 wall #4F453B'. Dark blue-black floor with orange-lit cracks (volcanic/lava-cave read, not the requested dirt-brown) -- user picked it for the atmosphere anyway over 3 closer-to-palette alternatives. 4x4 atlas, 32px cells, SpriteCook dual-grid mask order."
+    },
+    {
+      "asset_id": "f77fa50c-5ed8-4b42-ad48-13393a8b5f8e",
+      "label": "wall-material-v3",
+      "role": "texture",
+      "sha12": "e83a1704bc21",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/textures/wall_material.png",
+      "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette (#4F453B/#2B2621). Third attempt: first two ('pebble'/'stone' wording) produced strong vertical rock-column banding that survived a prompt tweak toward 'irregular, non-repeating'; only dropping pebble/stone language entirely ('smooth compacted dirt wall, no embedded rocks or stones') fixed it. Verified seamless via a headless Godot 4x4 tile composite, no visible repeat or banding. Intentionally plain/subtle -- pair with assets/decals/ for visual variety, not meant to carry detail alone."
+    },
+    {
+      "asset_id": "85e32229-34b8-4111-97f9-e08c16481524",
+      "label": "floor-material-v3-simple",
+      "role": "texture",
+      "sha12": "2d4f07e618e1",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/textures/floor_material.png",
+      "notes": "generate_game_art mode=texture, bg_mode=include, dirt-brown palette. Replaces floor-material-v2 (asset 0657eba0, no longer referenced by any file): v2's 'claw-drag scoring' detail read as distracting scratches in-game once wired into FloorRenderer -- user asked for something simpler. This version drops all linear/scratch detail entirely ('no scratches, no claw marks, no linear details, plain simple flat surface'), same trick that fixed wall_material's banding. Verified seamless via headless Godot 3x3 tile composite, no artifacts, calm subtle mottling only."
+    },
+    {
+      "asset_id": "167258df-a3ef-4e7a-b9bc-b391a113825c",
+      "label": "wet-floor-material",
+      "role": "texture",
+      "sha12": "eec53089142f",
+      "local": "assets/textures/wet_floor_material.png",
+      "notes": "generate_game_art-style seamless texture, murky reddish-brown clay floodwater with subtle even ripples and a dull liquid sheen. Base layer for flooded tiles (WaterIngress hazard) -- sits under water_overlay_material.png. Replaces the earlier water-material asset (0c476bad, plain blue #2673BF, never wired into code). Verified seamless via headless Godot 3x3 tile composite."
+    },
+    {
+      "asset_id": "2bd08a56-f480-4296-b8f8-5c83af7210b7",
+      "label": "water-overlay-material",
+      "role": "texture",
+      "sha12": "32f6b6520ba5",
+      "local": "assets/textures/water_overlay_material.png",
+      "notes": "generate_game_art-style seamless texture, murky greenish-brown floodwater with sharp small-scale specular highlights forming a shimmering caustic pattern. Animated overlay drawn on top of wet_floor_material.png via water_overlay.gdshader (TIME-scrolled UV). Verified seamless via headless Godot 3x3 tile composite."
+    },
+    {
+      "asset_id": "219bb4bb-c4d4-49f5-ae37-e87e31244155",
+      "label": "decal-root-tangle",
+      "role": "decal",
+      "sha12": "d5fff2c910d2",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/decals/root_tangle.png",
+      "notes": "generate_game_art mode=assets, bg_mode=transparent. Isolated root-tangle detail for stamping onto wall_material variety (WallOverdrawMask use case). Clean cutout, no issues found."
+    },
+    {
+      "asset_id": "fd80535b-a426-416f-8729-c64fe23bc89a",
+      "label": "decal-crack-mineral-stain",
+      "role": "decal",
+      "sha12": "9c05e5e349a6",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/decals/crack_mineral_stain.png",
+      "notes": "generate_game_art mode=assets, bg_mode=transparent. Isolated crack/mineral-stain detail for stamping onto wall_material variety (WallOverdrawMask use case). Clean cutout, no issues found."
+    },
+    {
+      "asset_id": "4bb7a5ca-130d-4fc8-84c7-8d3f2a67a46e",
+      "label": "wolf-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "02c407a06038",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/wolf_nswe.png",
+      "notes": "Wolf spider, 2x2 grid (S top-left, N top-right, W bottom-left, E bottom-right), high three-quarter oblique camera matching the faux-3D tunnel walls (not flat top-down). SLICED into wolf_south/north/west.png (auto_slice_asset) and WIRED into resources/spiders/wolf.tres -> Player/Enemy via SpiderClassData.frame_for_facing(), replacing single-sprite in-engine rotation (docs/art-bible.md §2's 2026-07-21 revision). The sheet's own EAST quadrant was discarded (see wolf-west-pose-v2's own notes below for why) -- EAST is now always the west texture mirrored via Sprite2D.flip_h, never a separate file. An underside/ceiling-plane companion set was attempted (several prompt approaches) but never converged and isn't saved anywhere -- topside-only for now."
+    },
+    {
+      "asset_id": "c748af01-0b1a-48e5-aa5c-ec21ca0d53ef",
+      "label": "warden-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "5325b119ccb5",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/warden_nswe.png",
+      "notes": "Warden (trapdoor spider), same 2x2 NSWE grid/camera convention as wolf-nswe-directional-grid. SLICED into warden_south/north/west.png and WIRED into resources/spiders/weaver.tres (Warden's kit maps to the WEAVER class enum id, confirmed via weaver.tres's #66BF73 green display_color matching Warden's art-bible color exactly). Warden's own EAST quadrant was the one class whose west/east actually read correctly as generated -- but it was still discarded in favor of the uniform flip_h-from-west approach (see wolf-west-pose-v2's notes) so every class goes through the same, permanently-consistent code path instead of Warden being a special case."
+    },
+    {
+      "asset_id": "290f1dd5-b662-4254-80a0-488e71757aa6",
+      "label": "ogre-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "f59c01c93978",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/ogre_nswe.png",
+      "notes": "Ogre (net-casting spider), resting pose, same 2x2 NSWE grid/camera convention as wolf-nswe-directional-grid. SLICED into ogre_south/north.png and WIRED into resources/spiders/net_caster.tres (NET_CASTER class enum id) as the default/resting art. The sheet's own WEST/EAST quadrants were discarded -- see ogre-west-pose-v2's own notes below -- replaced by a fresh single west pose, mirrored in code for EAST. The Net Hold action-pose set (below) is sliced but NOT wired, deferred as a separate follow-up since it needs to swap in only while NetHoldSkill is actively held, not replace the resting art outright."
+    },
+    {
+      "asset_id": "ffa78d4c-07f5-47d7-8c53-c4494673f984",
+      "label": "ogre-net-hold-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "5c2aab389297",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/ogre_net_hold_nswe.png",
+      "notes": "Ogre, Net Hold action pose (net held taut between front legs, cribellate-silk mesh per docs/art-bible.md §5's 2026-07-21 net-language revision), same 2x2 NSWE grid/camera convention as ogre-nswe-directional-grid. A separate set from Ogre's resting pose, for the Net Hold/Shot kit action. SLICED into ogre_net_hold_south/north/west/east.png -- via a manual quadrant crop + per-quadrant alpha-bounds trim (world/maze headless script), not auto_slice_asset, since the net's deliberately holey/semi-transparent silk mesh fragmented connected-alpha detection into 9 scattered pieces instead of 4. NOT YET WIRED -- deferred until NetHoldSkill exposes an active-hold state Player/Enemy can key the swap off of."
+    },
+    {
+      "asset_id": "028d20a1-d7f3-4232-aa3b-e12148e0bcef",
+      "label": "echo-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "f57bef8712b3",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/echo_nswe.png",
+      "notes": "Echo (trashline/decoy orb-weaver), same 2x2 NSWE grid/camera convention as wolf-nswe-directional-grid. SLICED into echo_south/north.png and WIRED into resources/spiders/decoy.tres (DECOY class enum id). The sheet's own WEST/EAST quadrants were discarded -- see echo-west-pose-v2's own notes below -- replaced by a fresh single west pose, mirrored in code for EAST."
+    },
+    {
+      "asset_id": "567c886d-d7dd-4989-bdc2-a349d5a1787a",
+      "label": "wolf-west-pose-v2",
+      "role": "player_directional",
+      "sha12": "36374a97a840",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/wolf_west.png",
+      "notes": "Replaces wolf-nswe-directional-grid's own WEST/EAST quadrants. Root cause: the original sheet's west/east poses read as 'walking backwards' regardless of which one was assigned to which direction -- confirmed by swapping the two files against each other first (no improvement), meaning the pose itself, not the file/quadrant label, was the problem. Every class but Warden had this same defect. Single-pose regeneration (reference_asset_id = the sheet's own approved SOUTH slice, explicit mid-stride walking-left gait description: near-side legs reaching forward toward travel direction, far-side legs trailing/pushing off) fixed it -- user-confirmed correct. EAST is no longer a separate generated asset for any class: SpiderClassData.should_flip_h() mirrors this same texture via Sprite2D.flip_h instead, permanently avoiding needing the model to produce two independently-consistent mirror images."
+    },
+    {
+      "asset_id": "2473d56f-c5cc-49d5-ae10-0fe27718356d",
+      "label": "ogre-west-pose-v2",
+      "role": "player_directional",
+      "sha12": "a864f05ade1a",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/ogre_west.png",
+      "notes": "Same fix and reasoning as wolf-west-pose-v2, for Ogre. reference_asset_id = ogre-nswe-directional-grid's own approved SOUTH slice."
+    },
+    {
+      "asset_id": "b229f0fc-a4e8-4a19-8d7e-bd4cc428b0bd",
+      "label": "echo-west-pose-v2",
+      "role": "player_directional",
+      "sha12": "59b1a790e55a",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/echo_west.png",
+      "notes": "Same fix and reasoning as wolf-west-pose-v2, for Echo. reference_asset_id = echo-nswe-directional-grid's own approved SOUTH slice."
     }
   ]
 }

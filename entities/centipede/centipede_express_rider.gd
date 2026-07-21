@@ -39,6 +39,7 @@ var _exiting := false
 ## still look like it's sitting right at the edge the instant it frees
 ## (the same off-by-one found in Centipede._begin_exit(), fixed there too).
 var _exit_steps_remaining := 0
+var _body_color: Color
 
 
 func _ready() -> void:
@@ -72,8 +73,9 @@ func start_run(entry: Vector2i, direction: Vector2i) -> void:
 	for tile in _tiles:
 		var segment: CentipedeSegment = SegmentScene.instantiate()
 		add_child(segment)
-		segment.global_position = _level.tile_centre(tile)
 		_segments.append(segment)
+	_body_color = CentipedeSegment.random_body_color()
+	_sync_segments()
 	_schedule_next_step()
 
 
@@ -163,3 +165,4 @@ func _sync_segments() -> void:
 	for i in _segments.size():
 		if i < _tiles.size():
 			_segments[i].global_position = _level.tile_centre(_tiles[i])
+			_segments[i].set_visual(CentipedeSegment.radius_for_index(i, _tiles.size()), _body_color)

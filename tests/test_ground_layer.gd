@@ -49,3 +49,28 @@ func test_set_dimmed_false_clears_the_shader_parameter() -> void:
 	layer.set_dimmed(false)
 
 	assert_false(layer.dim_material().get_shader_parameter("dim_enabled"))
+
+
+func test_ready_creates_the_water_overlay_material() -> void:
+	var layer := _make_ground_layer()
+
+	var mat := layer.water_overlay_material()
+	assert_not_null(mat)
+	assert_eq(mat.shader, GroundLayer.WaterOverlayShader)
+
+
+func test_set_dimmed_true_sets_the_shader_parameter_on_the_water_overlay_material() -> void:
+	var layer := _make_ground_layer()
+
+	layer.set_dimmed(true)
+
+	assert_true(layer.water_overlay_material().get_shader_parameter("dim_enabled"))
+
+
+func test_set_dimmed_false_clears_the_shader_parameter_on_the_water_overlay_material() -> void:
+	var layer := _make_ground_layer()
+	layer.set_dimmed(true)
+
+	layer.set_dimmed(false)
+
+	assert_false(layer.water_overlay_material().get_shader_parameter("dim_enabled"))

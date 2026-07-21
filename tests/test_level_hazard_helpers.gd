@@ -77,14 +77,26 @@ func test_set_water_at_blocks_ground_movement_like_a_pit() -> void:
 	assert_true(level.is_blocked(open_cell, Level.Layer.GROUND))
 
 
-func test_set_water_at_spawns_a_distinct_blue_marker_not_the_pit_marker() -> void:
+func test_set_water_at_spawns_a_distinct_water_marker_not_the_pit_marker() -> void:
 	var level := _make_level()
 	var open_cell: Vector2i = level.maze.open_cells()[0]
 	level.set_water_at(open_cell, true)
 	assert_true(level._water_nodes.has(open_cell))
 	assert_false(level._pit_nodes.has(open_cell), "water uses its own marker, not the brown pit one")
 	var marker: Node2D = level._water_nodes[open_cell]
-	assert_eq((marker as Polygon2D).color, Level.WATER_MARKER_COLOR)
+	assert_eq(marker.get_child_count(), 2, "water marker is a base wet-floor layer plus an animated overlay layer")
+
+	var base: WaterTileLayer = marker.get_child(0)
+	assert_eq(base.texture, preload("res://assets/textures/wet_floor_material.png"))
+	assert_eq(base.material, level._ground_layer.dim_material())
+
+	var overlay: WaterTileLayer = marker.get_child(1)
+	assert_eq(overlay.texture, preload("res://assets/textures/water_overlay_material.png"))
+	assert_eq(overlay.material, level._ground_layer.water_overlay_material())
+	assert_eq(overlay.texture_repeat, CanvasItem.TEXTURE_REPEAT_ENABLED,
+		"overlay must wrap so its scrolled UV doesn't clamp at the texture edge")
+	assert_eq(base.texture_repeat, CanvasItem.TEXTURE_REPEAT_PARENT_NODE,
+		"base is a static single crop -- it never needs to wrap, so it's left at Godot's own default")
 
 
 func test_set_water_at_false_clears_the_block_and_frees_the_marker() -> void:

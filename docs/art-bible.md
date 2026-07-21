@@ -27,12 +27,22 @@ anatomy and a genuinely underground palette, not a cartoon mascot spider.
 
 ## 2. Established art style
 
-Seven reference sprites already exist (`assets/sprites/`) and set the house
-style. Match this, don't reinvent it:
+**Revised 2026-07-17** as part of the full art/animation pipeline reset
+(`docs/superpowers/specs/2026-07-17-art-pipeline-design.md`): the style
+direction below now targets SpriteCook's pixel-art mode, a deliberate pivot
+away from this section's original semi-realistic direction — driven by
+cost (pixel-mode generation is cheaper) as well as visual preference. The
+seven existing reference sprites (`assets/sprites/`) no longer set the house
+style; they are placeholders being fully replaced, not anchors to match.
+Category 0 of the pipeline produces the first real style anchor under this
+new direction.
 
-- **Semi-realistic pixel/vector illustration** — detailed, soft-edged,
-  anti-aliased outlines, not blocky 8-bit/retro pixel art. Fine linework
-  (see `web_trap.png`'s hand-drawn web strand detail) is in-style.
+- **Retro/indie pixel art** — crisp edges, grid-aligned, readable at small
+  scale. This replaces the prior "semi-realistic, soft-edged, not blocky
+  8-bit" direction; embracing a pixel-art look, not working around it. Fine
+  linework where it reads clearly at pixel-art scale (see `web_trap.png`'s
+  web-strand detail for the *kind* of silhouette detail worth keeping, not
+  its soft-edged rendering) is still worth preserving.
 - **Real arachnid/invertebrate anatomy**, not a cartoon/mascot reinterpretation
   — correct leg count and joints, correct body segmentation. The existing
   `enemy_trapdoor_spider.png` (a naturalistic trapdoor spider) and
@@ -45,22 +55,36 @@ style. Match this, don't reinvent it:
   creature rendering. A creature's "natural" coloring should read as
   camouflaged-into-dirt; the *accent* color (class tint, item glow) is what
   pops.
-- **Top-down "resting" pose**, legs spread naturally, viewed roughly from
-  directly above with a slight illustrative tilt — not a strict orthographic
-  flat-top view. No walk cycle needed: sprites are rotated in-engine to face
-  the direction of travel (`Player._process`, `player.gd:123-124`), so one
-  good top-down pose per creature is enough.
+- **Revised 2026-07-21 — high three-quarter oblique camera, not flat
+  top-down:** viewed from above and slightly in front (roughly 60-70°
+  above the horizon), matching the tilted faux-3D tunnel-wall rendering
+  (`MazeRenderer`'s top-face/front-face two-tone blocks) rather than a
+  strict orthographic bird's-eye view. First applied to a wolf-spider
+  NSWE (North/South/East/West) directional sprite set. Superseds this
+  section's earlier "directly above with a slight illustrative tilt"
+  framing — the tilt is now a real, consistent camera angle, not just an
+  illustrative flourish on an otherwise-flat pose.
 - **Sizes so far are not on a strict pixel grid** — existing sprites range
   91×92 to 126×126px, scaled to fit gameplay rather than authored to a fixed
   canvas. The maze's own grid unit is **48×48px** (`Level.TILE_SIZE`). A
   creature occupying one tile should read clearly at roughly that size once
   placed in-world; bigger multi-tile things (the Centipede) are built from
   repeated 48×48 segment tiles instead of one large sprite.
-- **No directional/rotational asymmetry** in a sprite's silhouette — since
-  the engine rotates the whole sprite to face travel direction, an
-  asymmetric "always faces this way regardless of rotation" design element
-  (like a fixed logo on the back) would rotate incorrectly. Keep creature art
-  radially neutral (a spider works fine here — legs radiate outward).
+- **Revised 2026-07-21 — directional/rotational asymmetry is now
+  expected, not forbidden.** The old rule ("keep creature art radially
+  neutral, since the engine rotates one sprite to face travel direction")
+  only held under a flat top-down camera, where rotation is
+  perspective-correct. Under the new oblique camera (previous bullet),
+  rotating a single image would visibly rotate the camera tilt itself
+  along with the character, which reads wrong — so a creature needs
+  distinct baked poses per direction instead (NSWE: North/South/East/
+  West, at minimum four; East/West can be mirror images of each other
+  rather than separately authored). **This is an art-direction change
+  only, not yet wired into the engine** — `Player._physics_process`
+  (`player.gd:124`) and `Enemy._process` (`enemy.gd:589`) both still
+  rotate a single sprite (`sprite.rotation = facing.angle()`); switching
+  them to pick between baked directional frames instead is a separate,
+  not-yet-scoped follow-up task once real NSWE art exists to wire in.
 
 ## 3. Color language
 
@@ -194,9 +218,23 @@ hard-hitting capture net** (`Net Hold` / `Net Shot`). Heaviest melee hitter
 of the four. Silhouette: the species' namesake huge forward-facing eyes
 (best night vision of any spider — he hunts in total darkness) and long,
 stick-thin legs — should read as unmistakably different from Wolf's stocky
-build even in silhouette alone. Net/projectile visual language: a woven
-diamond, off-white fill with a darker grey crosshatch (`#BFBFB2` fill,
-`#666659` lines).
+build even in silhouette alone. **Revised 2026-07-21 — net visual
+language, rewritten after the original description read as a flat
+geometric icon rather than real silk in practice:** fine, irregular
+cribellate spider silk (real *Deinopis* net material), woven into a small
+loose mesh — NOT a clean technical grid or fishing-net pattern.
+Individual threads visible, crossing at slightly uneven, organic angles
+rather than a perfect crosshatch. Fuzzy, faintly fluffy thread texture
+(cribellate silk is combed into a woolly strand, unlike smooth
+orb-weaver silk). Semi-transparent, with visible gaps between threads
+especially near the edges. Soft, frayed, slightly irregular outline
+rather than a crisp geometric border, with a gentle sag/give to its
+shape since it's flexible silk held taut by the spider's legs, not a
+rigid frame. Faint pale sheen on a few strands, subtle rather than shiny
+or plastic-looking. Off-white/pale grey silk color (`#BFBFB2` base,
+`#666659` shadow in the mesh gaps), roughly one to two body-lengths
+across — small relative to the spider itself. Applies to both the held
+net (`Net Hold`) and the thrown projectile (`Net Shot`).
 
 ### Echo — female — purple `#A673D9`
 **Species: trashline/decoy orb-weaver (*Cyclosa*).** Real *Cyclosa* build
@@ -278,26 +316,70 @@ organ) rather than a mechanical device.
 
 ## 8. Environment / tileset
 
-No tileset exists yet — the maze currently renders as flat colored
-rectangles (`world/maze/maze_renderer.gd`). Base tile unit: **48×48px**.
+Superseded from the original "no tileset yet, flat colored rectangles"
+plan below: floor, walls, and water tiles are textured, not flat-colored.
+Base tile unit: **48×48px**.
 
-Needed tile types, using the palette in §3:
-- **Floor** (ground-plane color, `#2B2621`) and its **ceiling-plane**
-  variant (`#212B3D`) — the *same* floor recolors depending which plane the
-  viewer currently occupies, so these should feel like the same material
-  under warm vs. cool lighting, not two different floor types.
-- **Wall** (`#4F453B`) — identical on both planes.
-- **Pit** marker (near-black `#26140D`) overlaid on floor — a natural hole.
-- **Water** marker (`#2673BF`) overlaid on floor — a flood, visually
-  distinct from the pit.
+Current materials (`assets/textures/`), each a single seamless-ish
+generated image, tinted per the palette in §3 rather than baked per-plane
+variants:
+- **`floor_material.png`** — ground floor.
+- **`wall_material.png`** — walls, identical on both planes.
+- **`wet_floor_material.png`** / **`water_overlay_material.png`** — the
+  flooded-tile base + animated overlay (see `WaterTileLayer`).
 
-Autotiling shape set (`world/maze/tile_types.gd`) — standard tunnel/dungeon
-topology, useful directly as a tileset shape list: a fully-enclosed blocked
-cell; horizontal and vertical straight tunnels (which double as dead-ends);
-four corner pieces; four T-junctions; one 4-way crossroads. 15 pieces total
-if built as a classic wall-autotile set (or fewer if only floor/wall edges
-need distinct art, since walls currently render as flat blocks with no
-directional detail yet).
+These aren't drawn as one continuously-tiled image (no autotile atlas, no
+`tile_types.gd` shape set — that plan was superseded). Every tile draws an
+independent, pseudo-randomly-cropped-and-flipped snapshot of its material
+via `TileTextureVariant` (`world/maze/tile_texture_variant.gd`,
+design: `docs/superpowers/specs/2026-07-20-tile-texture-variation-design.md`),
+specifically so adjacent tiles don't show the exact same pixels — the
+original per-tile draw calls (`draw_texture_rect(..., tile=true, ...)`)
+always reset UV sampling to that draw call's own origin, so every tile of
+a given material used to render pixel-identical.
+
+### Constraints for generating a new/replacement material texture
+
+Read this before generating a replacement for any of the four textures
+above, or diagnosing one that "looks wrong" once wired in:
+
+- **Same filename = zero code changes.** `TileTextureVariant` reads
+  `texture.get_size()` live, never a hardcoded dimension — overwrite the
+  existing PNG, re-run the headless `--import` step, done. A *new*
+  filename needs the one `preload("res://assets/textures/...")` line in
+  whichever renderer/`Level` updated to point at it.
+- **Minimum size, or the fix silently un-fixes itself.** The texture must
+  be comfortably larger than the biggest tile drawn from it — 48×48 for
+  floor/water, up to 48×32 for the wall's tallest face (its own top
+  face). Go smaller and `TileTextureVariant.variant_for()`'s defensive
+  clamp forces every tile's crop offset to `(0,0)`, quietly reintroducing
+  the "every tile looks identical" bug this system exists to prevent —
+  not a crash, not a test failure (this project's renderer tests
+  deliberately don't assert on pixels, by established convention — see
+  `docs/superpowers/plans/2026-07-20-tile-texture-variation.md`'s Global
+  Constraints), just a regression you'd only catch by looking. Bigger
+  than the minimum is always safer — more room means more distinct crop
+  positions.
+- **True seamless-tiling matters less than it used to.** The old 3×3/4×4
+  composite check existed for a continuously-*repeated* single texture;
+  now every tile takes an independent crop with a hard rectangular edge
+  against its neighbor's own independent crop regardless, so adjacent
+  tiles were never pixel-continuous with each other in the first place.
+  What actually matters: no single strong focal feature (a bright spot, a
+  hard edge, one obvious crack/rock/detail) that would look odd cropped
+  at an arbitrary offset. Evenly-distributed mottling/speckle — what every
+  material generated so far already is — is exactly the safe case.
+- **Non-square wall dest rects.** The wall's front face and overdraw band
+  are 48×16, not 48×48 — `wall_material.png` needs enough height (≥16px,
+  ideally much more for variety) as well as width. This is a sizing note
+  only, not a flip caveat: flipping uses a canvas transform
+  (`draw_set_transform`, scale `-1`), not a negative-size `Rect2`,
+  precisely because the latter was found to silently render as a
+  position-shifted gap (reading as solid black) on this project's actual
+  runtime — affecting square tiles (floor) exactly as much as non-square
+  ones (wall faces). Already fixed in `TileTextureVariant.draw_varied()`;
+  mentioned here only so a *new* piece of drawing code elsewhere doesn't
+  reach for that same idiom and reintroduce it.
 
 ## 9. Hazard VFX
 

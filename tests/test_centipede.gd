@@ -39,6 +39,20 @@ func test_spawn_at_positions_each_segment_at_its_tile_centre() -> void:
 	assert_eq(centipede._segments[1].global_position, level.tile_centre(Vector2i(1, 2)))
 
 
+func test_spawn_at_gives_head_and_tail_different_radii_and_a_shared_body_color() -> void:
+	var level := _make_level()
+	var tiles: Array[Vector2i] = [Vector2i(1, 1), Vector2i(1, 2), Vector2i(1, 3)]
+	var centipede := _make_centipede(level, tiles)
+
+	var segments := centipede.get_segments()
+	var first_color: Color = segments[0]._tint
+	assert_eq(segments[0]._radius, CentipedeSegment.HEAD_RADIUS)
+	assert_eq(segments[1]._radius, CentipedeSegment.BODY_RADIUS)
+	assert_eq(segments[2]._radius, CentipedeSegment.TAIL_RADIUS)
+	for segment in segments:
+		assert_eq(segment._tint, first_color, "every segment of one centipede shares the same random body color")
+
+
 func test_spawn_at_destroys_a_larva_already_sitting_on_a_claimed_tile() -> void:
 	var level := _make_level()
 	var tile := Vector2i(1, 2)

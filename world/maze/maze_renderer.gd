@@ -25,6 +25,34 @@ var _maze: MazeData
 var _tile_size := 48
 var wall_top_face_color := Color(0.36, 0.31, 0.26)
 var wall_front_face_color := Color(0.2, 0.16, 0.12)
+var _wall_texture: Texture2D = preload("res://assets/textures/wall_material.png")
+
+## Same boost as FloorRenderer's _TEXTURE_TINT_BOOST (see its own doc
+## comment) -- keeps the wall material's own detail visible under modulation
+## instead of crushing toward black, while preserving the top/front face
+## relative-brightness contrast the depth illusion depends on.
+const _TEXTURE_TINT_BOOST := 2.7
+
+
+func _tinted(color: Color) -> Color:
+	return Color(
+		minf(color.r * _TEXTURE_TINT_BOOST, 1.0),
+		minf(color.g * _TEXTURE_TINT_BOOST, 1.0),
+		minf(color.b * _TEXTURE_TINT_BOOST, 1.0),
+		color.a
+	)
+
+
+## WallOverdrawMask's repaint pass needs the exact same texture and tinted
+## top-face color this class draws with, or a wall tile currently occluding
+## an entity would visibly mismatch between the two passes -- see
+## WallOverdrawMask's own doc comment for why a second pass exists at all.
+func wall_texture() -> Texture2D:
+	return _wall_texture
+
+
+func tinted_wall_top_face_color() -> Color:
+	return _tinted(wall_top_face_color)
 ## Grid lines on top of open floor tiles, so the tile-stepped movement reads
 ## clearly against the map.
 var grid_line_color := Color(1, 1, 1, 0.08)
@@ -50,14 +78,20 @@ var _fade_center_tile: Vector2i
 var _has_fade_center := false
 
 ## Assumed visual half-extent (both axes) of an occludable entity's sprite --
-## every entity this half-extent is used for (Player/Enemy ~41px sprite,
-## CentipedeSegment ~40px collision box) is roughly tile-sized, so this is
-## deliberately just half a tile rather than a per-type measurement. Lives
-## here (not on WallOverdrawMask, its only reader) purely so wall_occludes_
-## extent()/_ceiling() can sit next to the plain position-check functions
-## they replace. See wall_occludes_extent()'s own doc comment for why a
-## plain position check can't substitute for this.
-const ENTITY_VISUAL_HALF_EXTENT := 24.0
+## every entity this half-extent is used for (Player/Enemy's normalized
+## SPRITE_TARGET_EXTENT_PX = 56px, CentipedeSegment's ~40px collision box)
+## is roughly tile-sized, so this is deliberately just over half a tile
+## rather than a per-type measurement. Bumped from the original 24.0
+## (calibrated for the old ~41px sprite) after the NSWE directional-sprite
+## size-up left leg tips visibly unmasked, poking through a wall's overdraw
+## silhouette even while the entity itself was correctly hidden by fog-of-
+## war -- test_entity_visual_half_extent_covers_the_current_sprite_size()
+## guards against this drifting out of sync again. Lives here (not on
+## WallOverdrawMask, its only reader) purely so wall_occludes_extent()/
+## _ceiling() can sit next to the plain position-check functions they
+## replace. See wall_occludes_extent()'s own doc comment for why a plain
+## position check can't substitute for this.
+const ENTITY_VISUAL_HALF_EXTENT := 28.0
 
 
 func _ready() -> void:
@@ -308,9 +342,10 @@ func _draw_wall_ground(tile: Vector2i) -> void:
 	var front_face_top := tile_bottom - wall_front_face_height
 	var overdraw_rect := overdraw_rect_for(tile)
 	var own_top_face := Rect2(tile_left, tile_top, _tile_size, front_face_top - tile_top)
-	draw_rect(overdraw_rect, Color(wall_top_face_color, wall_top_face_color.a * overdraw_alpha_for(tile)))
-	draw_rect(own_top_face, wall_top_face_color)
-	draw_rect(Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height), wall_front_face_color)
+	var top_tint := _tinted(wall_top_face_color)
+	TileTextureVariant.draw_varied(self, _wall_texture, overdraw_rect, tile, Color(top_tint, top_tint.a * overdraw_alpha_for(tile)))
+	TileTextureVariant.draw_varied(self, _wall_texture, own_top_face, tile, top_tint)
+	TileTextureVariant.draw_varied(self, _wall_texture, Rect2(tile_left, front_face_top, _tile_size, wall_front_face_height), tile, _tinted(wall_front_face_color))
 
 
 ## Ceiling-plane wall: mirrored -- front face anchored to the tile's own
@@ -329,9 +364,10 @@ func _draw_wall_ceiling(tile: Vector2i) -> void:
 	var front_face_bottom := tile_top + wall_front_face_height
 	var overdraw_rect := overdraw_rect_for(tile)
 	var own_top_face := Rect2(tile_left, front_face_bottom, _tile_size, tile_bottom - front_face_bottom)
-	draw_rect(own_top_face, _own_body_color_for(tile))
-	draw_rect(overdraw_rect, Color(wall_top_face_color, wall_top_face_color.a * overdraw_alpha_for(tile)))
-	draw_rect(Rect2(tile_left, tile_top, _tile_size, wall_front_face_height), wall_front_face_color)
+	var top_tint := _tinted(wall_top_face_color)
+	TileTextureVariant.draw_varied(self, _wall_texture, own_top_face, tile, _tinted(_own_body_color_for(tile)))
+	TileTextureVariant.draw_varied(self, _wall_texture, overdraw_rect, tile, Color(top_tint, top_tint.a * overdraw_alpha_for(tile)))
+	TileTextureVariant.draw_varied(self, _wall_texture, Rect2(tile_left, tile_top, _tile_size, wall_front_face_height), tile, _tinted(wall_front_face_color))
 
 
 ## True if a wall at `wall_tile` (tile coordinates) would visually overlap

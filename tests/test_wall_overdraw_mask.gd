@@ -195,7 +195,7 @@ func test_paint_color_for_defaults_to_full_opacity_without_a_fade_center() -> vo
 
 	var color: Color = _mask_of(level)._paint_color_for(Vector2i(2, 2))
 
-	assert_eq(color, level._renderer.wall_top_face_color)
+	assert_eq(color, level._renderer.tinted_wall_top_face_color())
 
 
 func test_paint_color_for_uses_the_renderers_live_alpha_at_that_tile() -> void:
@@ -227,7 +227,7 @@ func test_player_is_fully_occluded_by_a_wall_far_from_the_fade_center() -> void:
 
 	var colors: Dictionary = _mask_of(level)._occluded_wall_tile_colors()
 
-	assert_eq(colors[wall_tile], level._renderer.wall_top_face_color,
+	assert_eq(colors[wall_tile], level._renderer.tinted_wall_top_face_color(),
 		"the player must be fully occluded by a wall far from the fade centre, exactly like every other entity")
 
 
@@ -322,6 +322,22 @@ func test_straddled_columns_includes_both_columns_when_the_sprite_crosses_a_boun
 	assert_eq(columns.size(), 2)
 
 
+## Regression: a half_extent wider than half a tile (real since
+## MazeRenderer.ENTITY_VISUAL_HALF_EXTENT was bumped to 28 for the bigger
+## NSWE sprites) makes the window wide enough to span 3 columns, not just 2
+## -- the old [left_col, right_col]-only implementation silently dropped
+## the middle column, leaving a wall tile the sprite genuinely still
+## overlaps unchecked (caught via test_a_naturally_placed_blockade_gets_
+## occluded_by_the_wall_above_it starting to fail after that bump).
+func test_straddled_columns_includes_the_middle_column_when_the_extent_spans_three() -> void:
+	# x=120 (dead centre of column 2, [96,144)) with a 28px half-extent:
+	# window is [92,148), reaching into column 1 ([48,96)) on the left and
+	# column 3 ([144,192)) on the right, with column 2 itself in between.
+	var columns := WallOverdrawMask._straddled_columns(120.0, 28.0, 48)
+
+	assert_eq(columns, [1, 2, 3])
+
+
 ## ENTITY_VISUAL_HALF_EXTENT is exactly half a tile wide, so the [x-half,
 ## x+half) window this checks is exactly as wide as one tile -- meaning it
 ## can never sit fully inside a single column's bounds no matter where x
@@ -335,6 +351,18 @@ func test_straddled_columns_with_a_half_tile_extent_always_spans_two_adjacent_co
 	var columns := WallOverdrawMask._straddled_columns(72.0, 24.0, 48) # column 1's own exact centre
 
 	assert_eq(columns, [1, 2])
+
+
+## Regression guard: bumping Player/Enemy's SPRITE_TARGET_EXTENT_PX (the
+## normalized on-screen sprite footprint) without also bumping this constant
+## left leg tips unmasked -- visibly poking through a wall's overdraw
+## silhouette even while the entity itself is correctly hidden by fog-of-war,
+## since WallOverdrawMask only repaints out to this assumed half-extent.
+func test_entity_visual_half_extent_covers_the_current_sprite_size() -> void:
+	assert_true(WallOverdrawMask.ENTITY_VISUAL_HALF_EXTENT >= Player.SPRITE_TARGET_EXTENT_PX / 2.0,
+		"must reach at least as far as half the player's own normalized sprite size")
+	assert_true(WallOverdrawMask.ENTITY_VISUAL_HALF_EXTENT >= Enemy.SPRITE_TARGET_EXTENT_PX / 2.0,
+		"must reach at least as far as half the enemy's own normalized sprite size")
 
 
 func test_draw_does_not_error_on_ceiling_plane_with_a_centipede_segment_present() -> void:

@@ -1,6 +1,9 @@
-[gd_resource type="Resource" script_class="SpiderClassData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SpiderClassData" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://resources/spider_class_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/sprites/nswe/wolf_south.png" id="2_south"]
+[ext_resource type="Texture2D" path="res://assets/sprites/nswe/wolf_north.png" id="3_north"]
+[ext_resource type="Texture2D" path="res://assets/sprites/nswe/wolf_west.png" id="4_west"]
 
 [resource]
 script = ExtResource("1_data")
@@ -11,3 +14,6 @@ melee_damage_mult = 1.0
 web_enabled = true
 web_fire_rate_mult = 1.0
 web_projectile_speed_mult = 1.0
+sprite_south = ExtResource("2_south")
+sprite_north = ExtResource("3_north")
+sprite_west = ExtResource("4_west")

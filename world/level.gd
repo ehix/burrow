@@ -158,7 +158,9 @@ var _pit_nodes: Dictionary = {}
 ## MazeData._pits overlay underneath.
 var _water_tiles: Dictionary = {}
 var _water_nodes: Dictionary = {}
-const WATER_MARKER_COLOR := Color(0.15, 0.45, 0.75, 0.75)
+var _wet_floor_texture: Texture2D = preload("res://assets/textures/wet_floor_material.png")
+var _water_overlay_texture: Texture2D = preload("res://assets/textures/water_overlay_material.png")
+const WATER_OVERLAY_ALPHA := 0.7
 ## Every WaterIngress.ActiveFlood still mid-lifecycle (trigger to final
 ## drain) -- see register_active_flood()'s own doc comment.
 var _active_floods: Array = []
@@ -660,16 +662,27 @@ func is_water_at(tile: Vector2i) -> bool:
 
 
 func _spawn_water_marker(tile: Vector2i) -> Node2D:
-	var half := TILE_SIZE * 0.5
-	var poly := Polygon2D.new()
-	poly.polygon = PackedVector2Array([
-		Vector2(-half, -half), Vector2(half, -half),
-		Vector2(half, half), Vector2(-half, half)])
-	poly.color = WATER_MARKER_COLOR
-	poly.position = _tile_centre(tile.x, tile.y)
-	_ground_layer.add_child(poly)
-	poly.material = _ground_layer.dim_material()
-	return poly
+	var container := Node2D.new()
+	container.position = _tile_centre(tile.x, tile.y)
+	_ground_layer.add_child(container)
+
+	var base := WaterTileLayer.new()
+	base.texture = _wet_floor_texture
+	base.tile_size = TILE_SIZE
+	base.tile = tile
+	container.add_child(base)
+	base.material = _ground_layer.dim_material()
+
+	var overlay := WaterTileLayer.new()
+	overlay.texture = _water_overlay_texture
+	overlay.tile_size = TILE_SIZE
+	overlay.tile = tile
+	overlay.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	overlay.modulate_color = Color(1, 1, 1, WATER_OVERLAY_ALPHA)
+	container.add_child(overlay)
+	overlay.material = _ground_layer.water_overlay_material()
+
+	return container
 
 
 func _drown_traps_at(tile: Vector2i) -> void:

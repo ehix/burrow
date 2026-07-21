@@ -74,7 +74,7 @@ func _draw() -> void:
 		return
 	var colors := _occluded_wall_tile_colors()
 	for wall_tile in colors:
-		draw_rect(_renderer.overdraw_rect_for(wall_tile), colors[wall_tile])
+		TileTextureVariant.draw_varied(self, _renderer.wall_texture(), _renderer.overdraw_rect_for(wall_tile), wall_tile, colors[wall_tile])
 
 
 ## Every wall tile currently occluding at least one entity, mapped to the
@@ -135,15 +135,21 @@ func _occluded_wall_tile_colors() -> Dictionary:
 ## what the wall itself is currently rendering there (see this class's own
 ## doc comment).
 func _paint_color_for(wall_tile: Vector2i) -> Color:
-	var color := _renderer.wall_top_face_color
+	var color := _renderer.tinted_wall_top_face_color()
 	return Color(color, color.a * _renderer.overdraw_alpha_for(wall_tile))
 
 
 ## Every wall-tile x-column an entity's sprite could visually overlap at
-## `position_x`, given its horizontal half-extent -- almost always both its
-## own column and one neighbor while it's mid-step, since half_extent is
-## close to half a tile wide. A pure function so it's directly unit-testable.
-## Needed because entity_tile.x alone (a single floor-divided column) only
+## `position_x`, given its horizontal half-extent -- returns every column
+## from left_col to right_col inclusive, not just the two endpoints: usually
+## that's just its own column plus one neighbor (half_extent close to half a
+## tile wide), but a half_extent wider than half a tile (ENTITY_VISUAL_HALF_
+## EXTENT = 28 vs. a 48px tile) can genuinely span 3 columns, and dropping
+## the middle one silently missed a wall tile the sprite still overlapped
+## (see test_straddled_columns_includes_the_middle_column_when_the_extent_
+## spans_three()'s own comment for the exact regression). A pure function
+## so it's directly unit-testable. Needed because entity_tile.x alone (a
+## single floor-divided column) only
 ## ever names ONE candidate wall tile per frame; as an entity crosses a
 ## column boundary next to a wall run, checking only that one candidate left
 ## the far half of its sprite fully visible until the exact frame the column
@@ -155,9 +161,10 @@ func _paint_color_for(wall_tile: Vector2i) -> Color:
 static func _straddled_columns(position_x: float, half_extent: float, tile_size: int) -> Array[int]:
 	var left_col := int(floor((position_x - half_extent) / tile_size))
 	var right_col := int(floor((position_x + half_extent) / tile_size))
-	if left_col == right_col:
-		return [left_col]
-	return [left_col, right_col]
+	var columns: Array[int] = []
+	for col in range(left_col, right_col + 1):
+		columns.append(col)
+	return columns
 
 
 ## Every entity that should be subject to wall-overdraw occlusion: the full

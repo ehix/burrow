@@ -60,6 +60,59 @@ func test_apply_class_tints_the_sprite_to_the_class_color() -> void:
 	assert_eq(player.sprite.modulate, Player.WeaverData.display_color)
 
 
+func test_apply_class_swaps_the_sprite_texture_to_the_new_classs_art() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WEAVER)
+	assert_eq(player.sprite.texture, Player.WeaverData.frame_for_facing(player.facing))
+
+
+## Every class's directional art was cropped to a different raw pixel size
+## by SpriteCook's slicer (Ogre/Decoy's leaner builds cropped tighter than
+## Wolf's stocky one), so a flat Sprite2D.scale left them inconsistently
+## sized in-game purely by crop-tightness accident, not design. Every class
+## must normalize to the same on-screen footprint regardless of its raw
+## texture dimensions.
+func test_every_class_normalizes_to_the_same_on_screen_sprite_extent() -> void:
+	var player := _make_player()
+	var extent: float = Player.SPRITE_TARGET_EXTENT_PX
+	for spider_class in [SpiderClassData.SpiderClass.NET_CASTER, SpiderClassData.SpiderClass.WOLF,
+			SpiderClassData.SpiderClass.WEAVER, SpiderClassData.SpiderClass.DECOY]:
+		player.apply_class(spider_class)
+		var tex_size := player.sprite.texture.get_size()
+		var effective := player.sprite.scale.x * maxf(tex_size.x, tex_size.y)
+		assert_almost_eq(effective, extent, 0.5,
+			"class %d's sprite should read as the same size as every other class's" % spider_class)
+
+
+func test_facing_changes_swap_the_sprite_frame_instead_of_rotating() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WOLF)
+
+	player.facing = Vector2.LEFT
+	player._update_sprite_frame()
+	assert_eq(player.sprite.texture, Player.WolfData.sprite_west)
+	assert_false(player.sprite.flip_h, "facing left uses the west texture unflipped")
+	assert_eq(player.sprite.rotation, 0.0, "the sprite never rotates now -- baked art carries the facing")
+
+	player.facing = Vector2.UP
+	player._update_sprite_frame()
+	assert_eq(player.sprite.texture, Player.WolfData.sprite_north)
+	assert_eq(player.sprite.rotation, 0.0)
+
+
+## There is no separate EAST texture (see SpiderClassData's own doc comment
+## for why) -- facing right reuses the west texture, mirrored.
+func test_facing_right_reuses_the_west_texture_flipped() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WOLF)
+
+	player.facing = Vector2.RIGHT
+	player._update_sprite_frame()
+
+	assert_eq(player.sprite.texture, Player.WolfData.sprite_west)
+	assert_true(player.sprite.flip_h, "facing right mirrors the same west texture")
+
+
 func test_sprite_tint_stays_the_class_color_regardless_of_plane() -> void:
 	# Ceiling/plane mechanics rework: the old ceiling tint-multiply was
 	# deleted (it clashed with each class's identity color) in favor of a
