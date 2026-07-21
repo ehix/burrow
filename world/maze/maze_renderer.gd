@@ -78,14 +78,20 @@ var _fade_center_tile: Vector2i
 var _has_fade_center := false
 
 ## Assumed visual half-extent (both axes) of an occludable entity's sprite --
-## every entity this half-extent is used for (Player/Enemy ~41px sprite,
-## CentipedeSegment ~40px collision box) is roughly tile-sized, so this is
-## deliberately just half a tile rather than a per-type measurement. Lives
-## here (not on WallOverdrawMask, its only reader) purely so wall_occludes_
-## extent()/_ceiling() can sit next to the plain position-check functions
-## they replace. See wall_occludes_extent()'s own doc comment for why a
-## plain position check can't substitute for this.
-const ENTITY_VISUAL_HALF_EXTENT := 24.0
+## every entity this half-extent is used for (Player/Enemy's normalized
+## SPRITE_TARGET_EXTENT_PX = 56px, CentipedeSegment's ~40px collision box)
+## is roughly tile-sized, so this is deliberately just over half a tile
+## rather than a per-type measurement. Bumped from the original 24.0
+## (calibrated for the old ~41px sprite) after the NSWE directional-sprite
+## size-up left leg tips visibly unmasked, poking through a wall's overdraw
+## silhouette even while the entity itself was correctly hidden by fog-of-
+## war -- test_entity_visual_half_extent_covers_the_current_sprite_size()
+## guards against this drifting out of sync again. Lives here (not on
+## WallOverdrawMask, its only reader) purely so wall_occludes_extent()/
+## _ceiling() can sit next to the plain position-check functions they
+## replace. See wall_occludes_extent()'s own doc comment for why a plain
+## position check can't substitute for this.
+const ENTITY_VISUAL_HALF_EXTENT := 28.0
 
 
 func _ready() -> void:
