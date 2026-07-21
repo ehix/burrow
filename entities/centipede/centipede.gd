@@ -28,6 +28,7 @@ var _target: Vector2i
 var _path: Array[Vector2i] = []
 var _exit_direction := Vector2i.ZERO
 var _exit_steps_remaining := 0
+var _body_color: Color
 
 
 func _ready() -> void:
@@ -63,8 +64,9 @@ func spawn_at(tiles: Array[Vector2i]) -> void:
 		_level._destroy_occupants_at(tile)
 		var segment: CentipedeSegment = SegmentScene.instantiate()
 		add_child(segment)
-		segment.global_position = _level.tile_centre(tile)
 		_segments.append(segment)
+	_body_color = CentipedeSegment.random_body_color()
+	_sync_segments()
 
 
 ## Any segment being hit lands here (CentipedeSegment.take_hit() forwards to
@@ -427,6 +429,7 @@ func _sync_segments() -> void:
 	for i in _segments.size():
 		if i < _tiles.size():
 			_segments[i].global_position = _level.tile_centre(_tiles[i])
+			_segments[i].set_visual(CentipedeSegment.radius_for_index(i, _tiles.size()), _body_color)
 
 
 ## The live Centipede whose body occupies `tile`, or null. Mirrors
