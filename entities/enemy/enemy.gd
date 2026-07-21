@@ -197,6 +197,7 @@ func _apply_class(spider_class: int) -> void:
 	web_emitter.cooldown = _base_web_cooldown / maxf(0.01, data.web_fire_rate_mult)
 	if facing_visual != null:
 		facing_visual.modulate = data.display_color
+	_update_sprite_frame()
 	for skill in _skills:
 		skill.queue_free()
 	_skills = _make_skills(spider_class)
@@ -585,8 +586,22 @@ func _face(dir: Vector2i) -> void:
 	if dir == Vector2i.ZERO:
 		return
 	facing = Vector2(dir)
-	if facing_visual != null:
-		facing_visual.rotation = facing.angle()
+	_update_sprite_frame()
+
+
+## Swaps in the active class's baked directional frame matching `facing`
+## instead of rotating a single sprite (docs/art-bible.md §2's 2026-07-21
+## revision) -- mirrors Player._update_sprite_frame(). Called whenever
+## `facing` changes and whenever the active class changes, so the two never
+## fall out of sync with each other.
+func _update_sprite_frame() -> void:
+	if facing_visual == null or not (facing_visual is Sprite2D) or _active_class_data == null:
+		return
+	var sprite := facing_visual as Sprite2D
+	var frame := _active_class_data.frame_for_facing(facing)
+	if frame != null:
+		sprite.texture = frame
+	sprite.rotation = 0.0
 
 
 func _tile_of(world: Vector2) -> Vector2i:

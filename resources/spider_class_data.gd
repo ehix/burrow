@@ -27,3 +27,30 @@ enum SpiderClass { NET_CASTER, WOLF, WEAVER, DECOY }
 ## Skill scenes this class can activate, in kit order. Each scene's root
 ## script must extend SkillComponent.
 @export var skill_scenes: Array[PackedScene] = []
+
+## Baked directional art (NSWE) at the high three-quarter oblique camera
+## angle (docs/art-bible.md §2) -- replaces the old single-sprite
+## in-engine-rotation approach, which only worked under a flat top-down
+## camera (see §2's 2026-07-21 revision for why rotation can't fake this
+## camera angle). Player.apply_class()/Enemy._apply_class() and every
+## `facing` update pull the matching frame through frame_for_facing().
+@export var sprite_south: Texture2D
+@export var sprite_north: Texture2D
+@export var sprite_west: Texture2D
+@export var sprite_east: Texture2D
+
+
+## Which baked directional frame matches `facing`. `facing` is always
+## exactly one of the 4 cardinal unit vectors by the time this is called --
+## Player._dominant_dir() and Enemy._dominant() both reduce all movement
+## input to a single cardinal direction before `facing` is ever assigned --
+## so an exact match is sufficient, no angle bucketing needed. Falls back to
+## `sprite_south` for the Vector2.ZERO case (the pre-movement default).
+func frame_for_facing(facing: Vector2) -> Texture2D:
+	if facing == Vector2.RIGHT:
+		return sprite_east
+	if facing == Vector2.LEFT:
+		return sprite_west
+	if facing == Vector2.UP:
+		return sprite_north
+	return sprite_south

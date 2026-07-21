@@ -60,6 +60,27 @@ func test_apply_class_tints_the_sprite_to_the_class_color() -> void:
 	assert_eq(player.sprite.modulate, Player.WeaverData.display_color)
 
 
+func test_apply_class_swaps_the_sprite_texture_to_the_new_classs_art() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WEAVER)
+	assert_eq(player.sprite.texture, Player.WeaverData.frame_for_facing(player.facing))
+
+
+func test_facing_changes_swap_the_sprite_frame_instead_of_rotating() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WOLF)
+
+	player.facing = Vector2.LEFT
+	player._update_sprite_frame()
+	assert_eq(player.sprite.texture, Player.WolfData.sprite_west)
+	assert_eq(player.sprite.rotation, 0.0, "the sprite never rotates now -- baked art carries the facing")
+
+	player.facing = Vector2.UP
+	player._update_sprite_frame()
+	assert_eq(player.sprite.texture, Player.WolfData.sprite_north)
+	assert_eq(player.sprite.rotation, 0.0)
+
+
 func test_sprite_tint_stays_the_class_color_regardless_of_plane() -> void:
 	# Ceiling/plane mechanics rework: the old ceiling tint-multiply was
 	# deleted (it clashed with each class's identity color) in favor of a

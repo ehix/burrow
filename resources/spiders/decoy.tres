@@ -1,6 +1,10 @@
-[gd_resource type="Resource" script_class="SpiderClassData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SpiderClassData" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://resources/spider_class_data.gd" id="1_data"]
+[ext_resource type="Texture2D" path="res://assets/sprites/nswe/echo_south.png" id="2_south"]
+[ext_resource type="Texture2D" path="res://assets/sprites/nswe/echo_north.png" id="3_north"]
+[ext_resource type="Texture2D" path="res://assets/sprites/nswe/echo_west.png" id="4_west"]
+[ext_resource type="Texture2D" path="res://assets/sprites/nswe/echo_east.png" id="5_east"]
 
 [resource]
 script = ExtResource("1_data")
@@ -12,3 +16,7 @@ web_enabled = true
 web_fire_rate_mult = 1.5
 web_projectile_speed_mult = 1.4
 web_fire_health_cost = 4.0
+sprite_south = ExtResource("2_south")
+sprite_north = ExtResource("3_north")
+sprite_west = ExtResource("4_west")
+sprite_east = ExtResource("5_east")

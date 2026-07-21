@@ -88,6 +88,25 @@ func test_apply_class_tints_the_sprite_to_the_class_color() -> void:
 	assert_eq(enemy.facing_visual.modulate, Enemy.DecoyClassData.display_color)
 
 
+func test_apply_class_swaps_the_sprite_texture_to_the_new_classs_art() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.DECOY)
+	assert_eq(enemy.facing_visual.texture, Enemy.DecoyClassData.frame_for_facing(enemy.facing))
+
+
+func test_facing_changes_swap_the_sprite_frame_instead_of_rotating() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.WOLF)
+
+	enemy._face(Vector2i.LEFT)
+	assert_eq(enemy.facing_visual.texture, Enemy.WolfData.sprite_west)
+	assert_eq(enemy.facing_visual.rotation, 0.0, "the sprite never rotates now -- baked art carries the facing")
+
+	enemy._face(Vector2i.UP)
+	assert_eq(enemy.facing_visual.texture, Enemy.WolfData.sprite_north)
+	assert_eq(enemy.facing_visual.rotation, 0.0)
+
+
 func test_switching_classes_frees_the_old_skills() -> void:
 	var enemy := _make_enemy()
 	enemy._apply_class(SpiderClassData.SpiderClass.WOLF)

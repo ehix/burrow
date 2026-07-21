@@ -121,7 +121,7 @@ func _physics_process(delta: float) -> void:
 	var dir := _dominant_dir(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 	if dir != Vector2i.ZERO:
 		facing = Vector2(dir)
-		sprite.rotation = facing.angle() # sprite drawn facing east (rotation 0)
+		_update_sprite_frame()
 		_mover.try_step(dir)
 	else:
 		# No input this frame: drop any queued step so a step finishing right
@@ -198,6 +198,7 @@ func apply_class(spider_class: int) -> void:
 	_active_class_data = data
 	refresh_upgrades()
 	_update_sprite_tint()
+	_update_sprite_frame()
 
 
 ## The current class's two class-specific SkillComponents, keyed by their
@@ -296,6 +297,19 @@ func _blocked(dir: Vector2i) -> bool:
 ## entity dimming instead (see Level._refresh_plane_focus()).
 func _update_sprite_tint() -> void:
 	sprite.modulate = _active_class_data.display_color if _active_class_data != null else Color.WHITE
+
+
+## Swaps in the active class's baked directional frame matching `facing`
+## instead of rotating a single sprite (docs/art-bible.md §2's 2026-07-21
+## revision) -- called whenever `facing` changes and whenever the active
+## class changes, so the two never fall out of sync with each other.
+func _update_sprite_frame() -> void:
+	if _active_class_data == null:
+		return
+	var frame := _active_class_data.frame_for_facing(facing)
+	if frame != null:
+		sprite.texture = frame
+	sprite.rotation = 0.0
 
 
 ## Placeholder held-item indicator — a colored dot above the sprite, keyed
