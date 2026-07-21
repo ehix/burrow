@@ -66,6 +66,24 @@ func test_apply_class_swaps_the_sprite_texture_to_the_new_classs_art() -> void:
 	assert_eq(player.sprite.texture, Player.WeaverData.frame_for_facing(player.facing))
 
 
+## Every class's directional art was cropped to a different raw pixel size
+## by SpriteCook's slicer (Ogre/Decoy's leaner builds cropped tighter than
+## Wolf's stocky one), so a flat Sprite2D.scale left them inconsistently
+## sized in-game purely by crop-tightness accident, not design. Every class
+## must normalize to the same on-screen footprint regardless of its raw
+## texture dimensions.
+func test_every_class_normalizes_to_the_same_on_screen_sprite_extent() -> void:
+	var player := _make_player()
+	var extent: float = Player.SPRITE_TARGET_EXTENT_PX
+	for spider_class in [SpiderClassData.SpiderClass.NET_CASTER, SpiderClassData.SpiderClass.WOLF,
+			SpiderClassData.SpiderClass.WEAVER, SpiderClassData.SpiderClass.DECOY]:
+		player.apply_class(spider_class)
+		var tex_size := player.sprite.texture.get_size()
+		var effective := player.sprite.scale.x * maxf(tex_size.x, tex_size.y)
+		assert_almost_eq(effective, extent, 0.5,
+			"class %d's sprite should read as the same size as every other class's" % spider_class)
+
+
 func test_facing_changes_swap_the_sprite_frame_instead_of_rotating() -> void:
 	var player := _make_player()
 	player.apply_class(SpiderClassData.SpiderClass.WOLF)

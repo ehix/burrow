@@ -594,6 +594,12 @@ func _face(dir: Vector2i) -> void:
 ## revision) -- mirrors Player._update_sprite_frame(). Called whenever
 ## `facing` changes and whenever the active class changes, so the two never
 ## fall out of sync with each other.
+## See Player.SPRITE_TARGET_EXTENT_PX's own comment for why this
+## normalization exists -- mirrors it exactly so Player and Enemy read as
+## the same size for the same class.
+const SPRITE_TARGET_EXTENT_PX := 56.0
+
+
 func _update_sprite_frame() -> void:
 	if facing_visual == null or not (facing_visual is Sprite2D) or _active_class_data == null:
 		return
@@ -601,6 +607,9 @@ func _update_sprite_frame() -> void:
 	var frame := _active_class_data.frame_for_facing(facing)
 	if frame != null:
 		sprite.texture = frame
+		var tex_size := frame.get_size()
+		if tex_size.x > 0.0 and tex_size.y > 0.0:
+			sprite.scale = Vector2.ONE * (SPRITE_TARGET_EXTENT_PX / maxf(tex_size.x, tex_size.y))
 	sprite.rotation = 0.0
 
 

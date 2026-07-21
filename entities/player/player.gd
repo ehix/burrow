@@ -303,12 +303,25 @@ func _update_sprite_tint() -> void:
 ## instead of rotating a single sprite (docs/art-bible.md §2's 2026-07-21
 ## revision) -- called whenever `facing` changes and whenever the active
 ## class changes, so the two never fall out of sync with each other.
+## Each class's directional art was cropped to a different raw pixel size by
+## SpriteCook's slicer (a leaner build like Ogre's or Decoy's crops tighter
+## than Wolf's stocky one), so every frame is scaled to this same on-screen
+## footprint regardless of its own texture size -- otherwise classes read as
+## inconsistently sized purely by crop-tightness accident, not design.
+## First-pass number (bumped up from the old flat 0.45 scale's effective
+## ~35-40px), easy to retune during playtest.
+const SPRITE_TARGET_EXTENT_PX := 56.0
+
+
 func _update_sprite_frame() -> void:
 	if _active_class_data == null:
 		return
 	var frame := _active_class_data.frame_for_facing(facing)
 	if frame != null:
 		sprite.texture = frame
+		var tex_size := frame.get_size()
+		if tex_size.x > 0.0 and tex_size.y > 0.0:
+			sprite.scale = Vector2.ONE * (SPRITE_TARGET_EXTENT_PX / maxf(tex_size.x, tex_size.y))
 	sprite.rotation = 0.0
 
 

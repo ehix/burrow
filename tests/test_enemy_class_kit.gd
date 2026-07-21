@@ -94,6 +94,22 @@ func test_apply_class_swaps_the_sprite_texture_to_the_new_classs_art() -> void:
 	assert_eq(enemy.facing_visual.texture, Enemy.DecoyClassData.frame_for_facing(enemy.facing))
 
 
+## Mirrors test_player_class_switching.gd's own test -- see its comment for
+## why this matters (Ogre/Decoy's leaner crops read smaller than Wolf's
+## stocky one under a flat scale factor).
+func test_every_class_normalizes_to_the_same_on_screen_sprite_extent() -> void:
+	var enemy := _make_enemy()
+	var extent: float = Enemy.SPRITE_TARGET_EXTENT_PX
+	var sprite := enemy.facing_visual as Sprite2D
+	for spider_class in [SpiderClassData.SpiderClass.NET_CASTER, SpiderClassData.SpiderClass.WOLF,
+			SpiderClassData.SpiderClass.WEAVER, SpiderClassData.SpiderClass.DECOY]:
+		enemy._apply_class(spider_class)
+		var tex_size := sprite.texture.get_size()
+		var effective := sprite.scale.x * maxf(tex_size.x, tex_size.y)
+		assert_almost_eq(effective, extent, 0.5,
+			"class %d's sprite should read as the same size as every other class's" % spider_class)
+
+
 func test_facing_changes_swap_the_sprite_frame_instead_of_rotating() -> void:
 	var enemy := _make_enemy()
 	enemy._apply_class(SpiderClassData.SpiderClass.WOLF)
