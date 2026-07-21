@@ -116,10 +116,23 @@ func test_facing_changes_swap_the_sprite_frame_instead_of_rotating() -> void:
 
 	enemy._face(Vector2i.LEFT)
 	assert_eq(enemy.facing_visual.texture, Enemy.WolfData.sprite_west)
+	assert_false((enemy.facing_visual as Sprite2D).flip_h, "facing left uses the west texture unflipped")
 	assert_eq(enemy.facing_visual.rotation, 0.0, "the sprite never rotates now -- baked art carries the facing")
 
 	enemy._face(Vector2i.UP)
 	assert_eq(enemy.facing_visual.texture, Enemy.WolfData.sprite_north)
+
+
+## There is no separate EAST texture (see SpiderClassData's own doc comment
+## for why) -- facing right reuses the west texture, mirrored.
+func test_facing_right_reuses_the_west_texture_flipped() -> void:
+	var enemy := _make_enemy()
+	enemy._apply_class(SpiderClassData.SpiderClass.WOLF)
+
+	enemy._face(Vector2i.RIGHT)
+
+	assert_eq(enemy.facing_visual.texture, Enemy.WolfData.sprite_west)
+	assert_true((enemy.facing_visual as Sprite2D).flip_h, "facing right mirrors the same west texture")
 	assert_eq(enemy.facing_visual.rotation, 0.0)
 
 

@@ -91,12 +91,26 @@ func test_facing_changes_swap_the_sprite_frame_instead_of_rotating() -> void:
 	player.facing = Vector2.LEFT
 	player._update_sprite_frame()
 	assert_eq(player.sprite.texture, Player.WolfData.sprite_west)
+	assert_false(player.sprite.flip_h, "facing left uses the west texture unflipped")
 	assert_eq(player.sprite.rotation, 0.0, "the sprite never rotates now -- baked art carries the facing")
 
 	player.facing = Vector2.UP
 	player._update_sprite_frame()
 	assert_eq(player.sprite.texture, Player.WolfData.sprite_north)
 	assert_eq(player.sprite.rotation, 0.0)
+
+
+## There is no separate EAST texture (see SpiderClassData's own doc comment
+## for why) -- facing right reuses the west texture, mirrored.
+func test_facing_right_reuses_the_west_texture_flipped() -> void:
+	var player := _make_player()
+	player.apply_class(SpiderClassData.SpiderClass.WOLF)
+
+	player.facing = Vector2.RIGHT
+	player._update_sprite_frame()
+
+	assert_eq(player.sprite.texture, Player.WolfData.sprite_west)
+	assert_true(player.sprite.flip_h, "facing right mirrors the same west texture")
 
 
 func test_sprite_tint_stays_the_class_color_regardless_of_plane() -> void:

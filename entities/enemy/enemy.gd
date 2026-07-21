@@ -610,6 +610,7 @@ func _update_sprite_frame() -> void:
 		var tex_size := frame.get_size()
 		if tex_size.x > 0.0 and tex_size.y > 0.0:
 			sprite.scale = Vector2.ONE * (SPRITE_TARGET_EXTENT_PX / maxf(tex_size.x, tex_size.y))
+	sprite.flip_h = _active_class_data.should_flip_h(facing)
 	sprite.rotation = 0.0
 
 
