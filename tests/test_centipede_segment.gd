@@ -56,3 +56,40 @@ func test_take_hit_nudges_itself_in_the_given_direction() -> void:
 	assert_ne(segment.position, rest,
 		"a hit visibly nudges the segment (CombatFx.shunt), mirroring Blockade.take_hit()'s own bump")
 	assert_eq(body.hits, 1, "still forwards the hit to the parent's shared counter")
+
+
+func test_radius_for_index_head_is_index_zero() -> void:
+	assert_eq(CentipedeSegment.radius_for_index(0, 5), CentipedeSegment.HEAD_RADIUS)
+
+
+func test_radius_for_index_tail_is_the_last_index() -> void:
+	assert_eq(CentipedeSegment.radius_for_index(4, 5), CentipedeSegment.TAIL_RADIUS)
+
+
+func test_radius_for_index_body_is_any_middle_index() -> void:
+	assert_eq(CentipedeSegment.radius_for_index(1, 5), CentipedeSegment.BODY_RADIUS)
+	assert_eq(CentipedeSegment.radius_for_index(2, 5), CentipedeSegment.BODY_RADIUS)
+	assert_eq(CentipedeSegment.radius_for_index(3, 5), CentipedeSegment.BODY_RADIUS)
+
+
+func test_radius_for_index_single_segment_body_counts_as_head() -> void:
+	assert_eq(CentipedeSegment.radius_for_index(0, 1), CentipedeSegment.HEAD_RADIUS)
+
+
+func test_random_body_color_stays_within_declared_hsv_bounds() -> void:
+	for i in 50:
+		var color := CentipedeSegment.random_body_color()
+		assert_true(color.h >= CentipedeSegment.HUE_MIN - 0.001 and color.h <= CentipedeSegment.HUE_MAX + 0.001)
+		assert_true(color.s >= CentipedeSegment.SATURATION_MIN - 0.01 and color.s <= CentipedeSegment.SATURATION_MAX + 0.01)
+		assert_true(color.v >= CentipedeSegment.VALUE_MIN - 0.01 and color.v <= CentipedeSegment.VALUE_MAX + 0.01)
+
+
+func test_set_visual_assigns_radius_and_tint() -> void:
+	var body := FakeCentipedeBody.new()
+	add_child_autofree(body)
+	var segment := _make_segment(body)
+
+	segment.set_visual(30.0, Color(0.5, 0.3, 0.2))
+
+	assert_eq(segment._radius, 30.0)
+	assert_eq(segment._tint, Color(0.5, 0.3, 0.2))
