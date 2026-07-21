@@ -30,18 +30,6 @@ extends Node2D
 ## only -- both of which left every *other* wall on the map fully opaque
 ## regardless of how close the player actually was to it, an inconsistency
 ## that had nothing to do with the entity standing there.)
-##
-## Second pass added 2026-07-21 (playtest finding, after Player/Enemy's
-## normalized sprite size grew to 56px, bigger than one 48px tile): the
-## fading sliver repaint above only ever covers the ONE plane-specific
-## direction a wall's overdraw can poke into, and only out to its own fixed
-## 16px height -- a plain SIDE wall (or an entity reaching further than
-## that 16px past a shared boundary) had nothing repainting it at all, so
-## an oversized sprite's leg tips still visibly bled onto/through walls in
-## every other direction. See plain_wall_overlap_rect()/_plain_wall_
-## overlap_paints()'s own doc comments for the fix -- always full opacity,
-## since (unlike the sliver) a wall's own top/front face never fades
-## regardless of the player's distance from it.
 
 ## See MazeRenderer.ENTITY_VISUAL_HALF_EXTENT's own doc comment.
 const ENTITY_VISUAL_HALF_EXTENT := MazeRenderer.ENTITY_VISUAL_HALF_EXTENT
@@ -87,8 +75,6 @@ func _draw() -> void:
 	var colors := _occluded_wall_tile_colors()
 	for wall_tile in colors:
 		TileTextureVariant.draw_varied(self, _renderer.wall_texture(), _renderer.overdraw_rect_for(wall_tile), wall_tile, colors[wall_tile])
-	for paint in _plain_wall_overlap_paints():
-		TileTextureVariant.draw_varied(self, _renderer.wall_texture(), paint.rect, paint.tile, paint.color)
 
 
 ## Every wall tile currently occluding at least one entity, mapped to the
@@ -151,73 +137,6 @@ func _occluded_wall_tile_colors() -> Dictionary:
 func _paint_color_for(wall_tile: Vector2i) -> Color:
 	var color := _renderer.tinted_wall_top_face_color()
 	return Color(color, color.a * _renderer.overdraw_alpha_for(wall_tile))
-
-
-## The exact overlap rectangle between an entity's square bounding box
-## (position +/- half_extent in both axes) and wall_tile's own actual tile
-## bounds, or null if they don't overlap at all. A pure function so it's
-## directly unit-testable without a scene tree.
-##
-## Deliberately distinct from wall_occludes_extent()/_ceiling(), which check
-## overlap against a wall's OVERDRAW SLIVER (a fixed wall_overdraw_height=
-## 16px band poking into the entity's own tile, fading near the player) --
-## this checks overlap against the wall's own real tile, which never fades
-## regardless of distance (MazeRenderer._draw_wall_ground()/_ceiling() only
-## ever modulates the sliver's own alpha, never the tile's own top/front
-## face). Needed for two gaps the sliver check alone can't cover, both only
-## exposed once Player/Enemy's normalized sprite size (56px,
-## SPRITE_TARGET_EXTENT_PX) grew bigger than one 48px tile:
-## 1. A plain SIDE wall (east/west of an entity, or the "other" north/south
-##    neighbor beyond the one plane-relevant overdraw direction) has no
-##    sliver/overdraw mechanic at all -- nothing previously repainted it.
-## 2. Even in the one direction the sliver DOES cover, the sliver rect
-##    itself is a fixed 16px band; a 28px half-extent can reach further
-##    than that past the shared boundary, bleeding into the wall's own
-##    actual tile beyond what the sliver repaint covers.
-## Both read as leg tips visibly poking through/onto a wall (playtest
-## finding) even while the entity itself is correctly hidden by fog-of-war.
-static func plain_wall_overlap_rect(position: Vector2, half_extent: float, wall_tile: Vector2i, tile_size: int) -> Variant:
-	var tile_left := float(wall_tile.x) * tile_size
-	var tile_top := float(wall_tile.y) * tile_size
-	var left := maxf(position.x - half_extent, tile_left)
-	var top := maxf(position.y - half_extent, tile_top)
-	var right := minf(position.x + half_extent, tile_left + tile_size)
-	var bottom := minf(position.y + half_extent, tile_top + tile_size)
-	if right <= left or bottom <= top:
-		return null
-	return Rect2(left, top, right - left, bottom - top)
-
-
-## Every wall tile (any of an occludable entity's own tile's 4 cardinal
-## neighbors, not just the plane-specific overdraw direction) whose own
-## tile body an oversized sprite bleeds into, each paired with the exact
-## overlap rect to repaint -- always at full opacity (color.a implicit 1.0
-## via tinted_wall_top_face_color()), since a wall's own top/front face
-## never fades regardless of distance from the player, unlike its overdraw
-## sliver (handled separately by _occluded_wall_tile_colors()). No
-## poked_into_tile_is_open()-style seam guard is needed here the way the
-## sliver pass needs one: that guard exists because the sliver pass
-## speculates about a tile the wall's overdraw pokes INTO; this pass only
-## ever repaints a tile already confirmed to be a real wall
-## (maze.is_open() false), never a tile beyond it.
-const _CARDINAL_OFFSETS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
-
-
-func _plain_wall_overlap_paints() -> Array:
-	var maze := _level.maze
-	var paints := []
-	for entity in _occludable_entities():
-		var position: Vector2 = entity.global_position
-		var entity_tile := _level.tile_of(position)
-		for offset in _CARDINAL_OFFSETS:
-			var wall_tile: Vector2i = entity_tile + offset
-			if maze.is_open(wall_tile.x, wall_tile.y):
-				continue
-			var rect = plain_wall_overlap_rect(position, ENTITY_VISUAL_HALF_EXTENT, wall_tile, Level.TILE_SIZE)
-			if rect == null:
-				continue
-			paints.append({"tile": wall_tile, "rect": rect, "color": _renderer.tinted_wall_top_face_color()})
-	return paints
 
 
 ## Every wall-tile x-column an entity's sprite could visually overlap at

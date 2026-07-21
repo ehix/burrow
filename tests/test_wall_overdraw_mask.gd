@@ -365,61 +365,6 @@ func test_entity_visual_half_extent_covers_the_current_sprite_size() -> void:
 		"must reach at least as far as half the enemy's own normalized sprite size")
 
 
-## plain_wall_overlap_rect(): the deeper fix for "legs bleed through walls"
-## surviving the ENTITY_VISUAL_HALF_EXTENT/_straddled_columns fix above --
-## that fix only ever covers the ONE plane-specific direction's overdraw
-## SLIVER (a fixed wall_overdraw_height=16px band), but a 28px half-extent
-## can reach further than 16px past the shared boundary, into the wall's
-## own actual tile -- and a plain SIDE wall (east/west, or the "other"
-## north/south neighbor) has no sliver/overdraw mechanic at all, so nothing
-## previously covered it in any direction. Unlike wall_occludes_extent()
-## (which checks against the sliver, fading near the player), this checks
-## overlap against the wall's own real tile bounds -- always fully opaque,
-## since a wall's own top/front face never fades, only its overdraw sliver
-## does (see MazeRenderer._draw_wall_ground()/_ceiling()).
-func test_plain_wall_overlap_rect_is_null_when_nowhere_near_the_wall_tile() -> void:
-	var rect = WallOverdrawMask.plain_wall_overlap_rect(Vector2(500, 500), 28.0, Vector2i(2, 2), 48)
-	assert_eq(rect, null)
-
-
-func test_plain_wall_overlap_rect_covers_the_overlap_when_the_sprite_bleeds_past_a_shared_boundary() -> void:
-	# Entity dead-centre of tile (2,1) -- y=1*48+24=72. Wall tile (2,2) starts
-	# at y=96. With a 28px half-extent the entity reaches down to y=100,
-	# 4px past the boundary into the wall's own tile.
-	var rect = WallOverdrawMask.plain_wall_overlap_rect(Vector2(120, 72), 28.0, Vector2i(2, 2), 48)
-	assert_eq(rect, Rect2(96, 96, 48, 4))
-
-
-func test_plain_wall_overlap_rect_covers_a_side_wall_the_sprite_bleeds_into() -> void:
-	# Entity dead-centre of tile (2,1) -- x=2*48+24=120, y=1*48+24=72. Wall
-	# tile (3,1) (the tile immediately EAST) spans x=[144,192), y=[48,96).
-	# With a 28px half-extent the entity reaches out to x=148 (4px past the
-	# x boundary into that side wall) and y=[44,100] vertically, clamped to
-	# the wall tile's own y-range [48,96] since the entity's own tile (1)
-	# is entirely above y=48 -- the overlap is only the sliver actually
-	# inside the wall tile's bounds, not the entity's full reach.
-	var rect = WallOverdrawMask.plain_wall_overlap_rect(Vector2(120, 72), 28.0, Vector2i(3, 1), 48)
-	assert_eq(rect, Rect2(144, 48, 4, 48))
-
-
-func test_plain_wall_overlap_paints_repaints_a_side_wall_the_player_bleeds_into() -> void:
-	var level := _make_level()
-	var entity_tile := Vector2i(2, 1)
-	var side_wall := Vector2i(3, 1) # immediately east
-	level.maze.set_open(entity_tile.x, entity_tile.y)
-	level.maze.set_wall(side_wall.x, side_wall.y)
-	# Everything else out of range, so only this one straddle can fire.
-	level.enemy.global_position = level.tile_centre(Vector2i(50, 50))
-	level.player.global_position = level.tile_centre(entity_tile)
-
-	var paints := _mask_of(level)._plain_wall_overlap_paints()
-
-	var tiles: Array[Vector2i] = []
-	for paint in paints:
-		tiles.append(paint.tile)
-	assert_true(tiles.has(side_wall), "the side wall the player's oversized sprite bleeds into gets repainted")
-
-
 func test_draw_does_not_error_on_ceiling_plane_with_a_centipede_segment_present() -> void:
 	var level := _make_level()
 	level._renderer.set_active_plane(Level.Layer.CEILING)
