@@ -36,15 +36,21 @@
   - **Straight body**: running vertically (connects the top edge to the bottom edge).
   - **Corner body**: connects the top edge to the right edge (a single bend shape — this one piece gets rotated to all 4 turn orientations in code, not authored 4 times).
 
-- [ ] **Step 1: Generate each piece via SpriteCook `generate_game_art`**
+- [ ] **Step 1: Generate one composite image via SpriteCook `generate_game_art`**
 
-Use `mode="assets"`, `bg_mode="transparent"`, pixel art style, prompts built from the design spec's style direction (`docs/superpowers/specs/2026-07-20-centipede-art-design.md` §3: blocky/cube-ish pixel art matching the faux-3D wall aesthetic, imposing bulk not menace, neutral/desaturated base tone, ~64px canvas). Use `style_asset_ids`/`reference_asset_id` across the four generations so they read as one consistent set. Iterate on any piece that doesn't match the brief (the project's own history — `wall_material.png` needing 3 attempts, `floor_material.png` needing 1 regeneration — is the expected norm here, not a failure signal).
+Use `mode="assets"`, `bg_mode="transparent"`, pixel art style, ~256px canvas (4x the ~64px per-piece target). Prompt for a single image laid out as a 2×2 grid: head (top-left), tail (top-right), straight body (bottom-left), corner body (bottom-right) — each piece separated from its neighbors by a generous transparent gap (no touching silhouettes, legs must not reach across a gap), each already drawn in its required authoring orientation (head/tail pointing up, straight body vertical, corner connecting top+right edge). Follow the design spec's style direction (`docs/superpowers/specs/2026-07-20-centipede-art-design.md` §3: blocky/cube-ish pixel art matching the faux-3D wall aesthetic, imposing bulk not menace, neutral/desaturated base tone).
 
-- [ ] **Step 2: Show the user each generated piece and get explicit approval**
+This replaces the original 4-independent-calls approach — an earlier attempt at that produced pieces that didn't read as belonging to the same creature (palette/proportion drift call to call). One shared generation pass forces consistency by construction and costs 1 generation instead of 4.
 
-Send the generated images to the user (do not just describe them). Wait for their confirmation that each piece matches their idea before continuing. If they ask for changes, regenerate and re-show — repeat until approved. **Do not proceed to Step 3 without this approval.**
+- [ ] **Step 2: Split via `auto_slice_asset`**
 
-- [ ] **Step 3: Download, import, and verify**
+Call `auto_slice_asset` on the composite (connected-alpha-region detection, not literal pixel quartering — robust to unequal piece sizes as long as the gaps held). If two pieces merged into one slice, or a piece failed to isolate cleanly, use the returned `manual_slice_url` for a custom-rectangle split instead of regenerating the whole composite.
+
+- [ ] **Step 3: Show the user each sliced piece and get explicit approval**
+
+Send the 4 sliced images to the user (do not just describe them), identified by which quadrant/role each came from. Wait for their confirmation that each piece matches their idea before continuing. If one specific piece is wrong, regenerate *only that piece* via `edit_asset_id`/`style_asset_ids` against the good composite (do not fall back to 4 independent unreferenced generations). If the whole composite is off-brief, regenerate the composite and re-slice. Repeat until all 4 are approved. **Do not proceed to Step 4 without this approval.**
+
+- [ ] **Step 4: Download, import, and verify**
 
 Download the approved assets to the paths listed above. Run:
 
@@ -55,11 +61,11 @@ git status --short assets/sprites/centipede/
 
 Expected: all 4 `.png` files plus their `.png.import` sidecars appear as new/untracked.
 
-- [ ] **Step 4: Update the asset manifest**
+- [ ] **Step 5: Update the asset manifest**
 
-Add 4 entries to `spritecook-assets.json` following the existing format (see `wall-material-v3`/`floor-material-v3-simple` entries for the pattern: `asset_id`, `label`, `role: "sprite"`, `sha12` computed via `sha256sum <file> | cut -c1-12`, `local`, `notes` describing the generation prompt/mode and this project's own reasoning for the authoring-orientation convention).
+Add 4 entries to `spritecook-assets.json` following the existing format (see `wall-material-v3`/`floor-material-v3-simple` entries for the pattern: `asset_id`, `label`, `role: "sprite"`, `sha12` computed via `sha256sum <file> | cut -c1-12`, `local`, `notes` describing the generation prompt/mode and this project's own reasoning for the authoring-orientation convention). Note each of the 4 assets was produced by slicing one shared composite generation, not 4 independent generations — worth recording since it affects which `asset_id` any future edit/regeneration should reference.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add assets/sprites/centipede/ spritecook-assets.json

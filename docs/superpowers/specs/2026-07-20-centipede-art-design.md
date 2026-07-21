@@ -37,10 +37,8 @@ color variants.
 
 ## 3. Assets
 
-Four still-image pieces via SpriteCook (`generate_game_art`, pixel mode,
-transparent background — the same tool/mode already used for
-`wall_material.png`/`floor_material.png`, not the character-animation
-pipeline, since these don't animate):
+Four still-image pieces, ending up as four separate files exactly as
+before:
 
 - `centipede_head.png`
 - `centipede_tail.png`
@@ -48,6 +46,33 @@ pipeline, since these don't animate):
 - `centipede_body_corner.png` — one L-shaped bend, rotated in-engine to
   whichever of the 4 turn orientations a given body segment needs; not 4
   separately-authored corner pieces.
+
+**Generation method (revised — single composite generation, not 4
+independent calls):** an earlier attempt at 4 separate `generate_game_art`
+calls (even chained with `style_asset_ids`/`reference_asset_id`) produced
+pieces that didn't read as belonging to the same creature — palette and
+proportions drifted call to call. Instead, generate **one** image
+containing all 4 pieces laid out on a 2×2 grid, each in its own quadrant
+with a generous transparent gap to its neighbors (no touching/overlapping
+silhouettes — legs especially must not reach across a gap), each already
+drawn in its required authoring orientation (head/tail pointing up,
+straight body vertical, corner connecting top+right — same conventions §4
+depends on). One shared generation pass forces the 4 pieces to share
+style/palette/anatomy by construction, and costs 1 generation instead of
+4. Canvas generated at roughly 4x the target per-piece size (e.g. ~256px
+total for a ~64px-per-piece target, matching the existing
+`player_wolf_spider.png` sizing convention) so each quadrant retains real
+pixel budget after splitting, with the transparent gap margin on top of
+that.
+
+Split via `auto_slice_asset` (SpriteCook MCP), which detects separate
+pieces by connected alpha region rather than by literal pixel quartering —
+robust to the 4 pieces not being equal-sized, as long as the gaps hold.
+If a specific piece comes back wrong (wrong orientation, doesn't match the
+others) or two pieces merge into one slice, regenerate only that one piece
+via `edit_asset_id`/`style_asset_ids` against the good composite —
+**do not** fall back to 4 fully independent, unreferenced generations,
+since that's the approach that already failed.
 
 **Style:** blocky/cube-ish pixel art matching this project's faux-3D wall
 aesthetic (per user direction) — imposing bulk, not menacing detail,
@@ -62,10 +87,12 @@ strongly-colored source (e.g. baked-in green) would mix/clash against a
 target tint instead of reproducing it cleanly across the "wide earthy
 range" the design calls for.
 
-**Canvas size:** generated at a pixel-art-appropriate resolution (in the
-same ballpark as the existing `player_wolf_spider.png` convention, ~64px)
-rather than exactly 48px, matching this project's existing sprite-asset
-sizing precedent.
+**Canvas size (per final sliced piece):** a pixel-art-appropriate
+resolution (in the same ballpark as the existing `player_wolf_spider.png`
+convention, ~64px) rather than exactly 48px, matching this project's
+existing sprite-asset sizing precedent — see generation method above for
+how the composite canvas is sized to deliver this per piece after
+splitting.
 
 ## 4. Orientation & rendering wiring
 
