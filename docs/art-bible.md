@@ -55,22 +55,36 @@ new direction.
   creature rendering. A creature's "natural" coloring should read as
   camouflaged-into-dirt; the *accent* color (class tint, item glow) is what
   pops.
-- **Top-down "resting" pose**, legs spread naturally, viewed roughly from
-  directly above with a slight illustrative tilt — not a strict orthographic
-  flat-top view. No walk cycle needed: sprites are rotated in-engine to face
-  the direction of travel (`Player._process`, `player.gd:123-124`), so one
-  good top-down pose per creature is enough.
+- **Revised 2026-07-21 — high three-quarter oblique camera, not flat
+  top-down:** viewed from above and slightly in front (roughly 60-70°
+  above the horizon), matching the tilted faux-3D tunnel-wall rendering
+  (`MazeRenderer`'s top-face/front-face two-tone blocks) rather than a
+  strict orthographic bird's-eye view. First applied to a wolf-spider
+  NSWE (North/South/East/West) directional sprite set. Superseds this
+  section's earlier "directly above with a slight illustrative tilt"
+  framing — the tilt is now a real, consistent camera angle, not just an
+  illustrative flourish on an otherwise-flat pose.
 - **Sizes so far are not on a strict pixel grid** — existing sprites range
   91×92 to 126×126px, scaled to fit gameplay rather than authored to a fixed
   canvas. The maze's own grid unit is **48×48px** (`Level.TILE_SIZE`). A
   creature occupying one tile should read clearly at roughly that size once
   placed in-world; bigger multi-tile things (the Centipede) are built from
   repeated 48×48 segment tiles instead of one large sprite.
-- **No directional/rotational asymmetry** in a sprite's silhouette — since
-  the engine rotates the whole sprite to face travel direction, an
-  asymmetric "always faces this way regardless of rotation" design element
-  (like a fixed logo on the back) would rotate incorrectly. Keep creature art
-  radially neutral (a spider works fine here — legs radiate outward).
+- **Revised 2026-07-21 — directional/rotational asymmetry is now
+  expected, not forbidden.** The old rule ("keep creature art radially
+  neutral, since the engine rotates one sprite to face travel direction")
+  only held under a flat top-down camera, where rotation is
+  perspective-correct. Under the new oblique camera (previous bullet),
+  rotating a single image would visibly rotate the camera tilt itself
+  along with the character, which reads wrong — so a creature needs
+  distinct baked poses per direction instead (NSWE: North/South/East/
+  West, at minimum four; East/West can be mirror images of each other
+  rather than separately authored). **This is an art-direction change
+  only, not yet wired into the engine** — `Player._physics_process`
+  (`player.gd:124`) and `Enemy._process` (`enemy.gd:589`) both still
+  rotate a single sprite (`sprite.rotation = facing.angle()`); switching
+  them to pick between baked directional frames instead is a separate,
+  not-yet-scoped follow-up task once real NSWE art exists to wire in.
 
 ## 3. Color language
 
@@ -204,9 +218,23 @@ hard-hitting capture net** (`Net Hold` / `Net Shot`). Heaviest melee hitter
 of the four. Silhouette: the species' namesake huge forward-facing eyes
 (best night vision of any spider — he hunts in total darkness) and long,
 stick-thin legs — should read as unmistakably different from Wolf's stocky
-build even in silhouette alone. Net/projectile visual language: a woven
-diamond, off-white fill with a darker grey crosshatch (`#BFBFB2` fill,
-`#666659` lines).
+build even in silhouette alone. **Revised 2026-07-21 — net visual
+language, rewritten after the original description read as a flat
+geometric icon rather than real silk in practice:** fine, irregular
+cribellate spider silk (real *Deinopis* net material), woven into a small
+loose mesh — NOT a clean technical grid or fishing-net pattern.
+Individual threads visible, crossing at slightly uneven, organic angles
+rather than a perfect crosshatch. Fuzzy, faintly fluffy thread texture
+(cribellate silk is combed into a woolly strand, unlike smooth
+orb-weaver silk). Semi-transparent, with visible gaps between threads
+especially near the edges. Soft, frayed, slightly irregular outline
+rather than a crisp geometric border, with a gentle sag/give to its
+shape since it's flexible silk held taut by the spider's legs, not a
+rigid frame. Faint pale sheen on a few strands, subtle rather than shiny
+or plastic-looking. Off-white/pale grey silk color (`#BFBFB2` base,
+`#666659` shadow in the mesh gaps), roughly one to two body-lengths
+across — small relative to the spider itself. Applies to both the held
+net (`Net Hold`) and the thrown projectile (`Net Shot`).
 
 ### Echo — female — purple `#A673D9`
 **Species: trashline/decoy orb-weaver (*Cyclosa*).** Real *Cyclosa* build

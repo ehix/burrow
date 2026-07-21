@@ -129,6 +129,51 @@
       "model": "gemini-3.1-flash-image",
       "local": "assets/decals/crack_mineral_stain.png",
       "notes": "generate_game_art mode=assets, bg_mode=transparent. Isolated crack/mineral-stain detail for stamping onto wall_material variety (WallOverdrawMask use case). Clean cutout, no issues found."
+    },
+    {
+      "asset_id": "4bb7a5ca-130d-4fc8-84c7-8d3f2a67a46e",
+      "label": "wolf-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "02c407a06038",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/wolf_nswe.png",
+      "notes": "Wolf spider, 2x2 grid (S top-left, N top-right, W bottom-left, E bottom-right), high three-quarter oblique camera matching the faux-3D tunnel walls (not flat top-down). NOT SLICED OR WIRED into gameplay yet -- raw generated sheet only. Requires Player/Enemy to switch from single-sprite in-engine rotation to baked directional-frame swapping before use (see docs/art-bible.md §2's 2026-07-21 revision). An underside/ceiling-plane companion set was attempted (several prompt approaches) but never converged and isn't saved anywhere -- topside-only for now."
+    },
+    {
+      "asset_id": "c748af01-0b1a-48e5-aa5c-ec21ca0d53ef",
+      "label": "warden-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "5325b119ccb5",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/warden_nswe.png",
+      "notes": "Warden (trapdoor spider), same 2x2 NSWE grid/camera convention as wolf-nswe-directional-grid. NOT SLICED OR WIRED into gameplay yet."
+    },
+    {
+      "asset_id": "290f1dd5-b662-4254-80a0-488e71757aa6",
+      "label": "ogre-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "f59c01c93978",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/ogre_nswe.png",
+      "notes": "Ogre (net-casting spider), resting pose, same 2x2 NSWE grid/camera convention as wolf-nswe-directional-grid. NOT SLICED OR WIRED into gameplay yet."
+    },
+    {
+      "asset_id": "ffa78d4c-07f5-47d7-8c53-c4494673f984",
+      "label": "ogre-net-hold-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "5c2aab389297",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/ogre_net_hold_nswe.png",
+      "notes": "Ogre, Net Hold action pose (net held taut between front legs, cribellate-silk mesh per docs/art-bible.md §5's 2026-07-21 net-language revision), same 2x2 NSWE grid/camera convention as ogre-nswe-directional-grid. A separate set from Ogre's resting pose, for the Net Hold/Shot kit action. NOT SLICED OR WIRED into gameplay yet."
+    },
+    {
+      "asset_id": "028d20a1-d7f3-4232-aa3b-e12148e0bcef",
+      "label": "echo-nswe-directional-grid",
+      "role": "player_directional",
+      "sha12": "f57bef8712b3",
+      "model": "gemini-3.1-flash-image",
+      "local": "assets/sprites/nswe/echo_nswe.png",
+      "notes": "Echo (trashline/decoy orb-weaver), same 2x2 NSWE grid/camera convention as wolf-nswe-directional-grid. NOT SLICED OR WIRED into gameplay yet."
     }
   ]
 }
