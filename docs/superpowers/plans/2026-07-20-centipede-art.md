@@ -1,3 +1,8 @@
+> **Superseded 2026-07-21** — generative AI abandoned for this asset in
+> favor of pure procedural geometry. See
+> `docs/superpowers/plans/2026-07-21-centipede-procedural-geometry.md`.
+> Left here for history, not an active plan.
+
 # Centipede Art Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Task 1 is an exception — see its own note below: it must be executed by the controller directly, never dispatched to a subagent, because it requires a live human approval step no subagent can wait on.**

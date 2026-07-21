@@ -1,5 +1,13 @@
 # Centipede Art (Design)
 
+> **Superseded 2026-07-21.** After 3 rounds of SpriteCook generation
+> (single-composite-grid method, see this doc's own revised §3) the user
+> concluded generative AI wasn't going to converge on this asset and
+> pivoted to pure procedural geometry instead. See
+> `docs/superpowers/specs/2026-07-21-centipede-procedural-geometry-
+> design.md` for the design that replaced this one. Left here for
+> history/lessons-learned, not an active plan.
+
 ## 1. Goal
 
 Replace the Centipede's placeholder visual (a flat 40×40 olive-green rect,
