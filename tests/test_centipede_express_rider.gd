@@ -36,6 +36,19 @@ func _make_fake_spider(level: Level, tile: Vector2i) -> Node2D:
 	return spider
 
 
+func test_start_run_gives_head_and_tail_different_radii_and_a_shared_body_color() -> void:
+	var level := _make_level()
+	var rider := _make_rider(level, Vector2i(5, 5), Vector2i.RIGHT)
+
+	var segments := rider.get_segments()
+	assert_true(segments.size() > 1)
+	var first_color: Color = segments[0]._tint
+	assert_eq(segments[0]._radius, CentipedeSegment.HEAD_RADIUS)
+	assert_eq(segments[segments.size() - 1]._radius, CentipedeSegment.TAIL_RADIUS)
+	for segment in segments:
+		assert_eq(segment._tint, first_color, "every segment shares the same random body color")
+
+
 func test_start_run_tucks_the_whole_body_off_map_behind_entry() -> void:
 	var level := _make_level()
 	var entry := Vector2i(1, 3)
